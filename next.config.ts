@@ -5,10 +5,12 @@ const withSerwist = withSerwistInit({
   swDest: 'public/sw.js',
   cacheOnNavigation: true,
   reloadOnOnline: true,
-  disable: process.env.NODE_ENV !== 'production',
 })
 
 export default withSerwist({
   reactStrictMode: true,
   turbopack: {},
+  webpack(config, { isServer }) {
+    return config
+  },
 })
