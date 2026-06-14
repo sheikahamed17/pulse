@@ -1,6 +1,7 @@
 {
-  "name": "pulse-init",
+  "name": "pulse",
   "version": "0.1.0",
+  "packageManager": "pnpm@11.6.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
