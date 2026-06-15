@@ -67,3 +67,62 @@ export async function applyLocalOp(op: Op): Promise<void> {
     // Other entity_kind branches added in later phases
   })
 }
+
+export async function getPendingOps(): Promise<Op[]> {
+  // For Phase 0, "pending" = every op generated since last server ack
+  const synced = (await db.sync_meta.get('synced_op_ids'))?.value ?? ''
+  const syncedSet = new Set(synced.split(',').filter(Boolean))
+  const all = await db.op_log.toArray()
+  return all.filter(o => !syncedSet.has(o.id))
+}
+
+async function markSynced(opIds: string[]) {
+  const existing = (await db.sync_meta.get('synced_op_ids'))?.value ?? ''
+  const combined = new Set(existing.split(',').filter(Boolean))
+  for (const id of opIds) combined.add(id)
+  await db.sync_meta.put({ key: 'synced_op_ids', value: [...combined].join(',') })
+}
+
+async function readLastSyncedHlc(): Promise<string | undefined> {
+  return (await db.sync_meta.get('last_synced_hlc'))?.value
+}
+
+async function writeLastSyncedHlc(hlc: string) {
+  await db.sync_meta.put({ key: 'last_synced_hlc', value: hlc })
+}
+
+export async function pushPullOnce(input: { userId: string }): Promise<{ applied: number; received: number }> {
+  const deviceId = await getDeviceId()
+  const pending = await getPendingOps()
+  const lastSyncedHlc = await readLastSyncedHlc()
+
+  const res = await fetch('/api/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      device_id: deviceId,
+      last_synced_hlc: lastSyncedHlc,
+      new_ops: pending,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`sync failed: ${res.status} ${await res.text()}`)
+  }
+
+  const body = await res.json() as {
+    server_hlc: string
+    new_ops_from_server: Op[]
+    applied_ack: string[]
+  }
+
+  // Apply server ops locally
+  for (const op of body.new_ops_from_server) {
+    await applyLocalOp(op)
+  }
+
+  await markSynced(body.applied_ack)
+  await writeLastSyncedHlc(body.server_hlc)
+
+  return { applied: body.applied_ack.length, received: body.new_ops_from_server.length }
+}

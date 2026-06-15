@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { db, resetDb } from '@/lib/dexie'
-import { generateOp, applyLocalOp, getDeviceId } from '@/lib/sync-client'
+import { generateOp, applyLocalOp, getDeviceId, pushPullOnce } from '@/lib/sync-client'
 
 describe('sync-client local pipeline', () => {
   beforeEach(async () => { await resetDb() })
@@ -33,5 +33,42 @@ describe('sync-client local pipeline', () => {
     const a = await generateOp({ entity_kind: 'widget', entity_id: 'w1', op_type: 'create', payload: { label: 'a' }, user_id: 'u1' })
     const b = await generateOp({ entity_kind: 'widget', entity_id: 'w2', op_type: 'create', payload: { label: 'b' }, user_id: 'u1' })
     expect(a.hlc < b.hlc).toBe(true)
+  })
+})
+
+describe('pushPullOnce', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('sends pending ops and applies returned ops', async () => {
+    // Arrange: one local op + one "server" op the server returns
+    const localOp = await generateOp({ entity_kind: 'widget', entity_id: 'w1', op_type: 'create', payload: { label: 'local' }, user_id: 'u1' })
+    await applyLocalOp(localOp)
+
+    const serverOp = {
+      id: 'op-from-server',
+      hlc: '0000000000999999-000000-server',
+      device_id: 'server',
+      user_id: 'u1',
+      entity_kind: 'widget' as const,
+      entity_id: 'w2',
+      op_type: 'create' as const,
+      payload: { label: 'server' },
+      schema_version: 1,
+    }
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      server_hlc: serverOp.hlc,
+      new_ops_from_server: [serverOp],
+      applied_ack: [localOp.id],
+    })))
+
+    // Act
+    await pushPullOnce({ userId: 'u1' })
+
+    // Assert
+    const widgets = await db.widgets.toArray()
+    expect(widgets.map(w => w.id).sort()).toEqual(['w1', 'w2'])
+
+    fetchSpy.mockRestore()
   })
 })
