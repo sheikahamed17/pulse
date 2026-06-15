@@ -66,7 +66,7 @@ export function applyOp(existing: EntityRow | undefined, op: Op): EntityRow {
 }
 
 function applyUpdate(existing: EntityRow, op: Op, now: string): EntityRow {
-  let next: EntityRow = { ...existing, field_hlcs: { ...existing.field_hlcs } }
+  const next: EntityRow = { ...existing, field_hlcs: { ...existing.field_hlcs } }
   let mutated = false
 
   for (const [k, v] of Object.entries(op.payload)) {
