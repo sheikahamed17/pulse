@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import * as fc from 'fast-check'
 import { applyOp, applyOps } from '@/lib/op-log'
+import { serializeHlc } from '@/lib/hlc'
 import type { Op, EntityRow } from '@/types/ops'
 
 const baseOp: Omit<Op, 'hlc' | 'op_type' | 'payload'> = {
@@ -90,5 +92,54 @@ describe('applyOps — multi-op replay', () => {
     const a = applyOps(undefined, ops)
     const b = applyOps(a, ops)
     expect(a).toEqual(b)
+  })
+})
+
+describe('op-log properties', () => {
+  const hlcArb = fc.record({
+    physicalMs: fc.integer({ min: 1, max: 1_000_000 }),
+    logical: fc.integer({ min: 0, max: 100 }),
+    deviceId: fc.stringMatching(/^[a-z]{1,4}$/),
+  }).map(serializeHlc)
+
+  const fieldArb = fc.constantFrom('label', 'color', 'size')
+  const valueArb = fc.string({ minLength: 1, maxLength: 8 })
+  const payloadArb = fc.dictionary(fieldArb, valueArb, { minKeys: 1, maxKeys: 3 })
+
+  const opTypeArb = fc.constantFrom<Op['op_type']>('create', 'update', 'delete')
+
+  const opArb: fc.Arbitrary<Op> = fc.record({
+    id: fc.uuid(),
+    hlc: hlcArb,
+    device_id: fc.stringMatching(/^[a-z]{1,4}$/),
+    user_id: fc.constant('u1'),
+    entity_kind: fc.constant('widget'),
+    entity_id: fc.constant('w1'),
+    op_type: opTypeArb,
+    payload: payloadArb,
+    schema_version: fc.constant(1),
+  }) as fc.Arbitrary<Op>
+
+  it('order-independent: any permutation of the same op set yields the same row', () => {
+    fc.assert(
+      fc.property(fc.array(opArb, { minLength: 2, maxLength: 20 }), ops => {
+        const a = applyOps(undefined, ops)
+        const shuffled = [...ops].sort(() => 0.5 - Math.random())
+        const b = applyOps(undefined, shuffled)
+        expect(a).toEqual(b)
+      }),
+      { numRuns: 200 }
+    )
+  })
+
+  it('idempotent: applying the same op set twice equals applying once', () => {
+    fc.assert(
+      fc.property(fc.array(opArb, { minLength: 1, maxLength: 10 }), ops => {
+        const a = applyOps(undefined, ops)
+        const b = applyOps(a, ops)
+        expect(a).toEqual(b)
+      }),
+      { numRuns: 200 }
+    )
   })
 })
