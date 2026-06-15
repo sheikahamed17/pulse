@@ -1,0 +1,12 @@
+name = "pulse"
+compatibility_date = "2026-06-15"
+compatibility_flags = ["nodejs_compat"]
+
+pages_build_output_dir = ".next"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pulse"
+database_id = "df509c20-ed81-4146-941f-6e48e7f1f925"
+
+# Local dev uses --persist; production uses the real D1 binding
