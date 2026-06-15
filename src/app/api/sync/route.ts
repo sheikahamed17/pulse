@@ -14,7 +14,10 @@ const RequestSchema = z.object({
   new_ops: z.array(OpSchema),
 })
 
-export const runtime = 'edge'  // run in Workers runtime so D1 binding is available
+// Do NOT use `runtime = 'edge'` — OpenNext makes the entire Worker the
+// Workers runtime regardless; adding the directive doubles the wrapper and
+// breaks `default` resolution.
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   const session = await getSession(req)
