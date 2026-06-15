@@ -18,5 +18,21 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
   return result.data
 }
 
-// Guard the eager parse at module-load time to avoid throwing during tests
-export const env = process.env.NODE_ENV === 'test' ? (undefined as unknown as Env) : parseEnv(process.env)
+let cached: Env | undefined
+function loadEnv(): Env {
+  if (cached) return cached
+  cached = parseEnv(process.env)
+  return cached
+}
+
+// Lazy getters. Module load does NOT trigger validation; only direct property
+// reads do. Object.keys/Object.entries on objects with getters return the
+// property names WITHOUT invoking the accessors, so build-time module
+// inspection (Next.js/Turbopack collecting page data) is safe. At runtime in
+// the Worker request handler, env vars are present and the getters succeed.
+export const env: Env = {
+  get BETTER_AUTH_SECRET() { return loadEnv().BETTER_AUTH_SECRET },
+  get BETTER_AUTH_URL() { return loadEnv().BETTER_AUTH_URL },
+  get GROQ_API_KEY() { return loadEnv().GROQ_API_KEY },
+  get NODE_ENV() { return loadEnv().NODE_ENV },
+} as Env
