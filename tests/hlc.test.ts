@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import * as fc from 'fast-check'
 import {
   createHlc,
   serializeHlc,
@@ -93,5 +94,54 @@ describe('HLC compare', () => {
       { physicalMs: 1, logical: 0, deviceId: 'a' },
       { physicalMs: 1, logical: 0, deviceId: 'b' }
     )).toBeLessThan(0)
+  })
+})
+
+describe('HLC properties', () => {
+  // Arbitrary HLC generator
+  const hlcArb = fc.record({
+    physicalMs: fc.integer({ min: 0, max: 2 ** 50 }),
+    logical: fc.integer({ min: 0, max: 999_999 }),
+    deviceId: fc.stringMatching(/^[a-z0-9-]{1,32}$/),
+  })
+
+  it('serialize/parse is a round trip', () => {
+    fc.assert(fc.property(hlcArb, h => {
+      expect(parseHlc(serializeHlc(h))).toEqual(h)
+    }))
+  })
+
+  it('serialized form sorts in the same order as compareHlc', () => {
+    fc.assert(fc.property(fc.array(hlcArb, { minLength: 2, maxLength: 10 }), arr => {
+      const byCompare = [...arr].sort(compareHlc)
+      const byString = [...arr].sort((a, b) => serializeHlc(a) < serializeHlc(b) ? -1 : serializeHlc(a) > serializeHlc(b) ? 1 : 0)
+      expect(byCompare).toEqual(byString)
+    }))
+  })
+
+  it('tickHlc always produces an HLC strictly greater than the input', () => {
+    fc.assert(fc.property(hlcArb, fc.integer({ min: 0, max: 2 ** 50 }), (h, wall) => {
+      const next = tickHlc(h, wall)
+      expect(compareHlc(next, h)).toBeGreaterThan(0)
+    }))
+  })
+
+  it('receiveHlc result is greater than both local and remote', () => {
+    fc.assert(fc.property(hlcArb, hlcArb, fc.integer({ min: 0, max: 2 ** 50 }), (local, remote, wall) => {
+      const result = receiveHlc(local, remote, wall)
+      expect(compareHlc(result, local)).toBeGreaterThan(0)
+      // result must be ≥ remote (not necessarily strictly greater — different device IDs may tie)
+      const cmp = compareHlc(result, remote)
+      expect(cmp === 0 ? result.deviceId === remote.deviceId : cmp > 0).toBe(true)
+    }))
+  })
+
+  it('compareHlc is transitive', () => {
+    fc.assert(fc.property(hlcArb, hlcArb, hlcArb, (a, b, c) => {
+      const ab = compareHlc(a, b)
+      const bc = compareHlc(b, c)
+      if (ab < 0 && bc < 0) expect(compareHlc(a, c)).toBeLessThan(0)
+      if (ab > 0 && bc > 0) expect(compareHlc(a, c)).toBeGreaterThan(0)
+    }))
   })
 })
