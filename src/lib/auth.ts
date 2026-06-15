@@ -6,8 +6,8 @@ import { env as envVars } from '@/lib/env'
 import { createDb } from '@/lib/db'
 import type { D1Database } from '@cloudflare/workers-types'
 
-async function buildAuth() {
-  const cfContext = await getCloudflareContext({ async: true })
+function buildAuth() {
+  const cfContext = getCloudflareContext()
   const cfEnv = cfContext.env as CloudflareEnv & { DB: D1Database }
   const db = createDb(cfEnv.DB)
 
@@ -27,11 +27,11 @@ async function buildAuth() {
 
 // Per-request handler — Cloudflare context not available at module load
 export async function handler(req: Request) {
-  const auth = await buildAuth()
+  const auth = buildAuth()
   return auth.handler(req)
 }
 
 export async function getSession(req: Request) {
-  const auth = await buildAuth()
+  const auth = buildAuth()
   return auth.api.getSession({ headers: req.headers })
 }
