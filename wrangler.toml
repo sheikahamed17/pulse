@@ -1,12 +1,23 @@
 name = "pulse"
+main = ".open-next/worker.js"
 compatibility_date = "2026-06-15"
 compatibility_flags = ["nodejs_compat"]
 
-pages_build_output_dir = ".next"
+# Static assets bundled by OpenNext. The binding "ASSETS" is what the
+# OpenNext worker uses internally to serve them. The directory matches
+# what OpenNext writes during `pnpm cf:build` (.open-next/assets).
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "pulse"
 database_id = "df509c20-ed81-4146-941f-6e48e7f1f925"
 
-# Local dev uses --persist; production uses the real D1 binding
+[observability]
+enabled = true
+
+# Local-dev notes:
+# - `pnpm exec wrangler dev` uses --persist by default for D1 (file under .wrangler/)
+# - `pnpm exec wrangler d1 execute pulse --remote ...` writes to the cloud DB
