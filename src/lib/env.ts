@@ -18,5 +18,31 @@ export function parseEnv(input: Record<string, string | undefined>): Env {
   return result.data
 }
 
-// Guard the eager parse at module-load time to avoid throwing during tests
-export const env = process.env.NODE_ENV === 'test' ? (undefined as unknown as Env) : parseEnv(process.env)
+let cached: Env | undefined
+function getEnv(): Env {
+  if (cached) return cached
+  cached = parseEnv(process.env)
+  return cached
+}
+
+// Lazy Proxy — first access triggers validation; module load never does.
+// This keeps the existing `env.SOMETHING` call sites unchanged while deferring
+// the throw to runtime (where env vars actually exist in the Worker).
+export const env: Env = new Proxy({} as Env, {
+  get(_, key) {
+    return getEnv()[key as keyof Env]
+  },
+  has(_, key) {
+    return key in getEnv()
+  },
+  ownKeys() {
+    return Reflect.ownKeys(getEnv())
+  },
+  getOwnPropertyDescriptor(_, key) {
+    const obj = getEnv()
+    if (key in obj) {
+      return { enumerable: true, configurable: true, value: obj[key as keyof Env] }
+    }
+    return undefined
+  },
+})
