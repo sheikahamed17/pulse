@@ -47,6 +47,16 @@ function buildAuth() {
     secret: parsed.data.BETTER_AUTH_SECRET,
     baseURL: parsed.data.BETTER_AUTH_URL,
     database: kyselyAdapter(db, { type: 'sqlite' }),
+    // Read the real client IP from Cloudflare's standard header so Better
+    // Auth's rate limiter can bucket per-IP instead of falling back to a
+    // single global per-path bucket. Without this, the deployed Worker logs
+    // a warning on every sign-in: "Rate limiting could not determine a
+    // client IP and is falling back to a single shared per-path bucket".
+    advanced: {
+      ipAddress: {
+        ipAddressHeaders: ['cf-connecting-ip'],
+      },
+    },
     // Better Auth defaults to camelCase column names (expiresAt, userId, etc.)
     // but our schema in migrations/0001_initial.sql uses snake_case to match
     // the sync engine tables (op_log, widgets, devices). Map Better Auth's
