@@ -54,6 +54,15 @@ jobs:
           command: deploy
 
       - name: Apply D1 migrations (idempotent)
+        # Allowed to fail without blocking the deploy. The default
+        # "Edit Cloudflare Workers" API token template does not include
+        # D1:Edit permission, so this step errors with `code: 10000`
+        # Authentication error until the token is regenerated with both
+        # Workers and D1 scopes. Phase 0 migrations are applied manually
+        # via `wrangler d1 execute --remote` from a logged-in dev machine.
+        # When the token is upgraded, this step will start succeeding
+        # without any workflow change.
+        continue-on-error: true
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
