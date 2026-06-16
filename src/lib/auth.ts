@@ -47,6 +47,49 @@ function buildAuth() {
     secret: parsed.data.BETTER_AUTH_SECRET,
     baseURL: parsed.data.BETTER_AUTH_URL,
     database: kyselyAdapter(db, { type: 'sqlite' }),
+    // Better Auth defaults to camelCase column names (expiresAt, userId, etc.)
+    // but our schema in migrations/0001_initial.sql uses snake_case to match
+    // the sync engine tables (op_log, widgets, devices). Map Better Auth's
+    // logical field names to our snake_case columns so the adapter generates
+    // SQL that matches the actual DB shape.
+    user: {
+      fields: {
+        emailVerified: 'email_verified',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
+    session: {
+      fields: {
+        userId: 'user_id',
+        expiresAt: 'expires_at',
+        ipAddress: 'ip_address',
+        userAgent: 'user_agent',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
+    account: {
+      fields: {
+        userId: 'user_id',
+        accountId: 'account_id',
+        providerId: 'provider_id',
+        accessToken: 'access_token',
+        refreshToken: 'refresh_token',
+        idToken: 'id_token',
+        accessTokenExpiresAt: 'access_token_expires_at',
+        refreshTokenExpiresAt: 'refresh_token_expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
+    verification: {
+      fields: {
+        expiresAt: 'expires_at',
+        createdAt: 'created_at',
+        updatedAt: 'updated_at',
+      },
+    },
     plugins: [
       magicLink({
         sendMagicLink: async ({ email, url }) => {
