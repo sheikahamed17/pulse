@@ -79,6 +79,19 @@ describe('RecurringPayloadSchema', () => {
     })
     expect(r.success).toBe(false)
   })
+
+  it('requires end_count when end_condition_kind=count', () => {
+    const r = RecurringPayloadSchema.safeParse({
+      amount: 1, currency: 'INR', direction: 'out',
+      period: 'monthly', interval_count: 1,
+      anchor_at: '2026-06-01T00:00:00Z',
+      next_due_at: '2026-07-01T00:00:00Z',
+      end_condition_kind: 'count',
+      is_active: 1,
+      // end_count omitted — refine should reject
+    })
+    expect(r.success).toBe(false)
+  })
 })
 
 describe('CategoryPayloadSchema', () => {
