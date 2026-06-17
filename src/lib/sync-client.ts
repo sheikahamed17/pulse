@@ -1,4 +1,5 @@
 import { db } from '@/lib/dexie'
+import type { WidgetRow } from '@/lib/dexie'
 import { applyOp } from '@/lib/op-log'
 import { createHlc, parseHlc, serializeHlc, tickHlc } from '@/lib/hlc'
 import type { Op } from '@/types/ops'
@@ -62,7 +63,7 @@ export async function applyLocalOp(op: Op): Promise<void> {
     if (op.entity_kind === 'widget') {
       const current = await db.widgets.get(op.entity_id)
       const next = applyOp(current, op)
-      await db.widgets.put(next)
+      await db.widgets.put(next as WidgetRow)
     }
     // Other entity_kind branches added in later phases
   })
