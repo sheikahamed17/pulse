@@ -7,6 +7,7 @@ import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip'
+import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { VoiceRecorder } from '@/components/voice-recorder'
 import { useCategories } from '@/hooks/use-categories'
@@ -179,6 +180,8 @@ export default function AppPage() {
         </div>
       </header>
       <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
+
+      <MoneyCard userId={user.id} />
 
       <div className="flex justify-center py-2">
         <VoiceRecorder
