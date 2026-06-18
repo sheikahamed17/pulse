@@ -15,6 +15,15 @@ import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 
+function nextDueFromAnchor(anchorIso: string, period: 'daily'|'weekly'|'monthly'|'yearly', n: number): string {
+  const d = new Date(anchorIso)
+  if (period === 'daily')   d.setUTCDate(d.getUTCDate() + n)
+  if (period === 'weekly')  d.setUTCDate(d.getUTCDate() + 7 * n)
+  if (period === 'monthly') d.setUTCMonth(d.getUTCMonth() + n)
+  if (period === 'yearly')  d.setUTCFullYear(d.getUTCFullYear() + n)
+  return d.toISOString()
+}
+
 export default function AppPage() {
   const router = useRouter()
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
@@ -96,25 +105,51 @@ export default function AppPage() {
     }
   }
 
-  async function confirmEntry(final: ChipDraft, _makeRecurring: boolean) {
+  async function confirmEntry(
+    final: ChipDraft,
+    recurring: { enabled: boolean; period: 'daily'|'weekly'|'monthly'|'yearly'; intervalCount: number },
+  ) {
     if (!user) return
-    const op = await generateOp({
+
+    let ruleId: string | null = null
+    if (recurring.enabled) {
+      ruleId = crypto.randomUUID()
+      const ruleOp = await generateOp({
+        entity_kind: 'recurring',
+        entity_id: ruleId,
+        op_type: 'create',
+        payload: {
+          amount: final.amount, currency: final.currency, direction: final.direction,
+          category_id: final.category_id ?? null,
+          description: final.description ?? null,
+          period: recurring.period,
+          interval_count: recurring.intervalCount,
+          anchor_at: final.occurred_at,
+          next_due_at: nextDueFromAnchor(final.occurred_at, recurring.period, recurring.intervalCount),
+          end_condition_kind: 'never',
+          is_active: 1,
+        },
+        user_id: user.id,
+      })
+      await applyLocalOp(ruleOp)
+    }
+
+    const entryOp = await generateOp({
       entity_kind: 'money',
       entity_id: crypto.randomUUID(),
       op_type: 'create',
       payload: {
-        amount: final.amount,
-        currency: final.currency,
-        direction: final.direction,
+        amount: final.amount, currency: final.currency, direction: final.direction,
         category_id: final.category_id ?? null,
         description: final.description ?? null,
         occurred_at: final.occurred_at,
         source: final.source,
         raw_input: final.raw_input ?? null,
+        recurring_rule_id: ruleId,
       },
       user_id: user.id,
     })
-    await applyLocalOp(op)
+    await applyLocalOp(entryOp)
     setDraft(null)
     pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
   }

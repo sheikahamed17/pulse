@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CategoryPicker } from '@/components/category-picker'
+import { PeriodPicker, type Period } from '@/components/period-picker'
 import { cn } from '@/lib/utils'
 import { currencySymbol } from '@/lib/currency'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
@@ -17,7 +18,7 @@ type Props = {
   userId: string
   draft: ChipDraft
   categoryById: Map<string, CategoryRow>
-  onConfirm: (final: ChipDraft, makeRecurring: boolean) => Promise<void>
+  onConfirm: (final: ChipDraft, recurring: { enabled: boolean; period: Period; intervalCount: number }) => Promise<void>
   onCancel: () => void
 }
 
@@ -25,6 +26,8 @@ export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCan
   const [d, setD] = useState<ChipDraft>(draft)
   const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category'>(null)
   const [makeRecurring, setMakeRecurring] = useState(false)
+  const [period, setPeriod] = useState<Period>('monthly')
+  const [intervalCount, setIntervalCount] = useState(1)
   const [busy, setBusy] = useState(false)
 
   const major = (d.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
@@ -33,7 +36,7 @@ export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCan
 
   async function handleConfirm() {
     setBusy(true)
-    try { await onConfirm(d, makeRecurring) } finally { setBusy(false) }
+    try { await onConfirm(d, { enabled: makeRecurring, period, intervalCount }) } finally { setBusy(false) }
   }
 
   return (
@@ -116,14 +119,23 @@ export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCan
         </div>
       )}
 
-      <label className="mb-3 flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
-        <span>Make recurring</span>
-        <input
-          type="checkbox"
-          checked={makeRecurring}
-          onChange={e => setMakeRecurring(e.currentTarget.checked)}
-        />
-      </label>
+      <div className="mb-3 flex flex-col gap-2">
+        <label className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+          <span>Make recurring</span>
+          <input
+            type="checkbox"
+            checked={makeRecurring}
+            onChange={e => setMakeRecurring(e.currentTarget.checked)}
+          />
+        </label>
+        {makeRecurring && (
+          <PeriodPicker
+            period={period}
+            intervalCount={intervalCount}
+            onChange={(p, n) => { setPeriod(p); setIntervalCount(n) }}
+          />
+        )}
+      </div>
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
