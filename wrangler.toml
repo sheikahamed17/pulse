@@ -18,6 +18,12 @@ database_id = "df509c20-ed81-4146-941f-6e48e7f1f925"
 [observability]
 enabled = true
 
+[triggers]
+# Phase 1.4: daily recurring-rules materializer
+# 02:00 UTC every day (low-traffic window globally).
+# Per-user time-zone sharding deferred to Phase 2.
+crons = ["0 2 * * *"]
+
 # Local-dev notes:
 # - `pnpm exec wrangler dev` uses --persist by default for D1 (file under .wrangler/)
 # - `pnpm exec wrangler d1 execute pulse --remote ...` writes to the cloud DB
