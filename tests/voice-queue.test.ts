@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import { db, resetDb } from '@/lib/dexie'
-import { enqueueVoice, drainVoiceQueue } from '@/lib/voice-queue'
+import { enqueueVoice, drainVoiceQueue, __resetDrainGuardForTests } from '@/lib/voice-queue'
 
 describe('voice-queue', () => {
-  beforeEach(async () => { await resetDb() })
+  beforeEach(async () => { await resetDb(); __resetDrainGuardForTests() })
 
   it('enqueue persists a blob with status=queued', async () => {
     await enqueueVoice(new Blob(['x'], { type: 'audio/webm' }))
@@ -43,5 +43,21 @@ describe('voice-queue', () => {
     expect(proc).toHaveBeenCalledTimes(2)
     await drainVoiceQueue({ processBlob: proc, maxRetries: 3 })
     expect(proc).toHaveBeenCalledTimes(2)
+  })
+
+  it('concurrent drain calls do not double-process items', async () => {
+    await enqueueVoice(new Blob(['a']))
+    const proc = vi.fn().mockResolvedValue({ ok: true })
+
+    // Fire both drains without awaiting between them — the second one's guard
+    // check happens synchronously before the first one's first await suspends.
+    await Promise.all([
+      drainVoiceQueue({ processBlob: proc, maxRetries: 3 }),
+      drainVoiceQueue({ processBlob: proc, maxRetries: 3 }),
+    ])
+
+    expect(proc).toHaveBeenCalledTimes(1)
+    const items = await db.voice_queue.toArray()
+    expect(items[0].status).toBe('done')
   })
 })

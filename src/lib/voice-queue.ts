@@ -16,21 +16,36 @@ type DrainArgs = {
   maxRetries: number
 }
 
+// In-process guard against concurrent drains. The `online` event + first-mount
+// effect can both fire `drainVoiceQueue()` overlapping; without this guard,
+// both reads see the same `queued` items before either marks them
+// `transcribing`, double-processing the blob (wasted Groq call + duplicate
+// chip render). Cross-tab races are not handled here — a Phase 2 concern.
+let isDraining = false
+
+export function __resetDrainGuardForTests() { isDraining = false }
+
 export async function drainVoiceQueue({ processBlob, maxRetries }: DrainArgs): Promise<void> {
-  const items = await db.voice_queue.where('status').equals('queued').toArray()
-  for (const item of items) {
-    await db.voice_queue.update(item.id, { status: 'transcribing' })
-    try {
-      await processBlob(item.blob)
-      await db.voice_queue.update(item.id, { status: 'done' })
-    } catch (err) {
-      const nextCount = item.retry_count + 1
-      const failed = nextCount >= maxRetries
-      await db.voice_queue.update(item.id, {
-        status: failed ? 'failed' : 'queued',
-        retry_count: nextCount,
-      })
-      console.warn('voice-queue: process failed', err)
+  if (isDraining) return
+  isDraining = true
+  try {
+    const items = await db.voice_queue.where('status').equals('queued').toArray()
+    for (const item of items) {
+      await db.voice_queue.update(item.id, { status: 'transcribing' })
+      try {
+        await processBlob(item.blob)
+        await db.voice_queue.update(item.id, { status: 'done' })
+      } catch (err) {
+        const nextCount = item.retry_count + 1
+        const failed = nextCount >= maxRetries
+        await db.voice_queue.update(item.id, {
+          status: failed ? 'failed' : 'queued',
+          retry_count: nextCount,
+        })
+        console.warn('voice-queue: process failed', err)
+      }
     }
+  } finally {
+    isDraining = false
   }
 }
