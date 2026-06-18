@@ -168,64 +168,76 @@ export default function AppPage() {
   if (!user) return <p className="p-8">Loading…</p>
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Pulse</h1>
-        <div className="flex items-center gap-2">
-          <Link href="/settings" className="text-xs text-muted-foreground hover:underline">Settings</Link>
-          <Button size="sm" variant="outline"
-            onClick={() => authClient.signOut().then(() => router.replace('/login'))}>
-            Sign out
-          </Button>
+    <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 md:grid-cols-[1fr_320px]">
+      <div className="flex flex-col gap-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Pulse</h1>
+          <div className="flex items-center gap-2">
+            <Link href="/settings" className="text-xs text-muted-foreground hover:underline">Settings</Link>
+            <Button size="sm" variant="outline"
+              onClick={() => authClient.signOut().then(() => router.replace('/login'))}>
+              Sign out
+            </Button>
+          </div>
+        </header>
+        <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
+
+        {/* Mobile-only: MoneyCard goes above the chat */}
+        <div className="md:hidden">
+          <MoneyCard userId={user.id} />
         </div>
-      </header>
-      <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
 
-      <MoneyCard userId={user.id} />
+        <div className="flex justify-center py-2">
+          <VoiceRecorder
+            disabled={draft !== null || parsing}
+            onParsed={(payload, transcript) => {
+              if (!payload) {
+                setDraft({
+                  amount: 0, currency: 'INR', direction: 'out',
+                  occurred_at: new Date().toISOString(),
+                  source: 'voice', raw_input: transcript,
+                })
+              } else {
+                setDraft(payload as ChipDraft)
+              }
+            }}
+          />
+        </div>
 
-      <div className="flex justify-center py-2">
-        <VoiceRecorder
-          disabled={draft !== null || parsing}
-          onParsed={(payload, transcript) => {
-            if (!payload) {
-              setDraft({
-                amount: 0, currency: 'INR', direction: 'out',
-                occurred_at: new Date().toISOString(),
-                source: 'voice', raw_input: transcript,
-              })
-            } else {
-              setDraft(payload as ChipDraft)
-            }
-          }}
-        />
+        <form
+          onSubmit={(e) => { e.preventDefault(); parseText() }}
+          className="flex gap-2"
+        >
+          <Input
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder='spent 80 on chai'
+            disabled={parsing || draft !== null}
+          />
+          <Button type="submit" disabled={parsing || draft !== null || !text.trim()}>
+            {parsing ? 'Parsing…' : 'Parse'}
+          </Button>
+        </form>
+
+        {draft && (
+          <ConfirmationChip
+            userId={user.id}
+            draft={draft}
+            categoryById={categoryById}
+            onConfirm={confirmEntry}
+            onCancel={() => setDraft(null)}
+          />
+        )}
+
+        <MoneyList userId={user.id} />
       </div>
 
-      <form
-        onSubmit={(e) => { e.preventDefault(); parseText() }}
-        className="flex gap-2"
-      >
-        <Input
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder='spent 80 on chai'
-          disabled={parsing || draft !== null}
-        />
-        <Button type="submit" disabled={parsing || draft !== null || !text.trim()}>
-          {parsing ? 'Parsing…' : 'Parse'}
-        </Button>
-      </form>
-
-      {draft && (
-        <ConfirmationChip
-          userId={user.id}
-          draft={draft}
-          categoryById={categoryById}
-          onConfirm={confirmEntry}
-          onCancel={() => setDraft(null)}
-        />
-      )}
-
-      <MoneyList userId={user.id} />
+      {/* Desktop-only sidebar */}
+      <aside className="hidden md:block">
+        <div className="sticky top-6 flex flex-col gap-4">
+          <MoneyCard userId={user.id} />
+        </div>
+      </aside>
     </main>
   )
 }
