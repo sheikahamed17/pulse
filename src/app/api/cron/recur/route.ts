@@ -12,13 +12,14 @@ const CRON_SAFETY_CAP = 100
 const RUN_BATCH_SIZE = 1000
 
 export async function POST(req: Request) {
-  if (!isCloudflareCron(req)) {
+  const { env } = getCloudflareContext()
+  const cfEnv = env as { CRON_SECRET?: string; DB: D1Database }
+
+  if (!isAuthorizedCron(req, cfEnv)) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  const { env } = getCloudflareContext()
-  const d1 = (env as { DB: D1Database }).DB
-  const db = createDb(d1)
+  const db = createDb(cfEnv.DB)
 
   const now = new Date().toISOString()
   const dueRules = await db
@@ -61,8 +62,26 @@ export async function POST(req: Request) {
   return NextResponse.json({ processed })
 }
 
-function isCloudflareCron(req: Request): boolean {
-  return req.headers.get('cf-cron') !== null || req.headers.get('x-cf-trigger') === 'cron'
+// Authenticate the cron endpoint with a server-only shared secret. The
+// previously-used `cf-cron` / `x-cf-trigger` headers are user-controllable
+// (any client can set them); Cloudflare's scheduled trigger fires via the
+// Worker `scheduled()` handler, NOT via an HTTP call with a special header.
+// So this route MUST be called via either: (a) the shim Worker's
+// scheduled() handler which reads env.CRON_SECRET and forwards as Bearer
+// auth, or (b) a deliberate manual trigger that includes the same secret.
+//
+// Web Crypto lacks crypto.timingSafeEqual (Node-only); a length-equal
+// XOR loop is the portable constant-time equivalent.
+function isAuthorizedCron(req: Request, env: { CRON_SECRET?: string }): boolean {
+  const auth = req.headers.get('authorization')
+  if (!auth || !env.CRON_SECRET) return false
+  const expected = `Bearer ${env.CRON_SECRET}`
+  if (auth.length !== expected.length) return false
+  let mismatch = 0
+  for (let i = 0; i < auth.length; i++) {
+    mismatch |= auth.charCodeAt(i) ^ expected.charCodeAt(i)
+  }
+  return mismatch === 0
 }
 
 function rowToRule(row: {

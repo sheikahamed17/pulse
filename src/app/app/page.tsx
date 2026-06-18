@@ -13,15 +13,25 @@ import { useCategories } from '@/hooks/use-categories'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
+import { computeNextDue } from '@/lib/recurring'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 
+// Delegate to the same engine the cron uses so the FIRST next_due_at clamps
+// day-of-month identically to subsequent fires (Jan 31 + 1mo → Feb 28, not
+// Mar 3 which raw setUTCMonth would produce).
 function nextDueFromAnchor(anchorIso: string, period: 'daily'|'weekly'|'monthly'|'yearly', n: number): string {
-  const d = new Date(anchorIso)
-  if (period === 'daily')   d.setUTCDate(d.getUTCDate() + n)
-  if (period === 'weekly')  d.setUTCDate(d.getUTCDate() + 7 * n)
-  if (period === 'monthly') d.setUTCMonth(d.getUTCMonth() + n)
-  if (period === 'yearly')  d.setUTCFullYear(d.getUTCFullYear() + n)
-  return d.toISOString()
+  return computeNextDue({
+    id: 'tmp',
+    period,
+    interval_count: n,
+    anchor_at: anchorIso,
+    next_due_at: anchorIso,
+    occurrences_so_far: 0,
+    end_condition_kind: 'never',
+    end_until: null,
+    end_count: null,
+    is_active: 1,
+  })
 }
 
 export default function AppPage() {

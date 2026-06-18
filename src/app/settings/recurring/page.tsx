@@ -65,7 +65,8 @@ export default function RecurringSettingsPage() {
           const cat = r.category_id ? categoryById.get(r.category_id) : undefined
           const major = (r.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
           const sym = currencySymbol(r.currency)
-          const periodText = `every ${r.interval_count > 1 ? `${r.interval_count} ` : ''}${r.period.replace(/ly$/, '')}${r.interval_count > 1 ? 's' : ''}`
+          const PERIOD_NOUN = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' } as const
+          const periodText = `every ${r.interval_count > 1 ? `${r.interval_count} ` : ''}${PERIOD_NOUN[r.period]}${r.interval_count > 1 ? 's' : ''}`
           return (
             <li key={r.id} className="flex flex-col gap-1 p-3">
               <div className="flex items-center justify-between">
