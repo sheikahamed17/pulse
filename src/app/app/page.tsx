@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip'
 import { MoneyList } from '@/components/money-list'
+import { VoiceRecorder } from '@/components/voice-recorder'
 import { useCategories } from '@/hooks/use-categories'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
+import { drainVoiceQueue } from '@/lib/voice-queue'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 
 export default function AppPage() {
@@ -40,6 +42,25 @@ export default function AppPage() {
       pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
     }, 10_000)
     return () => clearInterval(interval)
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    const onOnline = () => {
+      drainVoiceQueue({
+        processBlob: async (blob) => {
+          const fd = new FormData()
+          fd.append('audio', blob, 'voice.webm')
+          const res = await fetch('/api/voice', { method: 'POST', body: fd })
+          if (!res.ok) throw new Error(`voice ${res.status}`)
+          return { ok: true }
+        },
+        maxRetries: 3,
+      }).catch(err => console.error('drain', err))
+    }
+    window.addEventListener('online', onOnline)
+    onOnline()
+    return () => window.removeEventListener('online', onOnline)
   }, [user])
 
   const categories = useCategories(user?.id)
@@ -114,8 +135,21 @@ export default function AppPage() {
       </header>
       <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
 
-      <div className="rounded-md border bg-muted/30 p-3 text-center text-xs text-muted-foreground">
-        Voice input lands in Phase 1.3. Type below for now.
+      <div className="flex justify-center py-2">
+        <VoiceRecorder
+          disabled={draft !== null || parsing}
+          onParsed={(payload, transcript) => {
+            if (!payload) {
+              setDraft({
+                amount: 0, currency: 'INR', direction: 'out',
+                occurred_at: new Date().toISOString(),
+                source: 'voice', raw_input: transcript,
+              })
+            } else {
+              setDraft(payload as ChipDraft)
+            }
+          }}
+        />
       </div>
 
       <form
