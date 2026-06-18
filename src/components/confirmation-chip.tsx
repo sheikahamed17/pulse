@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CategoryPicker } from '@/components/category-picker'
 import { cn } from '@/lib/utils'
+import { currencySymbol } from '@/lib/currency'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 import type { CategoryRow } from '@/lib/dexie'
 
@@ -134,8 +135,4 @@ export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCan
       <p className="mt-1 text-center text-[10px] text-muted-foreground">tap any field to edit</p>
     </div>
   )
-}
-
-function currencySymbol(code: string): string {
-  return { INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'د.إ', SGD: 'S$', JPY: '¥', AUD: 'A$', CAD: 'C$' }[code] ?? code
 }

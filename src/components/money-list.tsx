@@ -6,6 +6,7 @@ import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
 import { useUndoStack } from '@/hooks/use-undo-stack'
+import { currencySymbol } from '@/lib/currency'
 import type { MoneyEntryRow } from '@/lib/dexie'
 
 type Props = { userId: string }
@@ -82,6 +83,5 @@ export function MoneyList({ userId }: Props) {
 
 function formatAmount(e: MoneyEntryRow): string {
   const major = (e.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
-  const sym   = ({ INR: '₹', USD: '$', EUR: '€', GBP: '£' } as Record<string, string>)[e.currency] ?? e.currency
-  return `${e.direction === 'out' ? '-' : '+'}${sym}${major}`
+  return `${e.direction === 'out' ? '-' : '+'}${currencySymbol(e.currency)}${major}`
 }

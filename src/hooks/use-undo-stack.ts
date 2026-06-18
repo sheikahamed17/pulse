@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type UndoEntry = {
   id: string
@@ -12,6 +12,14 @@ type UndoEntry = {
 export function useUndoStack(ttlMs = 5000) {
   const [entries, setEntries] = useState<UndoEntry[]>([])
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  useEffect(() => {
+    const timers = timersRef.current
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer)
+      timers.clear()
+    }
+  }, [])
 
   const push = useCallback((label: string, undo: () => Promise<void>) => {
     const id = crypto.randomUUID()
