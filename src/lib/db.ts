@@ -1,4 +1,4 @@
-import { Kysely, type Generated } from 'kysely'
+import { Kysely } from 'kysely'
 import { D1Dialect } from 'kysely-d1'
 import type { D1Database } from '@cloudflare/workers-types'
 

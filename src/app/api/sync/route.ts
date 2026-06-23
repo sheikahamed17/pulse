@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
-  const { device_id, last_synced_hlc, new_ops } = parsed.data
+  const { last_synced_hlc, new_ops } = parsed.data
 
   // Authorization: every op must claim this user
   for (const op of new_ops) {

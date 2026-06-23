@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
 import { applyOp, applyOps } from '@/lib/op-log'
 import { serializeHlc } from '@/lib/hlc'
-import type { Op, EntityRow } from '@/types/ops'
+import type { Op } from '@/types/ops'
 
 const baseOp: Omit<Op, 'hlc' | 'op_type' | 'payload'> = {
   id: 'op1',

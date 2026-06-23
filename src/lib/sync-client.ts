@@ -117,7 +117,7 @@ async function writeLastSyncedHlc(hlc: string) {
   await db.sync_meta.put({ key: 'last_synced_hlc', value: hlc })
 }
 
-export async function pushPullOnce(input: { userId: string }): Promise<{ applied: number; received: number }> {
+export async function pushPullOnce(_input: { userId: string }): Promise<{ applied: number; received: number }> {
   const deviceId = await getDeviceId()
   const pending = await getPendingOps()
   const lastSyncedHlc = await readLastSyncedHlc()

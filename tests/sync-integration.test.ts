@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// The mock Kysely chain is generic + recursive; typing each call site
+// precisely would be ~50 lines of fixture-only type definitions. Test
+// fixture, not production code — `any` is the right escape valve here.
+import { describe, it, expect, vi } from 'vitest'
 import { applyOps } from '@/lib/op-log'
 import type { Op } from '@/types/ops'
 
@@ -14,7 +18,7 @@ vi.mock('@opennextjs/cloudflare', () => ({
 }))
 
 vi.mock('@/lib/auth', () => ({
-  getSession: vi.fn(async (req: Request) => {
+  getSession: vi.fn(async (_req: Request) => {
     // Extract userId from request context (injected by test harness)
     const auth = (globalThis as any).__testAuth
     return auth ? { user: { id: auth.userId } } : null
@@ -111,7 +115,7 @@ class MockDb {
           onConflict: (fn: (oc: any) => any) => {
             // Mock the conflict builder
             const oc = {
-              column: (col: string) => {
+              column: (_col: string) => {
                 return {
                   doUpdateSet: (updates: Record<string, unknown>) => {
                     return {

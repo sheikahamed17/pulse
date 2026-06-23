@@ -58,7 +58,7 @@ export default function RecurringSettingsPage() {
       <ul className="divide-y divide-border rounded-md border">
         {rules.length === 0 && (
           <li className="p-4 text-sm text-muted-foreground">
-            No recurring rules. Toggle "Make recurring" on any entry to create one.
+            No recurring rules. Toggle &quot;Make recurring&quot; on any entry to create one.
           </li>
         )}
         {rules.map(r => {

@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
-import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { describe, it, expect } from 'vitest'
 
 /**
  * Integration test for Better Auth with Cloudflare context.
