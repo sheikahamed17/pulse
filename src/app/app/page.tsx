@@ -15,7 +15,8 @@ import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
 import { computeNextDue } from '@/lib/recurring'
-import type { MoneyPayload } from '@/lib/op-schemas/money'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/lib/dexie'
 
 // Delegate to the same engine the cron uses so the FIRST next_due_at clamps
 // day-of-month identically to subsequent fires (Jan 31 + 1mo → Feb 28, not
@@ -99,18 +100,26 @@ export default function AppPage() {
         }),
       })
       if (!res.ok) throw new Error(`/api/agent ${res.status}`)
-      const data = await res.json() as { payload: MoneyPayload }
-      setDraft({ ...data.payload, kind: 'money' })
+      const data = await res.json() as { intent: string; payload: ChipDraft | null }
+      if (data.payload) {
+        setDraft(data.payload)
+      } else {
+        // query_money / query_task / chat — not handled in 2.1; sub-phase 2.6 wires query_money.
+        console.warn('/api/agent returned no payload for intent:', data.intent)
+        setText('')               // clear input so user knows we received it
+        return
+      }
       setText('')
     } catch (err) {
       console.error(err)
+      // Fallback to a blank money draft (Phase 1 behavior preserved)
       setDraft({
         kind: 'money',
         amount: 0, currency: 'INR', direction: 'out',
         occurred_at: new Date().toISOString(),
         source: 'manual',
         raw_input: text.trim(),
-      } as const as ChipDraft)
+      })
       setText('')
     } finally {
       setParsing(false)
@@ -122,8 +131,29 @@ export default function AppPage() {
     recurring: { enabled: boolean; period: 'daily'|'weekly'|'monthly'|'yearly'; intervalCount: number },
   ) {
     if (!user) return
-    if (final.kind === 'task') return // Task handling in Task 15
 
+    if (final.kind === 'task') {
+      const op = await generateOp({
+        entity_kind: 'task',
+        entity_id: crypto.randomUUID(),
+        op_type: 'create',
+        payload: {
+          title: final.title,
+          due_at: final.due_at ?? null,
+          priority: final.priority,
+          completed_at: null,
+          source: final.source,
+          raw_input: final.raw_input ?? null,
+        },
+        user_id: user.id,
+      })
+      await applyLocalOp(op)
+      setDraft(null)
+      pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
+      return
+    }
+
+    // Money kind (Phase 1 logic, preserved verbatim)
     let ruleId: string | null = null
     if (recurring.enabled) {
       ruleId = crypto.randomUUID()
@@ -199,9 +229,9 @@ export default function AppPage() {
                   amount: 0, currency: 'INR', direction: 'out',
                   occurred_at: new Date().toISOString(),
                   source: 'voice', raw_input: transcript,
-                } as const as ChipDraft)
+                })
               } else {
-                setDraft({ ...(payload as MoneyPayload), kind: 'money' })
+                setDraft(payload as ChipDraft)
               }
             }}
           />
@@ -233,6 +263,9 @@ export default function AppPage() {
         )}
 
         <MoneyList userId={user.id} />
+
+        {/* Phase 2.1: temporary task list placeholder. Replaced by TaskList in sub-phase 2.2. */}
+        <TaskListStub userId={user.id} />
       </div>
 
       {/* Desktop-only sidebar */}
@@ -242,5 +275,27 @@ export default function AppPage() {
         </div>
       </aside>
     </main>
+  )
+}
+
+function TaskListStub({ userId }: { userId: string }) {
+  const tasks = useLiveQuery(
+    () => db.tasks.where('user_id').equals(userId).toArray(),
+    [userId],
+    [],
+  ) ?? []
+  return (
+    <div className="rounded-md border bg-muted/30 p-3">
+      <p className="text-xs text-muted-foreground mb-2">Tasks (temporary list — proper UI in sub-phase 2.2)</p>
+      <ul className="text-sm">
+        {tasks.filter(t => !t.deleted_at).map(t => (
+          <li key={t.id}>
+            <span className={t.completed_at ? 'line-through text-muted-foreground' : ''}>{t.title}</span>
+            {t.due_at && <span className="ml-2 text-xs text-muted-foreground">(due {new Date(t.due_at).toLocaleString()})</span>}
+          </li>
+        ))}
+        {tasks.length === 0 && <li className="text-xs text-muted-foreground">No tasks yet.</li>}
+      </ul>
+    </div>
   )
 }
