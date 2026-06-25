@@ -23,6 +23,14 @@ export default function SettingsPage() {
           </CardHeader>
         </Card>
       </Link>
+      <Link href="/settings/preferences">
+        <Card className="hover:bg-accent transition">
+          <CardHeader>
+            <CardTitle>Preferences</CardTitle>
+            <CardDescription>Primary currency, time zone, and other settings.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
       <Link href="/app" className="text-sm text-muted-foreground hover:underline">← Back to Pulse</Link>
     </main>
   )
