@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
+import { formatLocalDateTime } from '@/lib/format'
+import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { TaskRow } from '@/lib/dexie'
 
 type Props = { userId: string; filter: TaskFilter }
@@ -19,6 +21,7 @@ function useLongPress<T>(onLongPress: (arg: T) => void, ms = 500) {
 export function TaskList({ userId, filter }: Props) {
   const tasks = useTasks(userId, filter)
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const { prefs } = useUserPrefs()
   const longPress = useLongPress<TaskRow>(t => setMenuFor(t.id))
 
   async function toggleComplete(t: TaskRow) {
@@ -90,7 +93,7 @@ export function TaskList({ userId, filter }: Props) {
                   )}
                   {t.due_at && (
                     <span className={isOverdue ? 'text-rose-500' : ''}>
-                      due {new Date(t.due_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                      due {formatLocalDateTime(t.due_at, prefs.tz)}
                       {isOverdue && ' · overdue'}
                     </span>
                   )}

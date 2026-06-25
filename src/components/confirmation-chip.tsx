@@ -7,6 +7,8 @@ import { CategoryPicker } from '@/components/category-picker'
 import { PeriodPicker, type Period } from '@/components/period-picker'
 import { cn } from '@/lib/utils'
 import { currencySymbol } from '@/lib/currency'
+import { formatLocalDateTime } from '@/lib/format'
+import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 import type { TaskPayload } from '@/lib/op-schemas/task'
 import type { CategoryRow } from '@/lib/dexie'
@@ -182,6 +184,7 @@ function ConfirmationChipTask({
   const [editingTitle, setEditingTitle] = useState(false)
   const [editingDue, setEditingDue] = useState(false)
   const [busy, setBusy] = useState(false)
+  const { prefs } = useUserPrefs()
 
   async function handleConfirm() {
     setBusy(true)
@@ -190,7 +193,7 @@ function ConfirmationChipTask({
   }
 
   const dueDisplay = d.due_at
-    ? new Date(d.due_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    ? formatLocalDateTime(d.due_at, prefs.tz)
     : 'no due date'
 
   return (
