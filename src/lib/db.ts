@@ -138,6 +138,35 @@ export interface MoneyEntryTable {
   updated_at: string
 }
 
+export interface TaskTable {
+  id: string
+  user_id: string
+  title: string
+  due_at: string | null
+  priority: 'low' | 'medium' | 'high'
+  completed_at: string | null
+  source: 'voice' | 'manual'
+  raw_input: string | null
+  field_hlcs: string
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FxRateTable {
+  date: string                                   // 'YYYY-MM-DD'
+  base: string                                   // always 'EUR' from ECB
+  target: string                                 // ISO 4217 code
+  rate: number                                   // 1 base = `rate` units of target
+}
+
+export interface UserPrefsTable {
+  user_id: string
+  primary_currency: string
+  tz: string
+  updated_at: string
+}
+
 export interface DB {
   user: UserTable
   session: SessionTable
@@ -149,6 +178,9 @@ export interface DB {
   categories: CategoryTable
   recurring_rules: RecurringRuleTable
   money_entries: MoneyEntryTable
+  tasks: TaskTable
+  fx_rates: FxRateTable
+  user_prefs: UserPrefsTable
 }
 
 export function createDb(d1: D1Database): Kysely<DB> {
