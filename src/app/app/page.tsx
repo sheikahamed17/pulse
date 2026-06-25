@@ -11,8 +11,12 @@ import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { VoiceRecorder } from '@/components/voice-recorder'
 import { TabBar } from '@/components/tab-bar'
+import { TaskList } from '@/components/task-list'
+import { TaskFilter } from '@/components/task-filter'
+import { TaskSummary } from '@/components/task-summary'
 import { useTabState } from '@/hooks/use-tab-state'
 import { useCategories } from '@/hooks/use-categories'
+import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
@@ -43,6 +47,7 @@ export default function AppPage() {
   const [draft, setDraft] = useState<ChipDraft | null>(null)
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
+  const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -87,6 +92,12 @@ export default function AppPage() {
 
   const categories = useCategories(user?.id)
   const categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
+
+  const openTasksForBadge = useTasks(user?.id, 'open')
+  const taskBadgeCount = useMemo(() => {
+    const now = new Date().toISOString()
+    return openTasksForBadge.filter(t => !t.due_at || t.due_at <= now).length
+  }, [openTasksForBadge])
 
   async function parseText() {
     if (!text.trim() || !user) return
@@ -261,7 +272,7 @@ export default function AppPage() {
 
           {/* Desktop tab bar — appears in document flow above the tab content */}
           <div className="hidden md:block">
-            <TabBar active={activeTab} onChange={setTab} />
+            <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
           </div>
 
           {/* Conditional tab content */}
@@ -274,8 +285,9 @@ export default function AppPage() {
             </>
           )}
           {activeTab === 'tasks' && (
-            <div className="rounded-md border bg-muted/30 p-3 text-center text-xs text-muted-foreground">
-              Tasks tab — TaskList wires up in sub-phase 2.2 Task 19.
+            <div className="flex flex-col gap-3">
+              <TaskFilter active={taskFilter} onChange={setTaskFilter} />
+              <TaskList userId={user.id} filter={taskFilter} />
             </div>
           )}
         </div>
@@ -284,18 +296,14 @@ export default function AppPage() {
         <aside className="hidden md:block">
           <div className="sticky top-6 flex flex-col gap-4">
             {activeTab === 'money' && <MoneyCard userId={user.id} />}
-            {activeTab === 'tasks' && (
-              <div className="rounded-md border p-3 text-xs text-muted-foreground">
-                Task summary wires up in Task 21.
-              </div>
-            )}
+            {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
           </div>
         </aside>
       </main>
 
       {/* Mobile-only fixed bottom tab bar */}
       <div className="md:hidden">
-        <TabBar active={activeTab} onChange={setTab} />
+        <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
       </div>
     </>
   )

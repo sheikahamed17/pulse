@@ -39,7 +39,7 @@ export function TabBar({ active, onChange, taskBadgeCount }: Props) {
             <span className="relative text-lg md:text-base">
               {t.icon}
               {showBadge && (
-                <span className="absolute -right-2 -top-1 rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
+                <span className="absolute -right-2 -top-1 rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white tabular-nums">
                   {taskBadgeCount! > 9 ? '9+' : taskBadgeCount}
                 </span>
               )}
