@@ -4,3 +4,13 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   workerd: true
+
+# Transitive-dep minimums to clear dependabot alerts. All four packages here
+# are dev-time or build-time tooling (wrangler / miniflare / next-build); none
+# are reachable from the deployed Worker runtime, so the actual exposure is
+# local-machine-only. Still worth pinning.
+overrides:
+  undici: '>=7.28.0'   # GHSA-vmh5-mc38-953g (high TLS bypass) + 3 others
+  ws: '>=8.21.0'        # GHSA-96hv-2xvq-fx4p (high, fragment-DoS)
+  esbuild: '>=0.28.1'   # GHSA-g7r4-m6w7-qqqr (low, Windows dev-server)
+  postcss: '>=8.5.10'   # GHSA-qx2v-qp2m-jg93 (moderate, XSS in stringify)
