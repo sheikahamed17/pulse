@@ -10,7 +10,7 @@ const withSerwist = withSerwistInit({
 export default withSerwist({
   reactStrictMode: true,
   turbopack: {},
-  webpack(config, { isServer }) {
+  webpack(config) {
     return config
   },
 })

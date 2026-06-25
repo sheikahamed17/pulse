@@ -2,11 +2,13 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
+import type { Kysely } from 'kysely'
 import { getSession } from '@/lib/auth'
 import { createDb } from '@/lib/db'
 import { OpSchema, type Op } from '@/types/ops'
 import { mergeOpsForUser } from '@/lib/sync-server'
 import { applyOp } from '@/lib/op-log'
+import type { DB } from '@/lib/db'
 
 const RequestSchema = z.object({
   device_id: z.string().min(1),
@@ -31,7 +33,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
-  const { device_id, last_synced_hlc, new_ops } = parsed.data
+  const { last_synced_hlc, new_ops } = parsed.data
 
   // Authorization: every op must claim this user
   for (const op of new_ops) {
@@ -65,7 +67,7 @@ export async function POST(req: Request) {
 
   const { newOps, opsForClient } = mergeOpsForUser(existingOps, new_ops, last_synced_hlc)
 
-  // Persist new ops + materialize widgets
+  // Persist new ops + materialize rows
   for (const op of newOps) {
     await db
       .insertInto('op_log')
@@ -83,50 +85,7 @@ export async function POST(req: Request) {
       })
       .execute()
 
-    if (op.entity_kind === 'widget') {
-      const existing = await db
-        .selectFrom('widgets')
-        .where('id', '=', op.entity_id)
-        .where('user_id', '=', userId)
-        .selectAll()
-        .executeTakeFirst()
-
-      const existingRow = existing
-        ? {
-            id: existing.id,
-            user_id: existing.user_id,
-            field_hlcs: JSON.parse(existing.field_hlcs) as Record<string, string>,
-            deleted_at: existing.deleted_at,
-            created_at: existing.created_at,
-            updated_at: existing.updated_at,
-            label: existing.label,
-          }
-        : undefined
-
-      const merged = applyOp(existingRow as never, op)
-
-      const row = {
-        id: op.entity_id,
-        user_id: userId,
-        label: (merged.label as string | null) ?? null,
-        field_hlcs: JSON.stringify(merged.field_hlcs),
-        deleted_at: merged.deleted_at,
-        created_at: merged.created_at,
-        updated_at: merged.updated_at,
-      }
-
-      // Upsert. SQLite supports INSERT ... ON CONFLICT, exposed via Kysely's onConflict().
-      await db
-        .insertInto('widgets')
-        .values(row)
-        .onConflict(oc => oc.column('id').doUpdateSet({
-          label: row.label,
-          field_hlcs: row.field_hlcs,
-          deleted_at: row.deleted_at,
-          updated_at: row.updated_at,
-        }))
-        .execute()
-    }
+    await materializeRow(db, op, userId)
   }
 
   // Compute server HLC = max of all known op HLCs (lexicographic on serialized form works)
@@ -138,4 +97,127 @@ export async function POST(req: Request) {
     new_ops_from_server: opsForClient,
     applied_ack: new_ops.map(o => o.id),
   })
+}
+
+async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
+  switch (op.entity_kind) {
+    case 'widget':
+      return materializeWidget(db, op, userId)
+    case 'money':
+      return materializeRow_LWW(db, op, userId, 'money_entries', MONEY_FIELDS)
+    case 'recurring':
+      return materializeRow_LWW(db, op, userId, 'recurring_rules', RECURRING_FIELDS)
+    case 'category':
+      return materializeRow_LWW(db, op, userId, 'categories', CATEGORY_FIELDS)
+    default:
+      return // op_log stores the op; no materialization yet
+  }
+}
+
+const MONEY_FIELDS = [
+  'amount', 'currency', 'direction', 'category_id', 'description',
+  'occurred_at', 'source', 'raw_input', 'recurring_rule_id',
+] as const
+
+const RECURRING_FIELDS = [
+  'amount', 'currency', 'direction', 'category_id', 'description',
+  'period', 'interval_count', 'anchor_at', 'next_due_at',
+  'end_condition_kind', 'end_until', 'end_count',
+  'occurrences_so_far', 'is_active',
+] as const
+
+const CATEGORY_FIELDS = [
+  'name', 'kind', 'icon', 'color', 'sort_order', 'is_archived',
+] as const
+
+async function materializeRow_LWW(
+  db: Kysely<DB>,
+  op: Op,
+  userId: string,
+  tableName: 'money_entries' | 'recurring_rules' | 'categories',
+  fields: readonly string[],
+) {
+  const existing = await db
+    .selectFrom(tableName)
+    .where('id', '=', op.entity_id)
+    .where('user_id', '=', userId)
+    .selectAll()
+    .executeTakeFirst()
+
+  const existingRow = existing
+    ? {
+        ...existing,
+        field_hlcs: JSON.parse(existing.field_hlcs as string) as Record<string, string>,
+      } as never
+    : undefined
+
+  const merged = applyOp(existingRow, op) as Record<string, unknown>
+
+  const row: Record<string, unknown> = {
+    id: op.entity_id,
+    user_id: userId,
+    field_hlcs: JSON.stringify(merged.field_hlcs),
+    deleted_at: merged.deleted_at,
+    created_at: merged.created_at,
+    updated_at: merged.updated_at,
+  }
+  for (const f of fields) row[f] = merged[f] ?? null
+
+  const updates: Record<string, unknown> = {
+    field_hlcs: row.field_hlcs,
+    deleted_at: row.deleted_at,
+    updated_at: row.updated_at,
+  }
+  for (const f of fields) updates[f] = row[f]
+
+  await db
+    .insertInto(tableName as never)
+    .values(row as never)
+    .onConflict(oc => oc.column('id' as never).doUpdateSet(updates as never))
+    .execute()
+}
+
+async function materializeWidget(db: Kysely<DB>, op: Op, userId: string) {
+  const existing = await db
+    .selectFrom('widgets')
+    .where('id', '=', op.entity_id)
+    .where('user_id', '=', userId)
+    .selectAll()
+    .executeTakeFirst()
+
+  const existingRow = existing
+    ? {
+        id: existing.id,
+        user_id: existing.user_id,
+        field_hlcs: JSON.parse(existing.field_hlcs) as Record<string, string>,
+        deleted_at: existing.deleted_at,
+        created_at: existing.created_at,
+        updated_at: existing.updated_at,
+        label: existing.label,
+      }
+    : undefined
+
+  const merged = applyOp(existingRow as never, op)
+
+  const row = {
+    id: op.entity_id,
+    user_id: userId,
+    label: (merged.label as string | null) ?? null,
+    field_hlcs: JSON.stringify(merged.field_hlcs),
+    deleted_at: merged.deleted_at,
+    created_at: merged.created_at,
+    updated_at: merged.updated_at,
+  }
+
+  // Upsert. SQLite supports INSERT ... ON CONFLICT, exposed via Kysely's onConflict().
+  await db
+    .insertInto('widgets')
+    .values(row)
+    .onConflict(oc => oc.column('id').doUpdateSet({
+      label: row.label,
+      field_hlcs: row.field_hlcs,
+      deleted_at: row.deleted_at,
+      updated_at: row.updated_at,
+    }))
+    .execute()
 }

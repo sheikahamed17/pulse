@@ -53,19 +53,45 @@ export async function generateOp(input: {
 }
 
 export async function applyLocalOp(op: Op): Promise<void> {
-  // Idempotent: if already in op_log, no-op
   const existing = await db.op_log.get(op.id)
   if (existing) return
 
-  await db.transaction('rw', [db.op_log, db.widgets], async () => {
-    await db.op_log.add(op)
-    if (op.entity_kind === 'widget') {
-      const current = await db.widgets.get(op.entity_id)
-      const next = applyOp(current, op)
-      await db.widgets.put(next)
-    }
-    // Other entity_kind branches added in later phases
-  })
+  await db.transaction(
+    'rw',
+    [db.op_log, db.widgets, db.money_entries, db.recurring_rules, db.categories],
+    async () => {
+      await db.op_log.add(op)
+
+      switch (op.entity_kind) {
+        case 'widget': {
+          const current = await db.widgets.get(op.entity_id)
+          const next = applyOp(current as never, op)
+          await db.widgets.put(next as never)
+          return
+        }
+        case 'money': {
+          const current = await db.money_entries.get(op.entity_id)
+          const next = applyOp(current as never, op)
+          await db.money_entries.put(next as never)
+          return
+        }
+        case 'recurring': {
+          const current = await db.recurring_rules.get(op.entity_id)
+          const next = applyOp(current as never, op)
+          await db.recurring_rules.put(next as never)
+          return
+        }
+        case 'category': {
+          const current = await db.categories.get(op.entity_id)
+          const next = applyOp(current as never, op)
+          await db.categories.put(next as never)
+          return
+        }
+        // 'task' / 'project' / 'learning' / 'note' / 'budget' / 'insight':
+        // op_log stores the op but no client table yet (later phases).
+      }
+    },
+  )
 }
 
 export async function getPendingOps(): Promise<Op[]> {
@@ -91,7 +117,7 @@ async function writeLastSyncedHlc(hlc: string) {
   await db.sync_meta.put({ key: 'last_synced_hlc', value: hlc })
 }
 
-export async function pushPullOnce(input: { userId: string }): Promise<{ applied: number; received: number }> {
+export async function pushPullOnce(_input: { userId: string }): Promise<{ applied: number; received: number }> {
   const deviceId = await getDeviceId()
   const pending = await getPendingOps()
   const lastSyncedHlc = await readLastSyncedHlc()

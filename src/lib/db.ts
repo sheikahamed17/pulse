@@ -1,4 +1,4 @@
-import { Kysely, type Generated } from 'kysely'
+import { Kysely } from 'kysely'
 import { D1Dialect } from 'kysely-d1'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -82,6 +82,62 @@ export interface WidgetTable {
   updated_at: string
 }
 
+export interface CategoryTable {
+  id: string
+  user_id: string
+  name: string
+  kind: 'spend' | 'income'
+  icon: string | null
+  color: string | null
+  sort_order: number
+  is_archived: number
+  field_hlcs: string
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RecurringRuleTable {
+  id: string
+  user_id: string
+  amount: number
+  currency: string
+  direction: 'out' | 'in'
+  category_id: string | null
+  description: string | null
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  interval_count: number
+  anchor_at: string
+  next_due_at: string
+  end_condition_kind: 'never' | 'until' | 'count'
+  end_until: string | null
+  end_count: number | null
+  occurrences_so_far: number
+  is_active: number
+  field_hlcs: string
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MoneyEntryTable {
+  id: string
+  user_id: string
+  amount: number
+  currency: string
+  direction: 'out' | 'in'
+  category_id: string | null
+  description: string | null
+  occurred_at: string
+  source: 'voice' | 'manual' | 'recurring'
+  raw_input: string | null
+  recurring_rule_id: string | null
+  field_hlcs: string
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface DB {
   user: UserTable
   session: SessionTable
@@ -90,6 +146,9 @@ export interface DB {
   devices: DeviceTable
   op_log: OpLogTable
   widgets: WidgetTable
+  categories: CategoryTable
+  recurring_rules: RecurringRuleTable
+  money_entries: MoneyEntryTable
 }
 
 export function createDb(d1: D1Database): Kysely<DB> {

@@ -67,3 +67,10 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: d1 execute pulse --remote --file=migrations/0001_initial.sql
+
+      - name: Apply D1 migrations — Phase 1 (idempotent)
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: d1 execute pulse --remote --file=migrations/0002_phase_1_money.sql
