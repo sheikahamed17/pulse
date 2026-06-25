@@ -10,6 +10,18 @@ import { parseMoneyEntry } from '@/lib/agents/money-agent'
 
 export const dynamic = 'force-dynamic'
 
+async function loadUserPrefs(db: ReturnType<typeof createDb>, userId: string) {
+  const row = await db
+    .selectFrom('user_prefs')
+    .where('user_id', '=', userId)
+    .selectAll()
+    .executeTakeFirst()
+  return {
+    primary_currency: row?.primary_currency ?? 'INR',
+    tz: row?.tz ?? 'Asia/Kolkata',
+  }
+}
+
 export async function POST(req: Request) {
   const session = await getSession(req)
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -28,6 +40,7 @@ export async function POST(req: Request) {
 
   const d1 = (env as { DB: D1Database }).DB
   const db = createDb(d1)
+  const prefs = await loadUserPrefs(db, userId)
   const cats = await db
     .selectFrom('categories')
     .where('user_id', '=', userId)
@@ -57,6 +70,8 @@ export async function POST(req: Request) {
       client: groq,
       text: transcript,
       categories: cats.map(c => ({ name: c.name, kind: c.kind as 'spend' | 'income' })),
+      userTz: prefs.tz,
+      defaultCurrency: prefs.primary_currency,
     })
 
     const matchedCat = cats.find(

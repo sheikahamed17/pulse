@@ -58,6 +58,7 @@ export async function POST(req: Request) {
         text: parsed.data.text,
         categories: parsed.data.categories.map(c => ({ name: c.name, kind: c.kind })),
         nowIso,
+        userTz: prefs.tz,
         defaultCurrency: prefs.primary_currency,
       })
       const matchedCat = parsed.data.categories.find(

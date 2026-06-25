@@ -8,15 +8,17 @@ type Args = {
   text: string
   categories: Array<{ name: string; kind: 'spend' | 'income' }>
   nowIso?: string
+  userTz?: string
   defaultCurrency?: string
 }
 
 export async function parseMoneyEntry({
-  client, text, categories, nowIso, defaultCurrency,
+  client, text, categories, nowIso, userTz, defaultCurrency,
 }: Args): Promise<MoneyAgentResponse> {
   const system = buildMoneyAgentSystemPrompt({
     categories,
     nowIso: nowIso ?? new Date().toISOString(),
+    userTz: userTz ?? 'UTC',
     defaultCurrency,
   })
 

@@ -5,9 +5,31 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 const fakeDb = {
-  selectFrom: () => ({ where: () => ({ where: () => ({ where: () => ({ select: () => ({ execute: async () => [
-    { id: 'cat-food', name: 'Food', kind: 'spend' },
-  ] }) }) }) }) }),
+  selectFrom: (table: string) => {
+    if (table === 'user_prefs') {
+      return {
+        where: () => ({
+          selectAll: () => ({
+            executeTakeFirst: async () => ({ primary_currency: 'INR', tz: 'Asia/Kolkata' }),
+          }),
+        }),
+      }
+    }
+    // categories table
+    return {
+      where: () => ({
+        where: () => ({
+          where: () => ({
+            select: () => ({
+              execute: async () => [
+                { id: 'cat-food', name: 'Food', kind: 'spend' },
+              ],
+            }),
+          }),
+        }),
+      }),
+    }
+  },
 }
 
 vi.mock('@opennextjs/cloudflare', () => ({
