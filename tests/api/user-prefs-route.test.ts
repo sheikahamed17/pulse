@@ -12,13 +12,21 @@ const fakeDb = {
   }),
   insertInto: (_table: string) => ({
     values: (v: { user_id: string; primary_currency: string; tz: string; updated_at: string }) => ({
-      onConflict: () => ({
-        execute: async () => {
-          const existing = userPrefsTable.findIndex(r => r.user_id === v.user_id)
-          if (existing >= 0) userPrefsTable[existing] = v
-          else userPrefsTable.push(v)
-        },
-      }),
+      onConflict: (cb: (oc: any) => any) => {
+        const builder = {
+          column: (_col: string) => ({
+            doUpdateSet: (updates: { primary_currency: string; tz: string; updated_at: string }) => ({
+              execute: async () => {
+                const existing = userPrefsTable.findIndex(r => r.user_id === v.user_id)
+                const payload = { ...v, ...updates }
+                if (existing >= 0) userPrefsTable[existing] = payload
+                else userPrefsTable.push(payload)
+              },
+            }),
+          }),
+        }
+        return cb(builder)
+      },
     }),
   }),
 }
@@ -100,6 +108,20 @@ describe('/api/user-prefs', () => {
         body: JSON.stringify({ primary_currency: 'INR', tz: 'UTC' }),
       }))
       expect(res.status).toBe(401)
+    })
+
+    it('PUT: persists exact values from the doUpdateSet callback (covers upsert on existing row)', async () => {
+      // Seed an existing row
+      userPrefsTable.push({ user_id: 'u1', primary_currency: 'INR', tz: 'Asia/Kolkata', updated_at: '2026-06-17T00:00:00Z' })
+      const res = await PUT(new Request('http://x/api/user-prefs', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ primary_currency: 'EUR', tz: 'Europe/Berlin' }),
+      }))
+      expect(res.status).toBe(200)
+      expect(userPrefsTable).toHaveLength(1)
+      expect(userPrefsTable[0].primary_currency).toBe('EUR')
+      expect(userPrefsTable[0].tz).toBe('Europe/Berlin')
     })
   })
 })
