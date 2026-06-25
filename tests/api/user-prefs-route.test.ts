@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// The Kysely onConflict callback's builder shape is generic + recursive across
+// Kysely's internal types; typing it precisely here is fixture-only ceremony.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const userPrefsTable: Array<{ user_id: string; primary_currency: string; tz: string; updated_at: string }> = []

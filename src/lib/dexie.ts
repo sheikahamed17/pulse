@@ -112,6 +112,8 @@ class PulseDb extends Dexie {
   recurring_rules!: EntityTable<RecurringRuleRow, 'id'>
   money_entries!: EntityTable<MoneyEntryRow, 'id'>
   tasks!: EntityTable<TaskRow, 'id'>
+  // Dexie 4's EntityTable<T, K> expects K extends keyof T; compound key '[date+target]' is not a single keyof — fall back to `any` for the key generic only.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fx_rates!: EntityTable<FxRateRow, any>
 
   constructor() {
