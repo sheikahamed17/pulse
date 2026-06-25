@@ -109,6 +109,8 @@ async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
       return materializeRow_LWW(db, op, userId, 'recurring_rules', RECURRING_FIELDS)
     case 'category':
       return materializeRow_LWW(db, op, userId, 'categories', CATEGORY_FIELDS)
+    case 'task':
+      return materializeRow_LWW(db, op, userId, 'tasks', TASK_FIELDS)
     default:
       return // op_log stores the op; no materialization yet
   }
@@ -130,11 +132,16 @@ const CATEGORY_FIELDS = [
   'name', 'kind', 'icon', 'color', 'sort_order', 'is_archived',
 ] as const
 
+const TASK_FIELDS = [
+  'title', 'due_at', 'priority', 'completed_at',
+  'source', 'raw_input',
+] as const
+
 async function materializeRow_LWW(
   db: Kysely<DB>,
   op: Op,
   userId: string,
-  tableName: 'money_entries' | 'recurring_rules' | 'categories',
+  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks',
   fields: readonly string[],
 ) {
   const existing = await db
