@@ -62,3 +62,76 @@ describe('Dexie schema v2', () => {
     expect(await db.voice_queue.count()).toBe(1)
   })
 })
+
+describe('Dexie schema v3 — Phase 2', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('exposes the Phase 2 stores', () => {
+    expect(db.tasks).toBeDefined()
+    expect(db.fx_rates).toBeDefined()
+  })
+
+  it('round-trips a tasks row', async () => {
+    const row = {
+      id: 't1', user_id: 'u1',
+      title: 'call mom',
+      due_at: '2026-06-19T15:00:00.000Z',
+      priority: 'medium' as const,
+      completed_at: null,
+      source: 'voice' as const, raw_input: 'remind me to call mom tomorrow at 3',
+      field_hlcs: { title: '0000000000000001-000000-d1' },
+      deleted_at: null,
+      created_at: '2026-06-18T14:30:00.000Z',
+      updated_at: '2026-06-18T14:30:00.000Z',
+    }
+    await db.tasks.put(row)
+    const back = await db.tasks.get('t1')
+    expect(back?.title).toBe('call mom')
+    expect(back?.priority).toBe('medium')
+  })
+
+  it('compound index [user_id+due_at] supports range queries on open tasks', async () => {
+    await db.tasks.bulkPut([
+      { id: 'a', user_id: 'u1', title: 'a', due_at: '2026-06-19T00:00:00.000Z',
+        priority: 'medium', completed_at: null, source: 'manual', raw_input: null,
+        field_hlcs: {}, deleted_at: null,
+        created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z' },
+      { id: 'b', user_id: 'u1', title: 'b', due_at: '2026-06-25T00:00:00.000Z',
+        priority: 'high', completed_at: null, source: 'manual', raw_input: null,
+        field_hlcs: {}, deleted_at: null,
+        created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z' },
+    ])
+    const rows = await db.tasks
+      .where('[user_id+due_at]')
+      .between(['u1', '2026-06-20T00:00:00.000Z'], ['u1', '2026-06-30T00:00:00.000Z'])
+      .toArray()
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('b')
+  })
+
+  it('round-trips an fx_rates row', async () => {
+    await db.fx_rates.put({ date: '2026-06-18', base: 'EUR', target: 'USD', rate: 1.08 })
+    const all = await db.fx_rates.toArray()
+    expect(all).toHaveLength(1)
+    expect(all[0].rate).toBe(1.08)
+  })
+
+  it('Phase 0/1 stores from v1+v2 still work after v3 bump', async () => {
+    await db.widgets.put({
+      id: 'w1', user_id: 'u1', label: 'still works',
+      field_hlcs: {}, deleted_at: null,
+      created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z',
+    })
+    expect(await db.widgets.count()).toBe(1)
+    await db.money_entries.put({
+      id: 'm1', user_id: 'u1',
+      amount: 100, currency: 'INR', direction: 'out',
+      category_id: null, description: null,
+      occurred_at: '2026-06-18T00:00:00.000Z',
+      source: 'manual', raw_input: null, recurring_rule_id: null,
+      field_hlcs: {}, deleted_at: null,
+      created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z',
+    })
+    expect(await db.money_entries.count()).toBe(1)
+  })
+})
