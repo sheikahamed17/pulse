@@ -8,11 +8,12 @@ import { PeriodPicker, type Period } from '@/components/period-picker'
 import { cn } from '@/lib/utils'
 import { currencySymbol } from '@/lib/currency'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
+import type { TaskPayload } from '@/lib/op-schemas/task'
 import type { CategoryRow } from '@/lib/dexie'
 
-export type ChipDraft = MoneyPayload & {
-  draftCategoryName?: string
-}
+export type ChipDraft =
+  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string })
+  | (TaskPayload & { kind: 'task' })
 
 type Props = {
   userId: string
@@ -23,7 +24,26 @@ type Props = {
 }
 
 export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCancel }: Props) {
-  const [d, setD] = useState<ChipDraft>(draft)
+  if (draft.kind === 'task') {
+    return <ConfirmationChipTask draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+  }
+  return <ConfirmationChipMoney userId={userId} draft={draft} categoryById={categoryById} onConfirm={onConfirm} onCancel={onCancel} />
+}
+
+function ConfirmationChipMoney({
+  userId,
+  draft,
+  categoryById,
+  onConfirm,
+  onCancel,
+}: {
+  userId: string
+  draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string }
+  categoryById: Map<string, CategoryRow>
+  onConfirm: Props['onConfirm']
+  onCancel: () => void
+}) {
+  const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string }>(draft)
   const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category'>(null)
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
@@ -141,6 +161,106 @@ export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCan
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button className="flex-[2]" onClick={handleConfirm} disabled={busy}>
           Confirm {symbol}{major}
+        </Button>
+      </div>
+
+      <p className="mt-1 text-center text-[10px] text-muted-foreground">tap any field to edit</p>
+    </div>
+  )
+}
+
+function ConfirmationChipTask({
+  draft,
+  onConfirm,
+  onCancel,
+}: {
+  draft: TaskPayload & { kind: 'task' }
+  onConfirm: Props['onConfirm']
+  onCancel: () => void
+}) {
+  const [d, setD] = useState<TaskPayload & { kind: 'task' }>(draft)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [editingDue, setEditingDue] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function handleConfirm() {
+    setBusy(true)
+    try { await onConfirm(d, { enabled: false, period: 'monthly', intervalCount: 1 }) }
+    finally { setBusy(false) }
+  }
+
+  const dueDisplay = d.due_at
+    ? new Date(d.due_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    : 'no due date'
+
+  return (
+    <div className="rounded-2xl border bg-card p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between text-xs">
+        <span className="font-semibold uppercase tracking-wide text-violet-500">
+          ✅ Task
+        </span>
+        <span className="text-muted-foreground">priority: {d.priority}</span>
+      </div>
+
+      {editingTitle ? (
+        <Input
+          autoFocus
+          defaultValue={d.title}
+          onBlur={(e) => {
+            const v = e.currentTarget.value.trim()
+            if (v) setD(s => ({ ...s, title: v }))
+            setEditingTitle(false)
+          }}
+          className="mb-3 text-2xl font-semibold"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingTitle(true)}
+          className="mb-3 block text-2xl font-semibold text-left"
+        >
+          {d.title}
+        </button>
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {editingDue ? (
+          <Input
+            autoFocus
+            type="datetime-local"
+            defaultValue={d.due_at ? d.due_at.slice(0, 16) : ''}
+            onBlur={(e) => {
+              const v = e.currentTarget.value
+              setD(s => ({ ...s, due_at: v ? new Date(v).toISOString() : null }))
+              setEditingDue(false)
+            }}
+            className="h-7 text-xs"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingDue(true)}
+            className="rounded-md border bg-muted px-2 py-0.5 text-xs"
+          >
+            {d.due_at ? `📅 ${dueDisplay}` : '+ due date'}
+          </button>
+        )}
+
+        <select
+          value={d.priority}
+          onChange={e => setD(s => ({ ...s, priority: e.target.value as 'low' | 'medium' | 'high' }))}
+          className="rounded-md border bg-muted px-2 py-0.5 text-xs"
+        >
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </select>
+      </div>
+
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button className="flex-[2]" onClick={handleConfirm} disabled={busy || !d.title.trim()}>
+          Confirm task
         </Button>
       </div>
 

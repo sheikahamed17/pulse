@@ -100,16 +100,17 @@ export default function AppPage() {
       })
       if (!res.ok) throw new Error(`/api/agent ${res.status}`)
       const data = await res.json() as { payload: MoneyPayload }
-      setDraft(data.payload as ChipDraft)
+      setDraft({ ...data.payload, kind: 'money' })
       setText('')
     } catch (err) {
       console.error(err)
       setDraft({
+        kind: 'money',
         amount: 0, currency: 'INR', direction: 'out',
         occurred_at: new Date().toISOString(),
         source: 'manual',
         raw_input: text.trim(),
-      })
+      } as const as ChipDraft)
       setText('')
     } finally {
       setParsing(false)
@@ -121,6 +122,7 @@ export default function AppPage() {
     recurring: { enabled: boolean; period: 'daily'|'weekly'|'monthly'|'yearly'; intervalCount: number },
   ) {
     if (!user) return
+    if (final.kind === 'task') return // Task handling in Task 15
 
     let ruleId: string | null = null
     if (recurring.enabled) {
@@ -193,12 +195,13 @@ export default function AppPage() {
             onParsed={(payload, transcript) => {
               if (!payload) {
                 setDraft({
+                  kind: 'money',
                   amount: 0, currency: 'INR', direction: 'out',
                   occurred_at: new Date().toISOString(),
                   source: 'voice', raw_input: transcript,
-                })
+                } as const as ChipDraft)
               } else {
-                setDraft(payload as ChipDraft)
+                setDraft({ ...(payload as MoneyPayload), kind: 'money' })
               }
             }}
           />
