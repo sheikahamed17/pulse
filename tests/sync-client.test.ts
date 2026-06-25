@@ -151,3 +151,92 @@ describe('applyLocalOp — Phase 1 entity kinds', () => {
     expect(await db.money_entries.count()).toBe(1)
   })
 })
+
+describe('applyLocalOp — Phase 2 task entity', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('materializes a tasks row from a task create op', async () => {
+    await applyLocalOp({
+      id: 'op-t1',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'task', entity_id: 't1',
+      op_type: 'create',
+      payload: {
+        title: 'call mom',
+        due_at: '2026-06-19T15:00:00.000Z',
+        priority: 'medium',
+        source: 'voice',
+      },
+      schema_version: 1,
+    })
+    const row = await db.tasks.get('t1')
+    expect(row?.title).toBe('call mom')
+    expect(row?.priority).toBe('medium')
+    expect(row?.due_at).toBe('2026-06-19T15:00:00.000Z')
+  })
+
+  it('toggles completed_at via update op', async () => {
+    // Create then complete
+    await applyLocalOp({
+      id: 'op-t2-create',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'task', entity_id: 't2',
+      op_type: 'create',
+      payload: { title: 'file taxes', priority: 'high', source: 'manual' },
+      schema_version: 1,
+    })
+    await applyLocalOp({
+      id: 'op-t2-complete',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'task', entity_id: 't2',
+      op_type: 'update',
+      payload: { completed_at: '2026-06-19T15:00:00.000Z' },
+      schema_version: 1,
+    })
+    const row = await db.tasks.get('t2')
+    expect(row?.completed_at).toBe('2026-06-19T15:00:00.000Z')
+    expect(row?.title).toBe('file taxes')               // preserved across update
+  })
+
+  it('un-completes via update with completed_at: null', async () => {
+    await applyLocalOp({
+      id: 'op-t3-create',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'task', entity_id: 't3',
+      op_type: 'create',
+      payload: { title: 'x', completed_at: '2026-06-19T00:00:00.000Z', source: 'manual' },
+      schema_version: 1,
+    })
+    await applyLocalOp({
+      id: 'op-t3-uncomplete',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'task', entity_id: 't3',
+      op_type: 'update',
+      payload: { completed_at: null },
+      schema_version: 1,
+    })
+    const row = await db.tasks.get('t3')
+    expect(row?.completed_at).toBeNull()
+  })
+
+  it('is idempotent on duplicate task op.id', async () => {
+    const op = {
+      id: 'op-t-dup',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'task' as const, entity_id: 'tDup',
+      op_type: 'create' as const,
+      payload: { title: 'one', source: 'manual' as const },
+      schema_version: 1,
+    }
+    await applyLocalOp(op)
+    await applyLocalOp(op)
+    expect(await db.op_log.count()).toBe(1)
+    expect(await db.tasks.count()).toBe(1)
+  })
+})
