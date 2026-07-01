@@ -20,6 +20,7 @@ import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
+import { callVoiceApiStreaming } from '@/lib/voice-sse'
 import { computeNextDue } from '@/lib/recurring'
 
 // Delegate to the same engine the cron uses so the FIRST next_due_at clamps
@@ -76,10 +77,9 @@ export default function AppPage() {
     const onOnline = () => {
       drainVoiceQueue({
         processBlob: async (blob) => {
-          const fd = new FormData()
-          fd.append('audio', blob, 'voice.webm')
-          const res = await fetch('/api/voice', { method: 'POST', body: fd })
-          if (!res.ok) throw new Error(`voice ${res.status}`)
+          // Background drain — events are ignored (no UI to update)
+          const final = await callVoiceApiStreaming(blob, () => {})
+          if (!final) throw new Error('voice drain failed')
           return { ok: true }
         },
         maxRetries: 3,
