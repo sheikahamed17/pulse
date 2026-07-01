@@ -3,10 +3,12 @@ type Cat = { name: string; kind: 'spend' | 'income' }
 export function buildMoneyAgentSystemPrompt({
   categories,
   nowIso,
+  userTz,
   defaultCurrency = 'INR',
 }: {
   categories: Cat[]
   nowIso: string
+  userTz: string
   defaultCurrency?: string
 }): string {
   const spendList  = categories.filter(c => c.kind === 'spend').map(c => `"${c.name}"`).join(', ')  || '(none)'
@@ -15,6 +17,7 @@ export function buildMoneyAgentSystemPrompt({
   return `You extract a structured transaction from a single user utterance.
 
 Today (ISO): ${nowIso}
+User's local timezone: ${userTz}
 Default currency: ${defaultCurrency}
 
 Active spend categories: ${spendList}
@@ -55,12 +58,13 @@ Rules:
 
 5. description: short noun phrase capturing the specifics. "chai", "uber to airport", "netflix subscription". Omit category words (don't say "food chai"). null if nothing to add.
 
-6. occurred_at:
+6. occurred_at (interpret in ${userTz}, return ISO UTC):
    - "yesterday" → 24 hours before nowIso, same wall-clock time
-   - "last Tuesday" → most recent past Tuesday at noon UTC
-   - "this morning" → today at 09:00 local UTC
+   - "last Tuesday" → most recent past Tuesday at 12:00 ${userTz} time
+   - "this morning" → today at 09:00 ${userTz} time
    - "an hour ago" → nowIso minus 1 hour
    - No time cue → use nowIso
+   - Example: user in Asia/Kolkata says "this morning at 9am" at 14:00 IST → occurred_at = '<today>T03:30:00.000Z' (9am IST = 03:30 UTC).
 
 7. If you cannot detect any amount, return amount=0 (the UI will prompt the user).
 

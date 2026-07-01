@@ -80,6 +80,29 @@ export type MoneyEntryRow = {
   updated_at: string
 }
 
+export type TaskRow = {
+  id: string
+  user_id: string
+  title: string
+  due_at: string | null
+  priority: 'low' | 'medium' | 'high'
+  completed_at: string | null
+  source: 'voice' | 'manual'
+  raw_input: string | null
+  field_hlcs: Record<string, string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type FxRateRow = {
+  date: string                  // 'YYYY-MM-DD'
+  base: string                  // 'EUR' from ECB
+  target: string                // ISO 4217
+  rate: number
+  // Compound primary key in Dexie is [date+target] — `base` is implicitly 'EUR'.
+}
+
 class PulseDb extends Dexie {
   op_log!: EntityTable<Op, 'id'>
   widgets!: EntityTable<WidgetRow, 'id'>
@@ -88,6 +111,10 @@ class PulseDb extends Dexie {
   categories!: EntityTable<CategoryRow, 'id'>
   recurring_rules!: EntityTable<RecurringRuleRow, 'id'>
   money_entries!: EntityTable<MoneyEntryRow, 'id'>
+  tasks!: EntityTable<TaskRow, 'id'>
+  // Dexie 4's EntityTable<T, K> expects K extends keyof T; compound key '[date+target]' is not a single keyof — fall back to `any` for the key generic only.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fx_rates!: EntityTable<FxRateRow, any>
 
   constructor() {
     super('pulse')
@@ -102,6 +129,10 @@ class PulseDb extends Dexie {
       recurring_rules: 'id, user_id, next_due_at, is_active',
       money_entries:   'id, user_id, occurred_at, [user_id+occurred_at], category_id, recurring_rule_id',
     })
+    this.version(3).stores({
+      tasks:    'id, user_id, due_at, completed_at, [user_id+due_at], [user_id+completed_at]',
+      fx_rates: '[date+target], target, date',
+    })
   }
 }
 
@@ -115,4 +146,6 @@ export async function resetDb() {
   await db.categories.clear()
   await db.recurring_rules.clear()
   await db.money_entries.clear()
+  await db.tasks.clear()
+  await db.fx_rates.clear()
 }

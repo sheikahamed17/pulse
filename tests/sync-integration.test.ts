@@ -55,6 +55,7 @@ function resetMockDb() {
     categories: [],
     money_entries: [],
     recurring_rules: [],
+    tasks: [],
   }
 }
 
@@ -319,6 +320,41 @@ describe('/api/sync — Phase 1 entity kinds', () => {
       expect(rows).toHaveLength(1)
       expect(rows[0].period).toBe('monthly')
       expect(rows[0].next_due_at).toBe('2026-07-01T00:00:00Z')
+    })
+  })
+})
+
+describe('/api/sync — Phase 2 task entity_kind', () => {
+  it('persists a task entry and includes it in the next pull', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const op = {
+        id: 'op-task-1',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1', user_id: userId,
+        entity_kind: 'task',
+        entity_id: 'task-1',
+        op_type: 'create',
+        payload: {
+          title: 'call mom',
+          due_at: '2026-06-19T15:00:00.000Z',
+          priority: 'medium',
+          source: 'voice',
+          raw_input: 'remind me to call mom tomorrow at 3',
+        },
+        schema_version: 1,
+      }
+      const push = await callSync({ device_id: 'd1', new_ops: [op] })
+      expect(push.applied_ack).toEqual(['op-task-1'])
+
+      const pull = await callSync({ device_id: 'd2', new_ops: [] })
+      expect(pull.new_ops_from_server).toHaveLength(1)
+      expect(pull.new_ops_from_server[0].entity_kind).toBe('task')
+
+      // Server-side row materialized
+      const rows = await testDb.selectFrom('tasks').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].title).toBe('call mom')
+      expect(rows[0].priority).toBe('medium')
     })
   })
 })

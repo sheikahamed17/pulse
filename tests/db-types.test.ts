@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf } from 'vitest'
-import type { DB, OpLogTable, WidgetTable, MoneyEntryTable, RecurringRuleTable, CategoryTable } from '@/lib/db'
+import type { DB, OpLogTable, WidgetTable, MoneyEntryTable, RecurringRuleTable, CategoryTable, TaskTable, FxRateTable, UserPrefsTable } from '@/lib/db'
 
 // This file is mostly compile-time verification — the runtime tests below
 // just exercise the type imports so vitest doesn't complain about an empty
@@ -58,5 +58,35 @@ describe('Phase 1 DB types', () => {
 
   it('CategoryTable has spend/income kind', () => {
     expectTypeOf<CategoryTable>().toHaveProperty('kind').toEqualTypeOf<'spend' | 'income'>()
+  })
+})
+
+describe('Phase 2 DB types', () => {
+  it('DB includes tasks / fx_rates / user_prefs', () => {
+    expectTypeOf<DB>().toHaveProperty('tasks')
+    expectTypeOf<DB>().toHaveProperty('fx_rates')
+    expectTypeOf<DB>().toHaveProperty('user_prefs')
+  })
+
+  it('TaskTable has required fields', () => {
+    expectTypeOf<TaskTable>().toHaveProperty('title').toEqualTypeOf<string>()
+    expectTypeOf<TaskTable>().toHaveProperty('due_at').toEqualTypeOf<string | null>()
+    expectTypeOf<TaskTable>().toHaveProperty('priority').toEqualTypeOf<'low' | 'medium' | 'high'>()
+    expectTypeOf<TaskTable>().toHaveProperty('completed_at').toEqualTypeOf<string | null>()
+    expectTypeOf<TaskTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual'>()
+    expectTypeOf<TaskTable>().toHaveProperty('field_hlcs').toEqualTypeOf<string>()
+  })
+
+  it('FxRateTable has the rate primary key shape', () => {
+    expectTypeOf<FxRateTable>().toHaveProperty('date').toEqualTypeOf<string>()
+    expectTypeOf<FxRateTable>().toHaveProperty('base').toEqualTypeOf<string>()
+    expectTypeOf<FxRateTable>().toHaveProperty('target').toEqualTypeOf<string>()
+    expectTypeOf<FxRateTable>().toHaveProperty('rate').toEqualTypeOf<number>()
+  })
+
+  it('UserPrefsTable has primary_currency + tz', () => {
+    expectTypeOf<UserPrefsTable>().toHaveProperty('user_id').toEqualTypeOf<string>()
+    expectTypeOf<UserPrefsTable>().toHaveProperty('primary_currency').toEqualTypeOf<string>()
+    expectTypeOf<UserPrefsTable>().toHaveProperty('tz').toEqualTypeOf<string>()
   })
 })

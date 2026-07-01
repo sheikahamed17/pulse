@@ -20,9 +20,8 @@ enabled = true
 
 [triggers]
 # Phase 1.4: daily recurring-rules materializer
-# 02:00 UTC every day (low-traffic window globally).
-# Per-user time-zone sharding deferred to Phase 2.
-crons = ["0 2 * * *"]
+# Phase 2.4: daily ECB fx-rates fetcher (one hour later to avoid overlap)
+crons = ["0 2 * * *", "0 3 * * *"]
 
 # Local-dev notes:
 # - `pnpm exec wrangler dev` uses --persist by default for D1 (file under .wrangler/)

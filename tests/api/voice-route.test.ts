@@ -5,16 +5,35 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 const fakeDb = {
-  selectFrom: () => ({ where: () => ({ where: () => ({ where: () => ({ select: () => ({ execute: async () => [
-    { id: 'cat-food', name: 'Food', kind: 'spend' },
-  ] }) }) }) }) }),
+  selectFrom: (table: string) => {
+    if (table === 'user_prefs') {
+      return {
+        where: () => ({
+          selectAll: () => ({
+            executeTakeFirst: async () => ({ primary_currency: 'INR', tz: 'Asia/Kolkata' }),
+          }),
+        }),
+      }
+    }
+    // categories table
+    return {
+      where: () => ({
+        where: () => ({
+          where: () => ({
+            select: () => ({
+              execute: async () => [{ id: 'cat-food', name: 'Food', kind: 'spend' }],
+            }),
+          }),
+        }),
+      }),
+    }
+  },
 }
 
 vi.mock('@opennextjs/cloudflare', () => ({
   getCloudflareContext: () => ({ env: { GROQ_API_KEY: 'k', DB: null } }),
 }))
 vi.mock('@/lib/db', () => ({ createDb: () => fakeDb }))
-
 vi.mock('@/lib/agents/whisper', () => ({
   groqWhisper: vi.fn().mockResolvedValue({ transcript: 'spent 80 on chai', duration_ms: 1800 }),
 }))
@@ -28,35 +47,79 @@ vi.mock('@/lib/agents/money-agent', () => ({
     occurred_at: '2026-06-18T14:30:00.000Z',
   }),
 }))
+vi.mock('@/lib/agents/task-agent', () => ({
+  parseTaskEntry: vi.fn().mockResolvedValue({
+    title: 'Call mom', due_at: '2026-06-19T15:00:00.000Z', priority: 'medium',
+  }),
+}))
 
 const { POST } = await import('@/app/api/voice/route')
 
-describe('/api/voice', () => {
-  function makeMultipartReq(blob: Blob): Request {
+async function consumeSSE(res: Response): Promise<Array<Record<string, unknown>>> {
+  if (!res.body) return []
+  const reader = res.body.getReader()
+  const dec = new TextDecoder()
+  let buf = ''
+  const events: Array<Record<string, unknown>> = []
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    let nl
+    while ((nl = buf.indexOf('\n\n')) >= 0) {
+      const raw = buf.slice(0, nl)
+      buf = buf.slice(nl + 2)
+      if (raw.startsWith('data: ')) events.push(JSON.parse(raw.slice(6)))
+    }
+  }
+  return events
+}
+
+describe('/api/voice (SSE)', () => {
+  function multipartReq(blob: Blob): Request {
     const fd = new FormData()
     fd.append('audio', blob, 'voice.webm')
     return new Request('http://x/api/voice', { method: 'POST', body: fd })
   }
 
-  it('round-trips audio → transcript → payload with category_id resolved', async () => {
-    const res = await POST(makeMultipartReq(new Blob(['fake'], { type: 'audio/webm' })))
-    expect(res.status).toBe(200)
-    const body = await res.json() as { transcript: string; payload: { amount: number; category_id: string } }
-    expect(body.transcript).toBe('spent 80 on chai')
-    expect(body.payload.amount).toBe(8000)
-    expect(body.payload.category_id).toBe('cat-food')
+  it('emits 4 events in order for a log_money utterance', async () => {
+    const res = await POST(multipartReq(new Blob(['fake'], { type: 'audio/webm' })))
+    expect(res.headers.get('content-type')).toMatch(/event-stream/)
+    const events = await consumeSSE(res)
+    expect(events.map(e => e.step)).toEqual(['transcribing', 'transcript', 'parsing', 'payload'])
+    expect((events[1] as { text: string }).text).toBe('spent 80 on chai')
+    const payload = (events[3] as { payload: { kind: string; amount: number; category_id: string } }).payload
+    expect(payload.kind).toBe('money')
+    expect(payload.amount).toBe(8000)
+    expect(payload.category_id).toBe('cat-food')
   })
 
-  it('returns 401 without a session', async () => {
+  it('routes log_task to task_agent', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'log_task', confidence: 0.93 })
+
+    const res = await POST(multipartReq(new Blob(['fake'])))
+    const events = await consumeSSE(res)
+    const payload = (events.find(e => e.step === 'payload') as { payload: { kind: string; title: string } }).payload
+    expect(payload.kind).toBe('task')
+    expect(payload.title).toBe('Call mom')
+  })
+
+  it('returns 401 without session', async () => {
     const { getSession } = await import('@/lib/auth')
     ;(getSession as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null)
-    const res = await POST(makeMultipartReq(new Blob(['fake'])))
+    const res = await POST(multipartReq(new Blob(['fake'])))
     expect(res.status).toBe(401)
   })
 
-  it('returns 400 when audio blob is missing', async () => {
-    const fd = new FormData()
-    const res = await POST(new Request('http://x/api/voice', { method: 'POST', body: fd }))
-    expect(res.status).toBe(400)
+  it('emits error event when Whisper fails', async () => {
+    const { groqWhisper } = await import('@/lib/agents/whisper')
+    ;(groqWhisper as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('whisper boom'))
+
+    const res = await POST(multipartReq(new Blob(['fake'])))
+    const events = await consumeSSE(res)
+    const errEvent = events.find(e => e.step === 'error') as { message: string } | undefined
+    expect(errEvent).toBeDefined()
+    expect(errEvent!.message).toMatch(/whisper/i)
   })
 })

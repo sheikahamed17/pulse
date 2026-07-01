@@ -8,10 +8,13 @@ import { useRecurringRules } from '@/hooks/use-recurring-rules'
 import { useCategories } from '@/hooks/use-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { currencySymbol } from '@/lib/currency'
+import { formatLocalDateOnly } from '@/lib/format'
+import { useUserPrefs } from '@/hooks/use-user-prefs'
 
 export default function RecurringSettingsPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
+  const { prefs } = useUserPrefs()
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -78,7 +81,7 @@ export default function RecurringSettingsPage() {
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">
-                {cat ? `${cat.icon ?? ''} ${cat.name} · ` : ''}{periodText} · next {r.next_due_at.slice(0, 10)}
+                {cat ? `${cat.icon ?? ''} ${cat.name} · ` : ''}{periodText} · next {formatLocalDateOnly(r.next_due_at, prefs.tz)}
               </span>
               <div className="mt-1 flex gap-2">
                 <Button size="sm" variant="outline" onClick={() => setActive(r.id, r.is_active ? 0 : 1)}>

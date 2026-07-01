@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { createDb } from '@/lib/db'
+import { isAuthorizedCron } from '@/lib/cron-auth'
 import { computeNextDue, checkEndConditions, type RecurringRule } from '@/lib/recurring'
 import { applyOp } from '@/lib/op-log'
 import type { Op } from '@/types/ops'
@@ -62,27 +63,6 @@ export async function POST(req: Request) {
   return NextResponse.json({ processed })
 }
 
-// Authenticate the cron endpoint with a server-only shared secret. The
-// previously-used `cf-cron` / `x-cf-trigger` headers are user-controllable
-// (any client can set them); Cloudflare's scheduled trigger fires via the
-// Worker `scheduled()` handler, NOT via an HTTP call with a special header.
-// So this route MUST be called via either: (a) the shim Worker's
-// scheduled() handler which reads env.CRON_SECRET and forwards as Bearer
-// auth, or (b) a deliberate manual trigger that includes the same secret.
-//
-// Web Crypto lacks crypto.timingSafeEqual (Node-only); a length-equal
-// XOR loop is the portable constant-time equivalent.
-function isAuthorizedCron(req: Request, env: { CRON_SECRET?: string }): boolean {
-  const auth = req.headers.get('authorization')
-  if (!auth || !env.CRON_SECRET) return false
-  const expected = `Bearer ${env.CRON_SECRET}`
-  if (auth.length !== expected.length) return false
-  let mismatch = 0
-  for (let i = 0; i < auth.length; i++) {
-    mismatch |= auth.charCodeAt(i) ^ expected.charCodeAt(i)
-  }
-  return mismatch === 0
-}
 
 function rowToRule(row: {
   id: string; period: string; interval_count: number; anchor_at: string; next_due_at: string;

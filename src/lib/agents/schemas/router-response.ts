@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const INTENTS = ['log_money', 'query_money', 'chat'] as const
+export const INTENTS = ['log_money', 'log_task', 'query_money', 'query_task', 'chat'] as const
 
 export const RouterResponseSchema = z.object({
   intent: z.enum(INTENTS),

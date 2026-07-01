@@ -7,15 +7,22 @@ import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip'
+import { QueryAnswerCard, type QueryPlan } from '@/components/query-answer-card'
 import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { VoiceRecorder } from '@/components/voice-recorder'
+import { TabBar } from '@/components/tab-bar'
+import { TaskList } from '@/components/task-list'
+import { TaskFilter } from '@/components/task-filter'
+import { TaskSummary } from '@/components/task-summary'
+import { useTabState } from '@/hooks/use-tab-state'
 import { useCategories } from '@/hooks/use-categories'
+import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
+import { callVoiceApiStreaming } from '@/lib/voice-sse'
 import { computeNextDue } from '@/lib/recurring'
-import type { MoneyPayload } from '@/lib/op-schemas/money'
 
 // Delegate to the same engine the cron uses so the FIRST next_due_at clamps
 // day-of-month identically to subsequent fires (Jan 31 + 1mo → Feb 28, not
@@ -40,7 +47,10 @@ export default function AppPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<ChipDraft | null>(null)
+  const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null)
   const [parsing, setParsing] = useState(false)
+  const [activeTab, setTab] = useTabState()
+  const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -69,10 +79,9 @@ export default function AppPage() {
     const onOnline = () => {
       drainVoiceQueue({
         processBlob: async (blob) => {
-          const fd = new FormData()
-          fd.append('audio', blob, 'voice.webm')
-          const res = await fetch('/api/voice', { method: 'POST', body: fd })
-          if (!res.ok) throw new Error(`voice ${res.status}`)
+          // Background drain — events are ignored (no UI to update)
+          const final = await callVoiceApiStreaming(blob, () => {})
+          if (!final) throw new Error('voice drain failed')
           return { ok: true }
         },
         maxRetries: 3,
@@ -85,6 +94,12 @@ export default function AppPage() {
 
   const categories = useCategories(user?.id)
   const categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
+
+  const openTasksForBadge = useTasks(user?.id, 'open')
+  const taskBadgeCount = useMemo(() => {
+    const now = new Date().toISOString()
+    return openTasksForBadge.filter(t => !t.due_at || t.due_at <= now).length
+  }, [openTasksForBadge])
 
   async function parseText() {
     if (!text.trim() || !user) return
@@ -99,12 +114,24 @@ export default function AppPage() {
         }),
       })
       if (!res.ok) throw new Error(`/api/agent ${res.status}`)
-      const data = await res.json() as { payload: MoneyPayload }
-      setDraft(data.payload as ChipDraft)
-      setText('')
+      const data = await res.json() as { intent: string; payload: ChipDraft | QueryPlan | null }
+
+      if (!data.payload) {
+        setText('')
+        return
+      }
+      if ((data.payload as QueryPlan).kind === 'query_money') {
+        setQueryPlan(data.payload as QueryPlan)
+        setText('')
+      } else {
+        setDraft(data.payload as ChipDraft)
+        setText('')
+      }
     } catch (err) {
       console.error(err)
+      // Fallback to a blank money draft (Phase 1 behavior preserved)
       setDraft({
+        kind: 'money',
         amount: 0, currency: 'INR', direction: 'out',
         occurred_at: new Date().toISOString(),
         source: 'manual',
@@ -122,6 +149,29 @@ export default function AppPage() {
   ) {
     if (!user) return
 
+    if (final.kind === 'task') {
+      const op = await generateOp({
+        entity_kind: 'task',
+        entity_id: crypto.randomUUID(),
+        op_type: 'create',
+        payload: {
+          title: final.title,
+          due_at: final.due_at ?? null,
+          priority: final.priority,
+          completed_at: null,
+          source: final.source,
+          raw_input: final.raw_input ?? null,
+        },
+        user_id: user.id,
+      })
+      await applyLocalOp(op)
+      if (activeTab !== 'tasks') setTab('tasks')
+      setDraft(null)
+      pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
+      return
+    }
+
+    // Money kind (Phase 1 logic, preserved verbatim)
     let ruleId: string | null = null
     if (recurring.enabled) {
       ruleId = crypto.randomUUID()
@@ -161,6 +211,7 @@ export default function AppPage() {
       user_id: user.id,
     })
     await applyLocalOp(entryOp)
+    if (activeTab !== 'money') setTab('money')
     setDraft(null)
     pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
   }
@@ -168,76 +219,107 @@ export default function AppPage() {
   if (!user) return <p className="p-8">Loading…</p>
 
   return (
-    <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 md:grid-cols-[1fr_320px]">
-      <div className="flex flex-col gap-6">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Pulse</h1>
-          <div className="flex items-center gap-2">
-            <Link href="/settings" className="text-xs text-muted-foreground hover:underline">Settings</Link>
-            <Button size="sm" variant="outline"
-              onClick={() => authClient.signOut().then(() => router.replace('/login'))}>
-              Sign out
-            </Button>
+    <>
+      <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 pb-24 md:pb-6 md:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-6">
+          <header className="flex items-center justify-between">
+            <h1 className="text-2xl font-semibold">Pulse</h1>
+            <div className="flex items-center gap-2">
+              <Link href="/settings" className="text-xs text-muted-foreground hover:underline">Settings</Link>
+              <Button size="sm" variant="outline"
+                onClick={() => authClient.signOut().then(() => router.replace('/login'))}>
+                Sign out
+              </Button>
+            </div>
+          </header>
+          <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
+
+          {/* Shared input header — voice + text — dispatches to either tab */}
+          <div className="flex justify-center py-2">
+            <VoiceRecorder
+              disabled={draft !== null || parsing || queryPlan !== null}
+              onParsed={(payload, transcript) => {
+                if (!payload) {
+                  setDraft({
+                    kind: 'money',
+                    amount: 0, currency: 'INR', direction: 'out',
+                    occurred_at: new Date().toISOString(),
+                    source: 'voice', raw_input: transcript,
+                  })
+                } else if ((payload as QueryPlan).kind === 'query_money') {
+                  setQueryPlan(payload as QueryPlan)
+                } else {
+                  setDraft(payload as ChipDraft)
+                }
+              }}
+            />
           </div>
-        </header>
-        <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
 
-        {/* Mobile-only: MoneyCard goes above the chat */}
-        <div className="md:hidden">
-          <MoneyCard userId={user.id} />
+          <form onSubmit={(e) => { e.preventDefault(); parseText() }} className="flex gap-2">
+            <Input
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder='spent 80 on chai — or — remind me to call mom'
+              disabled={parsing || draft !== null || queryPlan !== null}
+            />
+            <Button type="submit" disabled={parsing || draft !== null || queryPlan !== null || !text.trim()}>
+              {parsing ? 'Parsing…' : 'Parse'}
+            </Button>
+          </form>
+
+          {draft && (
+            <ConfirmationChip
+              userId={user.id}
+              draft={draft}
+              categoryById={categoryById}
+              onConfirm={confirmEntry}
+              onCancel={() => setDraft(null)}
+            />
+          )}
+
+          {queryPlan && (
+            <QueryAnswerCard
+              userId={user.id}
+              plan={queryPlan}
+              onDismiss={() => setQueryPlan(null)}
+            />
+          )}
+
+          {/* Desktop tab bar — appears in document flow above the tab content */}
+          <div className="hidden md:block">
+            <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
+          </div>
+
+          {/* Conditional tab content */}
+          {activeTab === 'money' && (
+            <>
+              <div className="md:hidden">
+                <MoneyCard userId={user.id} />
+              </div>
+              <MoneyList userId={user.id} />
+            </>
+          )}
+          {activeTab === 'tasks' && (
+            <div className="flex flex-col gap-3">
+              <TaskFilter active={taskFilter} onChange={setTaskFilter} />
+              <TaskList userId={user.id} filter={taskFilter} />
+            </div>
+          )}
         </div>
 
-        <div className="flex justify-center py-2">
-          <VoiceRecorder
-            disabled={draft !== null || parsing}
-            onParsed={(payload, transcript) => {
-              if (!payload) {
-                setDraft({
-                  amount: 0, currency: 'INR', direction: 'out',
-                  occurred_at: new Date().toISOString(),
-                  source: 'voice', raw_input: transcript,
-                })
-              } else {
-                setDraft(payload as ChipDraft)
-              }
-            }}
-          />
-        </div>
+        {/* Desktop-only sticky sidebar (right column) */}
+        <aside className="hidden md:block">
+          <div className="sticky top-6 flex flex-col gap-4">
+            {activeTab === 'money' && <MoneyCard userId={user.id} />}
+            {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
+          </div>
+        </aside>
+      </main>
 
-        <form
-          onSubmit={(e) => { e.preventDefault(); parseText() }}
-          className="flex gap-2"
-        >
-          <Input
-            value={text}
-            onChange={e => setText(e.target.value)}
-            placeholder='spent 80 on chai'
-            disabled={parsing || draft !== null}
-          />
-          <Button type="submit" disabled={parsing || draft !== null || !text.trim()}>
-            {parsing ? 'Parsing…' : 'Parse'}
-          </Button>
-        </form>
-
-        {draft && (
-          <ConfirmationChip
-            userId={user.id}
-            draft={draft}
-            categoryById={categoryById}
-            onConfirm={confirmEntry}
-            onCancel={() => setDraft(null)}
-          />
-        )}
-
-        <MoneyList userId={user.id} />
+      {/* Mobile-only fixed bottom tab bar */}
+      <div className="md:hidden">
+        <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
       </div>
-
-      {/* Desktop-only sidebar */}
-      <aside className="hidden md:block">
-        <div className="sticky top-6 flex flex-col gap-4">
-          <MoneyCard userId={user.id} />
-        </div>
-      </aside>
-    </main>
+    </>
   )
 }
