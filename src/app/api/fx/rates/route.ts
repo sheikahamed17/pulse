@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { getSession } from '@/lib/auth'

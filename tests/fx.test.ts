@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { convertToPrimary } from '@/lib/fx'
 
 function makeFakeDb(rates: Array<{ date: string; target: string; rate: number }>) {
@@ -80,10 +80,6 @@ describe('convertToPrimary', () => {
   })
 
   it('uses the most-recent rate ≤ requested date (stale weekend)', async () => {
-    const db = makeFakeDb([
-      { date: '2026-06-19', target: 'USD', rate: 1.0823 },             // Friday (forward; should NOT match for an earlier date)
-      { date: '2026-06-16', target: 'USD', rate: 1.0800 },             // Monday — most recent ≤ Sunday-06-18
-    ])
     const db2 = makeFakeDb([
       { date: '2026-06-16', target: 'USD', rate: 1.0800 },
     ])
