@@ -27,6 +27,14 @@ vi.mock('@/lib/agents/task-agent', () => ({
   }),
 }))
 
+vi.mock('@/lib/agents/query-money-agent', () => ({
+  parseMoneyQuery: vi.fn().mockResolvedValue({
+    direction: 'out',
+    category_name: null,
+    period: { from: '2026-06-11T00:00:00.000Z', to: '2026-06-18T00:00:00.000Z', label: 'last week' },
+  }),
+}))
+
 vi.mock('@/lib/db', () => ({
   createDb: vi.fn(() => ({
     selectFrom: vi.fn().mockReturnThis(),
@@ -111,5 +119,24 @@ describe('/api/agent — Phase 2 log_task dispatch', () => {
     expect(body.payload.due_at).toBe('2026-06-19T15:00:00.000Z')
     expect(body.payload.priority).toBe('medium')
     expect(body.payload.source).toBe('manual')
+  })
+})
+
+describe('/api/agent — Phase 2.6 query_money dispatch', () => {
+  it('routes a query utterance to parseMoneyQuery and returns query plan', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_money', confidence: 0.93 })
+
+    const res = await POST(new Request('http://x/api/agent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'how much did I spend last week', categories: [] }),
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { intent: string; payload: { kind: string; direction: string; period: { label: string } } }
+    expect(body.intent).toBe('query_money')
+    expect(body.payload.kind).toBe('query_money')
+    expect(body.payload.direction).toBe('out')
+    expect(body.payload.period.label).toBe('last week')
   })
 })

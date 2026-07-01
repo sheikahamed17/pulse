@@ -8,6 +8,7 @@ import { makeGroqClient } from '@/lib/agents/llm-client'
 import { routeIntent } from '@/lib/agents/router'
 import { parseMoneyEntry } from '@/lib/agents/money-agent'
 import { parseTaskEntry } from '@/lib/agents/task-agent'
+import { parseMoneyQuery } from '@/lib/agents/query-money-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -105,7 +106,27 @@ export async function POST(req: Request) {
       })
     }
 
-    // query_money handled in sub-phase 2.6 (Task 39). For now, fall through to "no payload".
+    if (router.intent === 'query_money') {
+      const plan = await parseMoneyQuery({
+        client: groq,
+        text: parsed.data.text,
+        categories: parsed.data.categories.map(c => ({ name: c.name, kind: c.kind })),
+        nowIso,
+        userTz: prefs.tz,
+      })
+      return NextResponse.json({
+        transcript: parsed.data.text,
+        intent: 'query_money',
+        confidence: router.confidence,
+        payload: {
+          kind: 'query_money',
+          direction: plan.direction,
+          category_name: plan.category_name,
+          period: plan.period,
+        },
+      })
+    }
+
     // query_task is Phase 3 — same fall-through.
     return NextResponse.json({
       transcript: parsed.data.text,
