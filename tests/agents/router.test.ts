@@ -69,3 +69,21 @@ describe('routeIntent — Phase 2 (5 intents)', () => {
     expect(r.confidence).toBe(0)
   })
 })
+
+describe('routeIntent — all 5 intents reachable via mocked Groq', () => {
+  const samples = [
+    { intent: 'log_money',   text: 'spent 80 on chai',                              expected: 'log_money' },
+    { intent: 'log_task',    text: 'remind me to call mom tomorrow at 3pm',         expected: 'log_task' },
+    { intent: 'query_money', text: 'how much did I spend last week',                expected: 'query_money' },
+    { intent: 'query_task',  text: 'what do I have due this week',                  expected: 'query_task' },
+    { intent: 'chat',        text: 'thanks',                                        expected: 'chat' },
+  ]
+
+  for (const s of samples) {
+    it(`classifies "${s.text}" as ${s.expected}`, async () => {
+      const client = mockGroqWithJSON({ intent: s.intent, confidence: 0.9 })
+      const r = await routeIntent({ client: client as never, text: s.text })
+      expect(r.intent).toBe(s.expected)
+    })
+  }
+})
