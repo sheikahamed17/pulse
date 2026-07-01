@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
+import { useCategories } from '@/hooks/use-categories'
 import { convertViaRates } from '@/lib/fx'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
@@ -28,11 +29,19 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
   const { prefs } = useUserPrefs()
   const entries = useMoneyEntries(userId, { from: plan.period.from, to: plan.period.to })
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
+  const categories = useCategories(userId)
 
   useEffect(() => {
     const timer = setTimeout(onDismiss, AUTO_DISMISS_MS)
     return () => clearTimeout(timer)
   }, [onDismiss])
+
+  const targetCategoryId = useMemo(() => {
+    if (!plan.category_name) return null
+    const expectedKind = plan.direction === 'out' ? 'spend' : 'income'
+    const match = categories.find(c => c.name === plan.category_name && c.kind === expectedKind)
+    return match?.id ?? null
+  }, [plan.category_name, plan.direction, categories])
 
   const { total, count, conversionDate, multiCurrency } = useMemo(() => {
     let total = 0
@@ -42,13 +51,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
     const seenCurrencies = new Set<string>()
     for (const e of entries) {
       if (e.direction !== plan.direction) continue
-      if (plan.category_name) {
-        // For category filter, we need the category name — but the entry only has category_id.
-        // The chip slot expects this filter to be applied client-side. The agent returned the
-        // exact category_name from the active list; we use useCategories(userId) lookup at call site.
-        // For now: filter relies on the caller's responsibility to pass entries already filtered.
-        // The minimal version below skips category filter — Task 41 wires it via useCategories.
-      }
+      if (targetCategoryId && e.category_id !== targetCategoryId) continue
       count++
       seenCurrencies.add(e.currency)
       if (e.currency === prefs.primary_currency) {
@@ -63,7 +66,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
     }
     if (seenCurrencies.size > 1) multi = true
     return { total, count, conversionDate, multiCurrency: multi }
-  }, [entries, plan.direction, plan.category_name, prefs.primary_currency, rates])
+  }, [entries, plan.direction, targetCategoryId, prefs.primary_currency, rates])
 
   const divisor = prefs.primary_currency === 'JPY' ? 1 : 100
   const major = (total / divisor).toLocaleString(undefined, { maximumFractionDigits: prefs.primary_currency === 'JPY' ? 0 : 2 })
@@ -86,6 +89,12 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
       <p className="mb-3 text-xs text-muted-foreground">
         Based on {count} {count === 1 ? 'entry' : 'entries'}
       </p>
+
+      {plan.category_name && !targetCategoryId && (
+        <p className="mb-3 text-[10px] text-rose-500">
+          Category &quot;{plan.category_name}&quot; not found — showing all categories instead.
+        </p>
+      )}
 
       {multiCurrency && conversionDate && (
         <p className="mb-3 text-[10px] text-muted-foreground">

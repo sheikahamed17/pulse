@@ -7,6 +7,7 @@ import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip'
+import { QueryAnswerCard, type QueryPlan } from '@/components/query-answer-card'
 import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { VoiceRecorder } from '@/components/voice-recorder'
@@ -46,6 +47,7 @@ export default function AppPage() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<ChipDraft | null>(null)
+  const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null)
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
@@ -112,16 +114,19 @@ export default function AppPage() {
         }),
       })
       if (!res.ok) throw new Error(`/api/agent ${res.status}`)
-      const data = await res.json() as { intent: string; payload: ChipDraft | null }
-      if (data.payload) {
-        setDraft(data.payload)
-      } else {
-        // query_money / query_task / chat — not handled in 2.1; sub-phase 2.6 wires query_money.
-        console.warn('/api/agent returned no payload for intent:', data.intent)
-        setText('')               // clear input so user knows we received it
+      const data = await res.json() as { intent: string; payload: ChipDraft | QueryPlan | null }
+
+      if (!data.payload) {
+        setText('')
         return
       }
-      setText('')
+      if ((data.payload as QueryPlan).kind === 'query_money') {
+        setQueryPlan(data.payload as QueryPlan)
+        setText('')
+      } else {
+        setDraft(data.payload as ChipDraft)
+        setText('')
+      }
     } catch (err) {
       console.error(err)
       // Fallback to a blank money draft (Phase 1 behavior preserved)
@@ -232,7 +237,7 @@ export default function AppPage() {
           {/* Shared input header — voice + text — dispatches to either tab */}
           <div className="flex justify-center py-2">
             <VoiceRecorder
-              disabled={draft !== null || parsing}
+              disabled={draft !== null || parsing || queryPlan !== null}
               onParsed={(payload, transcript) => {
                 if (!payload) {
                   setDraft({
@@ -241,6 +246,8 @@ export default function AppPage() {
                     occurred_at: new Date().toISOString(),
                     source: 'voice', raw_input: transcript,
                   })
+                } else if ((payload as QueryPlan).kind === 'query_money') {
+                  setQueryPlan(payload as QueryPlan)
                 } else {
                   setDraft(payload as ChipDraft)
                 }
@@ -253,9 +260,9 @@ export default function AppPage() {
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder='spent 80 on chai — or — remind me to call mom'
-              disabled={parsing || draft !== null}
+              disabled={parsing || draft !== null || queryPlan !== null}
             />
-            <Button type="submit" disabled={parsing || draft !== null || !text.trim()}>
+            <Button type="submit" disabled={parsing || draft !== null || queryPlan !== null || !text.trim()}>
               {parsing ? 'Parsing…' : 'Parse'}
             </Button>
           </form>
@@ -267,6 +274,14 @@ export default function AppPage() {
               categoryById={categoryById}
               onConfirm={confirmEntry}
               onCancel={() => setDraft(null)}
+            />
+          )}
+
+          {queryPlan && (
+            <QueryAnswerCard
+              userId={user.id}
+              plan={queryPlan}
+              onDismiss={() => setQueryPlan(null)}
             />
           )}
 
