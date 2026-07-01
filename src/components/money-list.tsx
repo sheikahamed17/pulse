@@ -7,7 +7,11 @@ import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
 import { useUndoStack } from '@/hooks/use-undo-stack'
+import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { useFxRates } from '@/hooks/use-fx-rates'
 import { currencySymbol } from '@/lib/currency'
+import { convertViaRates } from '@/lib/fx'
+import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import type { MoneyEntryRow } from '@/lib/dexie'
 
 function useLongPress<T>(onLongPress: (arg: T) => void, ms = 500) {
@@ -29,6 +33,9 @@ export function MoneyList({ userId }: Props) {
   const undo = useUndoStack()
   const router = useRouter()
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const { prefs } = useUserPrefs()
+  const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
+  const [expandedFx, setExpandedFx] = useState<string | null>(null)
 
   const longPress = useLongPress<MoneyEntryRow>(e => setMenuFor(e.id))
 
@@ -80,6 +87,20 @@ export function MoneyList({ userId }: Props) {
                 <span className={e.direction === 'out' ? 'text-rose-600' : 'text-emerald-600'}>
                   {formatAmount(e)}
                 </span>
+                {e.currency !== prefs.primary_currency && (
+                  <button
+                    type="button"
+                    className="text-[10px] text-muted-foreground hover:underline text-left"
+                    onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
+                  >
+                    {expandedFx === e.id ? (() => {
+                      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+                      return conv
+                        ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
+                        : 'No FX rate yet for this date'
+                    })() : '≈ convert'}
+                  </button>
+                )}
                 <span className="text-xs text-muted-foreground">
                   {cat ? `${cat.icon ?? ''} ${cat.name}` : 'no category'}{e.description ? ` · ${e.description}` : ''}
                 </span>

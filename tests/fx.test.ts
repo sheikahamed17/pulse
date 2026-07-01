@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { convertToPrimary } from '@/lib/fx'
+import { convertToPrimary, convertViaRates } from '@/lib/fx'
 
 function makeFakeDb(rates: Array<{ date: string; target: string; rate: number }>) {
   return {
@@ -85,5 +85,22 @@ describe('convertToPrimary', () => {
     ])
     const out = await convertToPrimary(db2 as never, 100, 'EUR', 'USD', '2026-06-18T00:00:00.000Z')
     expect(out!.rateDate).toBe('2026-06-16')
+  })
+})
+
+describe('convertViaRates (client-side)', () => {
+  it('converts identical to convertToPrimary', () => {
+    const out = convertViaRates(9050, 'INR', 'USD', '2026-06-18T00:00:00.000Z', [
+      { date: '2026-06-18', target: 'INR', rate: 90.5 },
+      { date: '2026-06-18', target: 'USD', rate: 1.08 },
+    ])
+    expect(out!.amount).toBe(108)
+  })
+
+  it('returns null when a target rate is missing', () => {
+    const out = convertViaRates(100, 'XYZ', 'USD', '2026-06-18T00:00:00.000Z', [
+      { date: '2026-06-18', target: 'USD', rate: 1.08 },
+    ])
+    expect(out).toBeNull()
   })
 })

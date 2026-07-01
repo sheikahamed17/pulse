@@ -69,4 +69,46 @@ export async function convertToPrimary(
   return { amount: primaryMinor, rateDate }
 }
 
+// Client-side conversion using already-fetched FxRateRow[] (no DB access).
+// Same math as convertToPrimary but accepts the rate set directly.
+export function convertViaRates(
+  amount: number,
+  currency: string,
+  primary: string,
+  occurredAt: string,
+  rates: Array<{ date: string; target: string; rate: number }>,
+): { amount: number; rateDate: string } | null {
+  if (currency === primary) {
+    return { amount, rateDate: occurredAt.slice(0, 10) }
+  }
+
+  const asOfDate = occurredAt.slice(0, 10)
+
+  function freshest(target: string) {
+    if (target === 'EUR') return { date: asOfDate, rate: 1 }
+    let best: { date: string; rate: number } | null = null
+    for (const r of rates) {
+      if (r.target !== target) continue
+      if (r.date > asOfDate) continue
+      if (!best || r.date > best.date) best = { date: r.date, rate: r.rate }
+    }
+    return best
+  }
+
+  const eurToCurrency = freshest(currency)
+  const eurToPrimary  = freshest(primary)
+  if (!eurToCurrency || !eurToPrimary) return null
+
+  const ZERO_MINOR = new Set(['JPY'])
+  const div = (c: string) => ZERO_MINOR.has(c) ? 1 : 100
+
+  const major = amount / div(currency)
+  const eur = major / eurToCurrency.rate
+  const primaryMajor = eur * eurToPrimary.rate
+  const primaryMinor = Math.round(primaryMajor * div(primary))
+
+  const rateDate = eurToCurrency.date < eurToPrimary.date ? eurToCurrency.date : eurToPrimary.date
+  return { amount: primaryMinor, rateDate }
+}
+
 export type ConversionResult = Awaited<ReturnType<typeof convertToPrimary>>

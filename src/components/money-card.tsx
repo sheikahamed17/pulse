@@ -3,6 +3,11 @@
 import { useMemo } from 'react'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
+import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { useFxRates } from '@/hooks/use-fx-rates'
+import { convertViaRates } from '@/lib/fx'
+import { currencySymbol } from '@/lib/currency'
+import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 
 type Props = { userId: string }
 
@@ -16,13 +21,46 @@ export function MoneyCard({ userId }: Props) {
   const current = useMoneyEntries(userId, range)
   const previous = useMoneyEntries(userId, prevRange)
   const categories = useCategories(userId)
+  const { prefs } = useUserPrefs()
+  const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
   const catName = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
 
-  const currentSpend  = sumDirection(current,  'out')
-  const previousSpend = sumDirection(previous, 'out')
-  const delta = previousSpend === 0 ? null : ((currentSpend - previousSpend) / previousSpend) * 100
+  // Aggregate currentSpend in primary currency
+  let primarySpend = 0
+  let conversionApplied = false
+  let conversionDate: string | null = null
+  const skippedCurrencies = new Set<string>()
+  for (const e of current) {
+    if (e.direction !== 'out') continue
+    if (e.currency === prefs.primary_currency) {
+      primarySpend += e.amount
+    } else {
+      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+      if (conv) {
+        primarySpend += conv.amount
+        conversionApplied = true
+        if (!conversionDate || conv.rateDate < conversionDate) conversionDate = conv.rateDate
+      } else {
+        skippedCurrencies.add(e.currency)
+      }
+    }
+  }
 
-  const topCategories = useMemo(() => topNByCategory(current, catName, 3), [current, catName])
+  // Similarly for previousSpend
+  let previousPrimary = 0
+  for (const e of previous) {
+    if (e.direction !== 'out') continue
+    if (e.currency === prefs.primary_currency) {
+      previousPrimary += e.amount
+    } else {
+      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+      if (conv) previousPrimary += conv.amount
+    }
+  }
+
+  const delta = previousPrimary === 0 ? null : ((primarySpend - previousPrimary) / previousPrimary) * 100
+
+  const topCategories = useMemo(() => topNByCategoryWithConversion(current, catName, prefs.primary_currency, rates, 3), [current, catName, prefs.primary_currency, rates])
   const topMax = Math.max(1, ...topCategories.map(([, amt]) => amt))
 
   return (
@@ -36,7 +74,8 @@ export function MoneyCard({ userId }: Props) {
         )}
       </header>
       <div className="text-3xl font-semibold tabular-nums">
-        ₹{(currentSpend / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        {currencySymbol(prefs.primary_currency)}
+        {(primarySpend / (prefs.primary_currency === 'JPY' ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
       </div>
       <ul className="flex flex-col gap-1.5 pt-1">
         {topCategories.length === 0 && (
@@ -51,28 +90,43 @@ export function MoneyCard({ userId }: Props) {
                 style={{ width: `${(amt / topMax) * 100}%` }}
               />
             </div>
-            <span className="tabular-nums">₹{(amt / 100).toFixed(0)}</span>
+            <span className="tabular-nums">{currencySymbol(prefs.primary_currency)}{(amt / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(0)}</span>
           </li>
         ))}
       </ul>
+      {(conversionApplied || skippedCurrencies.size > 0) && (
+        <p className="border-t pt-2 text-[10px] text-muted-foreground">
+          {conversionApplied && conversionDate && (
+            <>Includes conversion via ECB {conversionDate}. </>
+          )}
+          {skippedCurrencies.size > 0 && (
+            <>Excluded {[...skippedCurrencies].join(', ')} (no FX rate yet).</>
+          )}
+        </p>
+      )}
     </section>
   )
 }
 
-function sumDirection(entries: ReturnType<typeof useMoneyEntries>, dir: 'out' | 'in'): number {
-  return entries.filter(e => e.direction === dir).reduce((s, e) => s + e.amount, 0)
-}
-
-function topNByCategory(
+function topNByCategoryWithConversion(
   entries: ReturnType<typeof useMoneyEntries>,
   catName: Map<string, ReturnType<typeof useCategories>[number]>,
+  primaryCurrency: string,
+  rates: Array<{ date: string; target: string; rate: number }>,
   n: number,
 ): Array<[ReturnType<typeof useCategories>[number] | undefined, number]> {
   const totals = new Map<string | undefined, number>()
   for (const e of entries) {
     if (e.direction !== 'out') continue
     const key = e.category_id ?? undefined
-    totals.set(key, (totals.get(key) ?? 0) + e.amount)
+    if (e.currency === primaryCurrency) {
+      totals.set(key, (totals.get(key) ?? 0) + e.amount)
+    } else {
+      const conv = convertViaRates(e.amount, e.currency, primaryCurrency, e.occurred_at, rates)
+      if (conv) {
+        totals.set(key, (totals.get(key) ?? 0) + conv.amount)
+      }
+    }
   }
   return [...totals.entries()]
     .map(([cid, amt]) => [cid ? catName.get(cid) : undefined, amt] as [ReturnType<typeof useCategories>[number] | undefined, number])
