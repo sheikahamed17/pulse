@@ -22,6 +22,7 @@ export default function PreferencesPage() {
   const [tzQuery, setTzQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const previousPrefsRef = useRef(prefs)
 
   useEffect(() => {
@@ -48,11 +49,13 @@ export default function PreferencesPage() {
 
   async function save() {
     setBusy(true)
+    setSaveError(null)
     try {
       await savePrefs({ primary_currency: state.primaryCurrency, tz: state.tz })
       setDirty(false)
     } catch (err) {
       console.error('save prefs', err)
+      setSaveError((err as Error).message || 'Could not save preferences. Please try again.')
     } finally {
       setBusy(false)
     }
@@ -63,6 +66,7 @@ export default function PreferencesPage() {
       const detected = Intl.DateTimeFormat().resolvedOptions().timeZone
       setState(s => ({ ...s, tz: detected }))
       setDirty(true)
+      setSaveError(null)
     } catch {
       /* ignore */
     }
@@ -81,7 +85,7 @@ export default function PreferencesPage() {
         <label className="text-sm font-medium">Primary currency</label>
         <select
           value={state.primaryCurrency}
-          onChange={e => { setState(s => ({ ...s, primaryCurrency: e.target.value })); setDirty(true) }}
+          onChange={e => { setState(s => ({ ...s, primaryCurrency: e.target.value })); setDirty(true); setSaveError(null) }}
           className="rounded-md border bg-background px-3 py-2 text-sm"
         >
           {SUPPORTED_CURRENCIES.map(c => (
@@ -100,12 +104,14 @@ export default function PreferencesPage() {
           onChange={e => setTzQuery(e.target.value)}
           placeholder="Search timezones…"
         />
-        <div className="max-h-48 overflow-y-auto rounded-md border bg-background">
+        <div role="listbox" aria-label="Time zone" className="max-h-48 overflow-y-auto rounded-md border bg-background">
           {filteredTzs.map(z => (
             <button
               key={z}
               type="button"
-              onClick={() => { setState(s => ({ ...s, tz: z })); setTzQuery(''); setDirty(true) }}
+              role="option"
+              aria-selected={state.tz === z}
+              onClick={() => { setState(s => ({ ...s, tz: z })); setTzQuery(''); setDirty(true); setSaveError(null) }}
               className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition hover:bg-accent ${
                 state.tz === z ? 'bg-accent font-medium' : ''
               }`}
@@ -162,19 +168,25 @@ export default function PreferencesPage() {
         )}
       </section>
 
-      <div className="flex gap-2">
-        <Button onClick={save} disabled={!dirty || busy}>
-          {busy ? 'Saving…' : 'Save'}
-        </Button>
-        {dirty && (
-          <Button variant="ghost" onClick={() => {
-            setState({
-              primaryCurrency: prefs.primary_currency,
-              tz: prefs.tz,
-            })
-            setDirty(false)
-          }}>Discard</Button>
+      <div className="flex flex-col gap-2">
+        {saveError && (
+          <p role="alert" className="text-sm text-rose-600">{saveError}</p>
         )}
+        <div className="flex gap-2">
+          <Button onClick={save} disabled={!dirty || busy}>
+            {busy ? 'Saving…' : 'Save'}
+          </Button>
+          {dirty && (
+            <Button variant="ghost" onClick={() => {
+              setState({
+                primaryCurrency: prefs.primary_currency,
+                tz: prefs.tz,
+              })
+              setDirty(false)
+              setSaveError(null)
+            }}>Discard</Button>
+          )}
+        </div>
       </div>
     </main>
   )
