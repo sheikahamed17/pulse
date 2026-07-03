@@ -9,13 +9,14 @@ import { writeDigestNarrative, fallbackSummary } from '@/lib/agents/digest-agent
 import { makeGroqClient } from '@/lib/agents/llm-client'
 import { applyOp } from '@/lib/op-log'
 import { serverHlcFor } from '@/lib/server-hlc'
+import { sendPushToUser } from '@/lib/web-push'
 import type { Op } from '@/types/ops'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   const { env } = getCloudflareContext()
-  const cfEnv = env as { CRON_SECRET?: string; DB: D1Database; GROQ_API_KEY?: string }
+  const cfEnv = env as { CRON_SECRET?: string; DB: D1Database; GROQ_API_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_PUBLIC_KEY?: string }
 
   if (!isAuthorizedCron(req, cfEnv)) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
@@ -156,6 +157,13 @@ export async function POST(req: Request) {
       })
       .onConflict(oc => oc.column('id').doNothing())
       .execute()
+
+    // Send wake-up push to the user's subscriptions
+    try {
+      await sendPushToUser(db, cfEnv, user.id)
+    } catch (err) {
+      console.error(`digest cron: sendPushToUser failed for user ${user.id}:`, err)
+    }
 
     digestsCreated++
   }

@@ -208,8 +208,10 @@ vi.mock('@opennextjs/cloudflare', () => ({
   getCloudflareContext: () => ({ env: { DB: null, CRON_SECRET: TEST_SECRET } }),
 }))
 vi.mock('@/lib/db', () => ({ createDb: () => fakeDb }))
+vi.mock('@/lib/web-push', () => ({ sendPushToUser: vi.fn().mockResolvedValue({ sent: 1, pruned: 0 }) }))
 
 const { POST } = await import('@/app/api/cron/digest/route')
+const { sendPushToUser } = await import('@/lib/web-push')
 
 function cronReq(secret = TEST_SECRET) {
   return new Request('http://x/api/cron/digest', {
@@ -223,6 +225,21 @@ describe('/api/cron/digest', () => {
     opLogTable.length = 0
     insightsTable.length = 0
     pushNotificationsTable.length = 0
+    // Restore fixture tables
+    moneyEntriesTable.length = 0
+    moneyEntriesTable.push({
+      id: 'e1', user_id: 'user-1', amount: 50000, currency: 'INR', direction: 'out',
+      category_id: null, description: 'test', occurred_at: '2026-06-25T10:00:00.000Z',
+      source: 'manual', raw_input: null, recurring_rule_id: null,
+      field_hlcs: '{}', deleted_at: null, created_at: '2026-06-25T10:00:00.000Z', updated_at: '2026-06-25T10:00:00.000Z',
+    })
+    tasksTable.length = 0
+    tasksTable.push({
+      id: 't1', user_id: 'user-1', title: 'test task', due_at: '2026-06-25T10:00:00.000Z',
+      priority: 'high', completed_at: null, source: 'manual', raw_input: null,
+      field_hlcs: '{}', deleted_at: null, created_at: '2026-06-25T10:00:00.000Z', updated_at: '2026-06-25T10:00:00.000Z',
+    })
+    vi.mocked(sendPushToUser).mockClear()
     // Fix 3: Pin time to 2026-06-29T02:30:00.000Z (Monday 08:00 Kolkata, Sunday in Americas)
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-29T02:30:00.000Z'))
@@ -294,5 +311,13 @@ describe('/api/cron/digest', () => {
     await POST(cronReq())
     const secondCount = opLogTable.length
     expect(secondCount).toBe(firstCount) // no new entries added
+  })
+
+  it('sends push to user after inserting notification row', async () => {
+    const res = await POST(cronReq())
+    expect(res.status).toBe(200)
+    const body = await res.json() as { digests_created: number }
+    expect(body.digests_created).toBeGreaterThan(0)
+    expect(vi.mocked(sendPushToUser)).toHaveBeenCalled()
   })
 })
