@@ -9,6 +9,13 @@ import { OpSchema, type Op } from '@/types/ops'
 import { mergeOpsForUser } from '@/lib/sync-server'
 import { applyOp } from '@/lib/op-log'
 import type { DB } from '@/lib/db'
+import {
+  MONEY_FIELDS,
+  RECURRING_FIELDS,
+  CATEGORY_FIELDS,
+  TASK_FIELDS,
+  INSIGHT_FIELDS,
+} from '@/lib/entity-fields'
 
 const RequestSchema = z.object({
   device_id: z.string().min(1),
@@ -117,31 +124,6 @@ async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
       return // op_log stores the op; no materialization yet
   }
 }
-
-const MONEY_FIELDS = [
-  'amount', 'currency', 'direction', 'category_id', 'description',
-  'occurred_at', 'source', 'receipt_key', 'raw_input', 'recurring_rule_id',
-] as const
-
-const RECURRING_FIELDS = [
-  'amount', 'currency', 'direction', 'category_id', 'description',
-  'period', 'interval_count', 'anchor_at', 'next_due_at',
-  'end_condition_kind', 'end_until', 'end_count',
-  'occurrences_so_far', 'is_active',
-] as const
-
-const CATEGORY_FIELDS = [
-  'name', 'kind', 'icon', 'color', 'sort_order', 'is_archived',
-] as const
-
-const TASK_FIELDS = [
-  'title', 'due_at', 'priority', 'completed_at',
-  'source', 'raw_input',
-] as const
-
-const INSIGHT_FIELDS = [
-  'period', 'starts_at', 'ends_at', 'summary', 'metrics',
-] as const
 
 async function materializeRow_LWW(
   db: Kysely<DB>,

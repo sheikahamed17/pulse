@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { SUPPORTED_CURRENCIES } from './money'
 
-export const RecurringPayloadSchema = z.object({
+export const RecurringPayloadObject = z.object({
   amount: z.number().int().nonnegative(),
   currency: z.enum(SUPPORTED_CURRENCIES),
   direction: z.enum(['out', 'in']),
@@ -16,7 +16,9 @@ export const RecurringPayloadSchema = z.object({
   end_count: z.number().int().positive().nullable().optional(),
   occurrences_so_far: z.number().int().nonnegative().optional(),
   is_active: z.union([z.literal(0), z.literal(1)]),
-}).refine(
+})
+
+export const RecurringPayloadSchema = RecurringPayloadObject.refine(
   (v) => v.end_condition_kind !== 'until' || !!v.end_until,
   { message: 'end_until is required when end_condition_kind = "until"' },
 ).refine(
