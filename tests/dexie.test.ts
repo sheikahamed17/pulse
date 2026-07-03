@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import 'fake-indexeddb/auto'
-import { db, resetDb } from '@/lib/dexie'
+import { db, resetDb, type InsightRow, type ReceiptQueueItem } from '@/lib/dexie'
 
 describe('Dexie schema v2', () => {
   beforeEach(async () => { await resetDb() })
@@ -17,7 +17,7 @@ describe('Dexie schema v2', () => {
       amount: 8000, currency: 'INR', direction: 'out' as const,
       category_id: 'c1', description: 'chai',
       occurred_at: '2026-06-18T14:30:00Z',
-      source: 'voice' as const, raw_input: 'spent 80 on chai',
+      source: 'voice' as const, receipt_key: null, raw_input: 'spent 80 on chai',
       recurring_rule_id: null,
       field_hlcs: { amount: '0000000000000001-000000-d1' },
       deleted_at: null,
@@ -35,13 +35,13 @@ describe('Dexie schema v2', () => {
       { id: 'a', user_id: 'u1', amount: 1, currency: 'INR', direction: 'out',
         category_id: null, description: null,
         occurred_at: '2026-06-01T00:00:00Z',
-        source: 'manual', raw_input: null, recurring_rule_id: null,
+        source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
         field_hlcs: {}, deleted_at: null,
         created_at: '2026-06-01T00:00:00Z', updated_at: '2026-06-01T00:00:00Z' },
       { id: 'b', user_id: 'u1', amount: 2, currency: 'INR', direction: 'out',
         category_id: null, description: null,
         occurred_at: '2026-06-15T00:00:00Z',
-        source: 'manual', raw_input: null, recurring_rule_id: null,
+        source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
         field_hlcs: {}, deleted_at: null,
         created_at: '2026-06-15T00:00:00Z', updated_at: '2026-06-15T00:00:00Z' },
     ])
@@ -128,10 +128,108 @@ describe('Dexie schema v3 — Phase 2', () => {
       amount: 100, currency: 'INR', direction: 'out',
       category_id: null, description: null,
       occurred_at: '2026-06-18T00:00:00.000Z',
-      source: 'manual', raw_input: null, recurring_rule_id: null,
+      source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
       field_hlcs: {}, deleted_at: null,
       created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z',
     })
     expect(await db.money_entries.count()).toBe(1)
+  })
+})
+
+describe('Dexie v4: insights + receipt_queue — Phase 3', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('exposes the Phase 3 stores', () => {
+    expect(db.insights).toBeDefined()
+    expect(db.receipt_queue).toBeDefined()
+  })
+
+  it('compound index [user_id+starts_at] on insights supports range queries', async () => {
+    const insight1: InsightRow = {
+      id: 'insight-1',
+      user_id: 'u1',
+      period: 'weekly',
+      starts_at: '2026-06-14T18:30:00.000Z',
+      ends_at: '2026-06-21T18:30:00.000Z',
+      summary: 'Week 1',
+      metrics: JSON.stringify({ spend: 1000 }),
+      field_hlcs: { summary: '1' },
+      deleted_at: null,
+      created_at: '2026-06-21T12:00:00.000Z',
+      updated_at: '2026-06-21T12:00:00.000Z',
+    }
+    const insight2: InsightRow = {
+      id: 'insight-2',
+      user_id: 'u1',
+      period: 'weekly',
+      starts_at: '2026-06-21T18:30:00.000Z',
+      ends_at: '2026-06-28T18:30:00.000Z',
+      summary: 'Week 2',
+      metrics: JSON.stringify({ spend: 1500 }),
+      field_hlcs: { summary: '2' },
+      deleted_at: null,
+      created_at: '2026-06-28T12:00:00.000Z',
+      updated_at: '2026-06-28T12:00:00.000Z',
+    }
+    await db.insights.bulkPut([insight1, insight2])
+    const rows = await db.insights
+      .where('[user_id+starts_at]')
+      .between(['u1', '2026-06-20T00:00:00.000Z'], ['u1', '2026-06-30T00:00:00.000Z'])
+      .toArray()
+    expect(rows).toHaveLength(1)
+    expect(rows[0].id).toBe('insight-2')
+  })
+
+  it('can insert and retrieve InsightRow', async () => {
+    const insight: InsightRow = {
+      id: 'insight-1',
+      user_id: 'user-1',
+      period: 'weekly',
+      starts_at: '2026-06-21T18:30:00.000Z',
+      ends_at: '2026-06-28T18:30:00.000Z',
+      summary: 'Great week!',
+      metrics: JSON.stringify({ spend_total: 5000 }),
+      field_hlcs: { summary: '1-summary', metrics: '1-metrics' },
+      deleted_at: null,
+      created_at: '2026-06-28T12:00:00.000Z',
+      updated_at: '2026-06-28T12:00:00.000Z',
+    }
+    await db.insights.put(insight)
+    const retrieved = await db.insights.get('insight-1')
+    expect(retrieved).toEqual(insight)
+  })
+
+  it('can insert and retrieve ReceiptQueueItem', async () => {
+    const blob = new Blob(['test'], { type: 'image/jpeg' })
+    const item: ReceiptQueueItem = {
+      id: 'receipt-1',
+      blob,
+      created_at: '2026-06-28T12:00:00.000Z',
+      retry_count: 0,
+      status: 'queued',
+    }
+    await db.receipt_queue.put(item as never)
+    const retrieved = await db.receipt_queue.get('receipt-1') as unknown as ReceiptQueueItem | undefined
+    expect(retrieved?.id).toBe('receipt-1')
+    expect(retrieved?.status).toBe('queued')
+  })
+
+  it('resetDb clears insights and receipt_queue', async () => {
+    await db.insights.put({
+      id: 'i1',
+      user_id: 'u1',
+      period: 'weekly',
+      starts_at: '2026-06-21T18:30:00.000Z',
+      ends_at: '2026-06-28T18:30:00.000Z',
+      summary: 'test',
+      metrics: '{}',
+      field_hlcs: {},
+      deleted_at: null,
+      created_at: '2026-06-28T12:00:00.000Z',
+      updated_at: '2026-06-28T12:00:00.000Z',
+    })
+    await resetDb()
+    const count = await db.insights.count()
+    expect(count).toBe(0)
   })
 })

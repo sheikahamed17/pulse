@@ -14,6 +14,28 @@ type VoiceQueueItem = {
   status: 'queued' | 'transcribing' | 'done' | 'failed'
 }
 
+export type InsightRow = {
+  id: string
+  user_id: string
+  period: 'weekly'
+  starts_at: string
+  ends_at: string
+  summary: string
+  metrics: string             // JSON string (deserialize on client)
+  field_hlcs: Record<string, string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type ReceiptQueueItem = {
+  id: string
+  blob: Blob
+  created_at: string
+  retry_count: number
+  status: 'queued' | 'transcribing' | 'done' | 'failed'
+}
+
 export type WidgetRow = {
   id: string
   user_id: string
@@ -71,7 +93,8 @@ export type MoneyEntryRow = {
   category_id: string | null
   description: string | null
   occurred_at: string
-  source: 'voice' | 'manual' | 'recurring'
+  source: 'voice' | 'manual' | 'recurring' | 'receipt'
+  receipt_key: string | null
   raw_input: string | null
   recurring_rule_id: string | null
   field_hlcs: Record<string, string>
@@ -112,6 +135,8 @@ class PulseDb extends Dexie {
   recurring_rules!: EntityTable<RecurringRuleRow, 'id'>
   money_entries!: EntityTable<MoneyEntryRow, 'id'>
   tasks!: EntityTable<TaskRow, 'id'>
+  insights!: EntityTable<InsightRow, 'id'>
+  receipt_queue!: EntityTable<ReceiptQueueItem, 'id'>
   // Dexie 4's EntityTable<T, K> expects K extends keyof T; compound key '[date+target]' is not a single keyof — fall back to `any` for the key generic only.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fx_rates!: EntityTable<FxRateRow, any>
@@ -133,6 +158,10 @@ class PulseDb extends Dexie {
       tasks:    'id, user_id, due_at, completed_at, [user_id+due_at], [user_id+completed_at]',
       fx_rates: '[date+target], target, date',
     })
+    this.version(4).stores({
+      insights: 'id, user_id, [user_id+starts_at]',
+      receipt_queue: 'id, status, created_at',
+    })
   }
 }
 
@@ -147,5 +176,7 @@ export async function resetDb() {
   await db.recurring_rules.clear()
   await db.money_entries.clear()
   await db.tasks.clear()
+  await db.insights.clear()
+  await db.receipt_queue.clear()
   await db.fx_rates.clear()
 }
