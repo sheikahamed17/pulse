@@ -28,3 +28,9 @@ crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1"]
 # Local-dev notes:
 # - `pnpm exec wrangler dev` uses --persist by default for D1 (file under .wrangler/)
 # - `pnpm exec wrangler d1 execute pulse --remote ...` writes to the cloud DB
+
+[vars]
+# VAPID_PUBLIC_KEY is the public ES256 key for Web Push. Generated once via:
+#   node scripts/generate-vapid-keys.mjs
+# The value is set by Sheik during push setup; see docs/runbooks/push-setup.md
+# VAPID_PUBLIC_KEY = "base64url_public_key_here"
