@@ -111,6 +111,8 @@ async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
       return materializeRow_LWW(db, op, userId, 'categories', CATEGORY_FIELDS)
     case 'task':
       return materializeRow_LWW(db, op, userId, 'tasks', TASK_FIELDS)
+    case 'insight':
+      return materializeRow_LWW(db, op, userId, 'insights', INSIGHT_FIELDS)
     default:
       return // op_log stores the op; no materialization yet
   }
@@ -118,7 +120,7 @@ async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
 
 const MONEY_FIELDS = [
   'amount', 'currency', 'direction', 'category_id', 'description',
-  'occurred_at', 'source', 'raw_input', 'recurring_rule_id',
+  'occurred_at', 'source', 'receipt_key', 'raw_input', 'recurring_rule_id',
 ] as const
 
 const RECURRING_FIELDS = [
@@ -137,11 +139,15 @@ const TASK_FIELDS = [
   'source', 'raw_input',
 ] as const
 
+const INSIGHT_FIELDS = [
+  'period', 'starts_at', 'ends_at', 'summary', 'metrics',
+] as const
+
 async function materializeRow_LWW(
   db: Kysely<DB>,
   op: Op,
   userId: string,
-  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks',
+  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'insights',
   fields: readonly string[],
 ) {
   const existing = await db

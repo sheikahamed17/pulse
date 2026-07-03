@@ -56,6 +56,7 @@ function resetMockDb() {
     money_entries: [],
     recurring_rules: [],
     tasks: [],
+    insights: [],
   }
 }
 
@@ -355,6 +356,42 @@ describe('/api/sync — Phase 2 task entity_kind', () => {
       expect(rows).toHaveLength(1)
       expect(rows[0].title).toBe('call mom')
       expect(rows[0].priority).toBe('medium')
+    })
+  })
+})
+
+describe('/api/sync — Phase 3 insight materialization', () => {
+  it('materializes a create insight op to D1 insights table', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const op = {
+        id: 'op-insight-1',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'insight',
+        entity_id: 'insight-1',
+        op_type: 'create' as const,
+        payload: {
+          period: 'weekly',
+          starts_at: '2026-06-21T18:30:00.000Z',
+          ends_at: '2026-06-28T18:30:00.000Z',
+          summary: 'Great week!',
+          metrics: JSON.stringify({ spend_total: 5000 }),
+        },
+        schema_version: 1,
+      }
+      const push = await callSync({ device_id: 'd1', new_ops: [op] })
+      expect(push.applied_ack).toEqual(['op-insight-1'])
+
+      const pull = await callSync({ device_id: 'd2', new_ops: [] })
+      expect(pull.new_ops_from_server).toHaveLength(1)
+      expect(pull.new_ops_from_server[0].entity_kind).toBe('insight')
+
+      // Server-side row materialized
+      const rows = await testDb.selectFrom('insights').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].summary).toBe('Great week!')
+      expect(rows[0].period).toBe('weekly')
     })
   })
 })

@@ -5,6 +5,7 @@ import { createDb } from '@/lib/db'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 import { computeNextDue, checkEndConditions, type RecurringRule } from '@/lib/recurring'
 import { applyOp } from '@/lib/op-log'
+import { serverHlcFor } from '@/lib/server-hlc'
 import type { Op } from '@/types/ops'
 
 export const dynamic = 'force-dynamic'
@@ -165,7 +166,3 @@ async function emitEntry(
     .execute()
 }
 
-function serverHlcFor(iso: string): string {
-  const ms = new Date(iso).getTime().toString().padStart(16, '0')
-  return `${ms}-000000-cron`
-}
