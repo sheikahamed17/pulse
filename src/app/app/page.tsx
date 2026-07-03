@@ -12,6 +12,7 @@ import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { DigestCard } from '@/components/digest-card'
 import { VoiceRecorder } from '@/components/voice-recorder'
+import { ReceiptButton } from '@/components/receipt-button'
 import { TabBar } from '@/components/tab-bar'
 import { TaskList } from '@/components/task-list'
 import { TaskFilter } from '@/components/task-filter'
@@ -248,7 +249,7 @@ export default function AppPage() {
           <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
 
           {/* Shared input header — voice + text — dispatches to either tab */}
-          <div className="flex justify-center py-2">
+          <div className="flex justify-center gap-2 py-2">
             <VoiceRecorder
               disabled={draft !== null || parsing || queryPlan !== null}
               onParsed={(payload, transcript) => {
@@ -264,6 +265,12 @@ export default function AppPage() {
                 } else {
                   setDraft(payload as ChipDraft)
                 }
+              }}
+            />
+            <ReceiptButton
+              disabled={draft !== null || parsing || queryPlan !== null}
+              onParsed={(payload, previewUrl) => {
+                setDraft({ ...(payload as unknown as ChipDraft), receiptPreviewUrl: previewUrl } as unknown as ChipDraft)
               }}
             />
           </div>
