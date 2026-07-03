@@ -19,6 +19,8 @@ import { TaskSummary } from '@/components/task-summary'
 import { useTabState } from '@/hooks/use-tab-state'
 import { useCategories } from '@/hooks/use-categories'
 import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
+import { usePushSubscription } from '@/hooks/use-push-subscription'
+import { db } from '@/lib/dexie'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
@@ -52,6 +54,8 @@ export default function AppPage() {
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
+  const { status: pushStatus, subscribe: pushSubscribe } = usePushSubscription()
+  const [showPushNudge, setShowPushNudge] = useState(false)
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -168,6 +172,14 @@ export default function AppPage() {
       await applyLocalOp(op)
       if (activeTab !== 'tasks') setTab('tasks')
       setDraft(null)
+      if (final.due_at && pushStatus === 'unsubscribed') {
+        try {
+          const shown = await db.sync_meta.get('push-nudge-shown')
+          if (!shown) setShowPushNudge(true)
+        } catch (err) {
+          console.warn('nudge check failed:', err)
+        }
+      }
       pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
       return
     }
@@ -290,6 +302,35 @@ export default function AppPage() {
           <div className="hidden md:block">
             <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
           </div>
+
+          {showPushNudge && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+              <span className="text-blue-900">Get notified when tasks are due</span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowPushNudge(false)
+                    await db.sync_meta.put({ key: 'push-nudge-shown', value: '1' })
+                    await pushSubscribe().catch((err) => console.error('subscribe', err))
+                  }}
+                  className="font-semibold text-blue-600 hover:underline"
+                >
+                  Enable
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowPushNudge(false)
+                    await db.sync_meta.put({ key: 'push-nudge-shown', value: '1' })
+                  }}
+                  className="text-blue-600 hover:underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Conditional tab content */}
           {activeTab === 'money' && (
