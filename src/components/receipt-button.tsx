@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import type { ReceiptStreamEvent } from '@/lib/receipt-sse'
 import { callReceiptApiStreaming } from '@/lib/receipt-sse'
+import { enqueueReceipt } from '@/lib/receipt-queue'
 import { Button } from '@/components/ui/button'
 
 type Props = {
@@ -36,6 +37,8 @@ export function ReceiptButton({ disabled, onParsed }: Props) {
     } catch (err) {
       setErrorMsg((err as Error).message)
       setState('error')
+      // Enqueue the receipt for later retry
+      await enqueueReceipt(file)
     }
   }
 

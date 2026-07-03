@@ -26,6 +26,8 @@ import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
 import { callVoiceApiStreaming } from '@/lib/voice-sse'
+import { drainReceiptQueue } from '@/lib/receipt-queue'
+import { callReceiptApiStreaming } from '@/lib/receipt-sse'
 import { computeNextDue } from '@/lib/recurring'
 
 // Delegate to the same engine the cron uses so the FIRST next_due_at clamps
@@ -92,6 +94,30 @@ export default function AppPage() {
         },
         maxRetries: 3,
       }).catch(err => console.error('drain', err))
+    }
+    window.addEventListener('online', onOnline)
+    onOnline()
+    return () => window.removeEventListener('online', onOnline)
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    const onOnline = () => {
+      drainReceiptQueue({
+        processBlob: async (blob) => {
+          // Background drain — mirrors the voice-queue drain effect exactly.
+          // The R2 upload + vision parse happen server-side; the parsed payload
+          // is intentionally discarded here (no chip surfaced) so a background
+          // drain never clobbers an active edit. The receipt image is preserved
+          // in R2 regardless and is viewable via the T36 viewer. Surfacing a
+          // drained receipt as a chip would need a draftRef (to read current
+          // draft without putting `draft` in deps) — deliberately deferred.
+          const final = await callReceiptApiStreaming(blob, () => {})
+          if (!final) throw new Error('receipt drain failed')
+          return { ok: true }
+        },
+        maxRetries: 3,
+      }).catch(err => console.error('receipt drain', err))
     }
     window.addEventListener('online', onOnline)
     onOnline()

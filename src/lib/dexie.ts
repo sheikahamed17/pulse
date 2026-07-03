@@ -33,7 +33,7 @@ export type ReceiptQueueItem = {
   blob: Blob
   created_at: string
   retry_count: number
-  status: 'queued' | 'transcribing' | 'done' | 'failed'
+  status: 'queued' | 'processing' | 'done' | 'failed'
 }
 
 export type WidgetRow = {
