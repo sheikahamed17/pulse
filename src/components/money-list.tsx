@@ -110,13 +110,10 @@ export function MoneyList({ userId }: Props) {
                     className="mt-0.5 self-start text-xs text-blue-600 hover:underline"
                     onClick={(ev) => {
                       ev.stopPropagation()
-                      fetch(`/api/receipt/${e.receipt_key}`)
-                        .then(r => {
-                          if (!r.ok) throw new Error('fetch failed')
-                          return r.blob()
-                        })
-                        .then(blob => window.open(URL.createObjectURL(blob), '_blank'))
-                        .catch(err => console.error('receipt view', err))
+                      // Same-origin authenticated GET (cookie session) that returns the
+                      // image directly — navigate to it. No fetch/blob/object-URL, so
+                      // there is nothing to leak or revoke.
+                      window.open(`/api/receipt/${e.receipt_key}`, '_blank', 'noopener')
                     }}
                   >
                     📎 Receipt
