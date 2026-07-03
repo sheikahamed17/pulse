@@ -221,6 +221,7 @@ export default function AppPage() {
         source: final.source,
         raw_input: final.raw_input ?? null,
         recurring_rule_id: ruleId,
+        receipt_key: final.receipt_key ?? null,
       },
       user_id: user.id,
     })
@@ -270,7 +271,7 @@ export default function AppPage() {
             <ReceiptButton
               disabled={draft !== null || parsing || queryPlan !== null}
               onParsed={(payload, previewUrl) => {
-                setDraft({ ...(payload as unknown as ChipDraft), receiptPreviewUrl: previewUrl } as unknown as ChipDraft)
+                setDraft({ ...(payload as unknown as ChipDraft), receiptPreviewUrl: previewUrl } as ChipDraft)
               }}
             />
           </div>

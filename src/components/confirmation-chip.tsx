@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CategoryPicker } from '@/components/category-picker'
@@ -14,7 +15,7 @@ import type { TaskPayload } from '@/lib/op-schemas/task'
 import type { CategoryRow } from '@/lib/dexie'
 
 export type ChipDraft =
-  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string })
+  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string })
   | (TaskPayload & { kind: 'task' })
 
 type Props = {
@@ -40,12 +41,12 @@ function ConfirmationChipMoney({
   onCancel,
 }: {
   userId: string
-  draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string }
+  draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }
   categoryById: Map<string, CategoryRow>
   onConfirm: Props['onConfirm']
   onCancel: () => void
 }) {
-  const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string }>(draft)
+  const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }>(draft)
   const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category'>(null)
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
@@ -78,6 +79,17 @@ function ConfirmationChipMoney({
           flip
         </button>
       </div>
+
+      {d.receiptPreviewUrl && (
+        <div className="relative mb-3 h-40 w-full overflow-hidden rounded-md">
+          <Image
+            src={d.receiptPreviewUrl}
+            alt="receipt"
+            fill
+            className="object-contain"
+          />
+        </div>
+      )}
 
       {editingField === 'amount' ? (
         <Input
