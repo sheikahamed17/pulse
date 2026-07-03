@@ -54,7 +54,7 @@ export async function parseReceiptImage({
   mime,
   categories,
   nowIso,
-  _userTz,
+  userTz: _userTz,
   defaultCurrency,
 }: ParseArgs): Promise<MoneyAgentResponse & { source: 'receipt' }> {
   const systemPrompt = buildReceiptVisionPrompt({
