@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Fake DB fixtures use `any` to avoid ~50 lines of recursive generic type definitions.
+// Test fixture, not production code — `any` is the right escape valve here.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const TEST_SECRET = 'test-cron-secret-1234567890abcdefghij'
@@ -100,7 +103,7 @@ const fakeDb = {
       rows: (TestUser | TestUserPrefs | TestMoneyEntry | TestTask | unknown)[],
       wheres: Array<{ col: string; op: string; val: unknown }>,
     ) => {
-      return rows.filter(r => {
+      return rows.filter((r: any) => {
         for (const w of wheres) {
           const { col, op, val } = w
           if (table === 'money_entries') {
@@ -248,14 +251,14 @@ describe('/api/cron/digest', () => {
 
   it('creates op_log entry with idempotency key', async () => {
     await POST(cronReq())
-    const opLogEntry = opLogTable.find(op => op.entity_kind === 'insight')
+    const opLogEntry = opLogTable.find((op: any) => op.entity_kind === 'insight') as any
     expect(opLogEntry).toBeDefined()
     expect(opLogEntry.id).toMatch(/^insight-weekly-/)
   })
 
   it('inserts push notification row', async () => {
     await POST(cronReq())
-    const notifRow = pushNotificationsTable.find(n => n.user_id === 'user-1')
+    const notifRow = pushNotificationsTable.find((n: any) => n.user_id === 'user-1')
     expect(notifRow).toBeDefined()
   })
 
@@ -266,7 +269,7 @@ describe('/api/cron/digest', () => {
     const res = await POST(cronReq())
     const _body = await res.json() as { users_processed: number; digests_created: number }
     // digests_created should be 0 because week is empty
-    expect(opLogTable.filter(op => op.entity_kind === 'insight')).toHaveLength(0)
+    expect(opLogTable.filter((op: any) => op.entity_kind === 'insight')).toHaveLength(0)
   })
 
   it('skips user whose local time is not Monday (dual-fire safety)', async () => {
