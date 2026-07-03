@@ -29,6 +29,7 @@ import { callVoiceApiStreaming } from '@/lib/voice-sse'
 import { drainReceiptQueue } from '@/lib/receipt-queue'
 import { callReceiptApiStreaming } from '@/lib/receipt-sse'
 import { computeNextDue } from '@/lib/recurring'
+import { withWebLock } from '@/lib/web-lock'
 
 // Delegate to the same engine the cron uses so the FIRST next_due_at clamps
 // day-of-month identically to subsequent fires (Jan 31 + 1mo → Feb 28, not
@@ -85,14 +86,16 @@ export default function AppPage() {
   useEffect(() => {
     if (!user) return
     const onOnline = () => {
-      drainVoiceQueue({
-        processBlob: async (blob) => {
-          // Background drain — events are ignored (no UI to update)
-          const final = await callVoiceApiStreaming(blob, () => {})
-          if (!final) throw new Error('voice drain failed')
-          return { ok: true }
-        },
-        maxRetries: 3,
+      withWebLock('pulse-voice-drain', async () => {
+        await drainVoiceQueue({
+          processBlob: async (blob) => {
+            // Background drain — events are ignored (no UI to update)
+            const final = await callVoiceApiStreaming(blob, () => {})
+            if (!final) throw new Error('voice drain failed')
+            return { ok: true }
+          },
+          maxRetries: 3,
+        })
       }).catch(err => console.error('drain', err))
     }
     window.addEventListener('online', onOnline)
@@ -103,20 +106,22 @@ export default function AppPage() {
   useEffect(() => {
     if (!user) return
     const onOnline = () => {
-      drainReceiptQueue({
-        processBlob: async (blob) => {
-          // Background drain — mirrors the voice-queue drain effect exactly.
-          // The R2 upload + vision parse happen server-side; the parsed payload
-          // is intentionally discarded here (no chip surfaced) so a background
-          // drain never clobbers an active edit. The receipt image is preserved
-          // in R2 regardless and is viewable via the T36 viewer. Surfacing a
-          // drained receipt as a chip would need a draftRef (to read current
-          // draft without putting `draft` in deps) — deliberately deferred.
-          const final = await callReceiptApiStreaming(blob, () => {})
-          if (!final) throw new Error('receipt drain failed')
-          return { ok: true }
-        },
-        maxRetries: 3,
+      withWebLock('pulse-receipt-drain', async () => {
+        await drainReceiptQueue({
+          processBlob: async (blob) => {
+            // Background drain — mirrors the voice-queue drain effect exactly.
+            // The R2 upload + vision parse happen server-side; the parsed payload
+            // is intentionally discarded here (no chip surfaced) so a background
+            // drain never clobbers an active edit. The receipt image is preserved
+            // in R2 regardless and is viewable via the T36 viewer. Surfacing a
+            // drained receipt as a chip would need a draftRef (to read current
+            // draft without putting `draft` in deps) — deliberately deferred.
+            const final = await callReceiptApiStreaming(blob, () => {})
+            if (!final) throw new Error('receipt drain failed')
+            return { ok: true }
+          },
+          maxRetries: 3,
+        })
       }).catch(err => console.error('receipt drain', err))
     }
     window.addEventListener('online', onOnline)
