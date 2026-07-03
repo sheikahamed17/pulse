@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { InsightPayloadSchema, type InsightPayload } from '@/lib/op-schemas/insight'
+import { InsightPayloadSchema } from '@/lib/op-schemas/insight'
 
 describe('InsightPayloadSchema', () => {
   it('parses a valid insight payload', () => {
