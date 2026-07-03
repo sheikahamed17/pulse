@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { db, resetDb } from '@/lib/dexie'
 import { generateOp, applyLocalOp, getDeviceId, pushPullOnce } from '@/lib/sync-client'
+import type { Op } from '@/types/ops'
 
 describe('sync-client local pipeline', () => {
   beforeEach(async () => { await resetDb() })
@@ -238,5 +239,100 @@ describe('applyLocalOp — Phase 2 task entity', () => {
     await applyLocalOp(op)
     expect(await db.op_log.count()).toBe(1)
     expect(await db.tasks.count()).toBe(1)
+  })
+})
+
+describe('applyLocalOp: insight', () => {
+  beforeEach(async () => {
+    await resetDb()
+  })
+
+  it('creates a new insight row from op', async () => {
+    const userId = 'user-1'
+    const op: Op = {
+      id: 'op-insight-1',
+      hlc: '1234567890-000000-dev',
+      device_id: 'dev',
+      user_id: userId,
+      entity_kind: 'insight',
+      entity_id: 'insight-1',
+      op_type: 'create',
+      payload: {
+        period: 'weekly',
+        starts_at: '2026-06-21T18:30:00.000Z',
+        ends_at: '2026-06-28T18:30:00.000Z',
+        summary: 'Great week!',
+        metrics: JSON.stringify({ spend_total: 5000 }),
+      },
+      schema_version: 1,
+    }
+    await applyLocalOp(op)
+    const row = await db.insights.get('insight-1')
+    expect(row?.summary).toBe('Great week!')
+    expect(row?.user_id).toBe(userId)
+  })
+
+  it('updates existing insight (LWW merge)', async () => {
+    const userId = 'user-1'
+    const op1: Op = {
+      id: 'op-1',
+      hlc: '1000-000000-dev',
+      device_id: 'dev',
+      user_id: userId,
+      entity_kind: 'insight',
+      entity_id: 'insight-1',
+      op_type: 'create',
+      payload: {
+        period: 'weekly',
+        starts_at: '2026-06-21T18:30:00.000Z',
+        ends_at: '2026-06-28T18:30:00.000Z',
+        summary: 'Old summary',
+        metrics: '{}',
+      },
+      schema_version: 1,
+    }
+    await applyLocalOp(op1)
+    const op2: Op = {
+      id: 'op-2',
+      hlc: '2000-000000-dev',
+      device_id: 'dev',
+      user_id: userId,
+      entity_kind: 'insight',
+      entity_id: 'insight-1',
+      op_type: 'update',
+      payload: {
+        summary: 'Updated summary',
+      },
+      schema_version: 1,
+    }
+    await applyLocalOp(op2)
+    const row = await db.insights.get('insight-1')
+    expect(row?.summary).toBe('Updated summary')
+  })
+
+  it('idempotent: duplicate op has no effect', async () => {
+    const userId = 'user-1'
+    const op: Op = {
+      id: 'op-dup',
+      hlc: '1000-000000-dev',
+      device_id: 'dev',
+      user_id: userId,
+      entity_kind: 'insight',
+      entity_id: 'insight-1',
+      op_type: 'create',
+      payload: {
+        period: 'weekly',
+        starts_at: '2026-06-21T18:30:00.000Z',
+        ends_at: '2026-06-28T18:30:00.000Z',
+        summary: 'First',
+        metrics: '{}',
+      },
+      schema_version: 1,
+    }
+    await applyLocalOp(op)
+    const before = await db.op_log.count()
+    await applyLocalOp(op)
+    const after = await db.op_log.count()
+    expect(before).toBe(after)
   })
 })
