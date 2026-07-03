@@ -129,7 +129,8 @@ export interface MoneyEntryTable {
   category_id: string | null
   description: string | null
   occurred_at: string
-  source: 'voice' | 'manual' | 'recurring'
+  source: 'voice' | 'manual' | 'recurring' | 'receipt'
+  receipt_key: string | null
   raw_input: string | null
   recurring_rule_id: string | null
   field_hlcs: string
@@ -160,6 +161,40 @@ export interface FxRateTable {
   rate: number                                   // 1 base = `rate` units of target
 }
 
+export interface InsightTable {
+  id: string
+  user_id: string
+  period: 'weekly'
+  starts_at: string
+  ends_at: string
+  summary: string
+  metrics: string             // JSON-encoded
+  field_hlcs: string          // JSON-encoded
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PushSubscriptionTable {
+  id: string
+  user_id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  failed_count: number
+  created_at: string
+}
+
+export interface PushNotificationTable {
+  id: string
+  user_id: string
+  title: string
+  body: string
+  url: string
+  created_at: string
+  read_at: string | null
+}
+
 export interface UserPrefsTable {
   user_id: string
   primary_currency: string
@@ -180,6 +215,9 @@ export interface DB {
   money_entries: MoneyEntryTable
   tasks: TaskTable
   fx_rates: FxRateTable
+  insights: InsightTable
+  push_subscriptions: PushSubscriptionTable
+  push_notifications: PushNotificationTable
   user_prefs: UserPrefsTable
 }
 

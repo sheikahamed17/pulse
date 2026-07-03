@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf } from 'vitest'
-import type { DB, OpLogTable, WidgetTable, MoneyEntryTable, RecurringRuleTable, CategoryTable, TaskTable, FxRateTable, UserPrefsTable } from '@/lib/db'
+import type { DB, OpLogTable, WidgetTable, MoneyEntryTable, RecurringRuleTable, CategoryTable, TaskTable, FxRateTable, UserPrefsTable, InsightTable, PushSubscriptionTable, PushNotificationTable } from '@/lib/db'
 
 // This file is mostly compile-time verification — the runtime tests below
 // just exercise the type imports so vitest doesn't complain about an empty
@@ -46,7 +46,7 @@ describe('Phase 1 DB types', () => {
   it('MoneyEntryTable has required fields', () => {
     expectTypeOf<MoneyEntryTable>().toHaveProperty('amount').toEqualTypeOf<number>()
     expectTypeOf<MoneyEntryTable>().toHaveProperty('direction').toEqualTypeOf<'out' | 'in'>()
-    expectTypeOf<MoneyEntryTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring'>()
+    expectTypeOf<MoneyEntryTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring' | 'receipt'>()
     expectTypeOf<MoneyEntryTable>().toHaveProperty('field_hlcs').toEqualTypeOf<string>()
   })
 
@@ -88,5 +88,55 @@ describe('Phase 2 DB types', () => {
     expectTypeOf<UserPrefsTable>().toHaveProperty('user_id').toEqualTypeOf<string>()
     expectTypeOf<UserPrefsTable>().toHaveProperty('primary_currency').toEqualTypeOf<string>()
     expectTypeOf<UserPrefsTable>().toHaveProperty('tz').toEqualTypeOf<string>()
+  })
+})
+
+describe('Phase 3 DB types', () => {
+  it('DB includes insights / push_subscriptions / push_notifications', () => {
+    expectTypeOf<DB>().toHaveProperty('insights')
+    expectTypeOf<DB>().toHaveProperty('push_subscriptions')
+    expectTypeOf<DB>().toHaveProperty('push_notifications')
+  })
+
+  it('InsightTable has required fields', () => {
+    expectTypeOf<InsightTable>().toHaveProperty('id').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('user_id').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('period').toEqualTypeOf<'weekly'>()
+    expectTypeOf<InsightTable>().toHaveProperty('starts_at').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('ends_at').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('summary').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('metrics').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('field_hlcs').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('deleted_at').toEqualTypeOf<string | null>()
+    expectTypeOf<InsightTable>().toHaveProperty('created_at').toEqualTypeOf<string>()
+    expectTypeOf<InsightTable>().toHaveProperty('updated_at').toEqualTypeOf<string>()
+  })
+
+  it('PushSubscriptionTable has required fields', () => {
+    expectTypeOf<PushSubscriptionTable>().toHaveProperty('id').toEqualTypeOf<string>()
+    expectTypeOf<PushSubscriptionTable>().toHaveProperty('user_id').toEqualTypeOf<string>()
+    expectTypeOf<PushSubscriptionTable>().toHaveProperty('endpoint').toEqualTypeOf<string>()
+    expectTypeOf<PushSubscriptionTable>().toHaveProperty('p256dh').toEqualTypeOf<string>()
+    expectTypeOf<PushSubscriptionTable>().toHaveProperty('auth').toEqualTypeOf<string>()
+    expectTypeOf<PushSubscriptionTable>().toHaveProperty('failed_count').toEqualTypeOf<number>()
+    expectTypeOf<PushSubscriptionTable>().toHaveProperty('created_at').toEqualTypeOf<string>()
+  })
+
+  it('PushNotificationTable has required fields', () => {
+    expectTypeOf<PushNotificationTable>().toHaveProperty('id').toEqualTypeOf<string>()
+    expectTypeOf<PushNotificationTable>().toHaveProperty('user_id').toEqualTypeOf<string>()
+    expectTypeOf<PushNotificationTable>().toHaveProperty('title').toEqualTypeOf<string>()
+    expectTypeOf<PushNotificationTable>().toHaveProperty('body').toEqualTypeOf<string>()
+    expectTypeOf<PushNotificationTable>().toHaveProperty('url').toEqualTypeOf<string>()
+    expectTypeOf<PushNotificationTable>().toHaveProperty('created_at').toEqualTypeOf<string>()
+    expectTypeOf<PushNotificationTable>().toHaveProperty('read_at').toEqualTypeOf<string | null>()
+  })
+
+  it('MoneyEntryTable.source includes receipt', () => {
+    expectTypeOf<MoneyEntryTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring' | 'receipt'>()
+  })
+
+  it('MoneyEntryTable has receipt_key field', () => {
+    expectTypeOf<MoneyEntryTable>().toHaveProperty('receipt_key').toEqualTypeOf<string | null>()
   })
 })
