@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from 'dexie'
+import Dexie, { type EntityTable, type Table } from 'dexie'
 import type { Op } from '@/types/ops'
 
 type SyncMeta = {
@@ -137,9 +137,7 @@ class PulseDb extends Dexie {
   tasks!: EntityTable<TaskRow, 'id'>
   insights!: EntityTable<InsightRow, 'id'>
   receipt_queue!: EntityTable<ReceiptQueueItem, 'id'>
-  // Dexie 4's EntityTable<T, K> expects K extends keyof T; compound key '[date+target]' is not a single keyof — fall back to `any` for the key generic only.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fx_rates!: EntityTable<FxRateRow, any>
+  fx_rates!: Table<FxRateRow>
 
   constructor() {
     super('pulse')
