@@ -86,6 +86,7 @@ function ConfirmationChipMoney({
             src={d.receiptPreviewUrl}
             alt="receipt"
             fill
+            unoptimized
             className="object-contain"
           />
         </div>
