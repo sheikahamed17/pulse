@@ -15,6 +15,10 @@ binding = "DB"
 database_name = "pulse"
 database_id = "df509c20-ed81-4146-941f-6e48e7f1f925"
 
+[[r2_buckets]]
+binding = "RECEIPTS"
+bucket_name = "pulse-receipts"
+
 [observability]
 enabled = true
 
