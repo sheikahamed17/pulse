@@ -10,6 +10,7 @@ import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip
 import { QueryAnswerCard, type QueryPlan } from '@/components/query-answer-card'
 import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
+import { DigestCard } from '@/components/digest-card'
 import { VoiceRecorder } from '@/components/voice-recorder'
 import { TabBar } from '@/components/tab-bar'
 import { TaskList } from '@/components/task-list'
@@ -293,6 +294,7 @@ export default function AppPage() {
           {/* Conditional tab content */}
           {activeTab === 'money' && (
             <>
+              <DigestCard userId={user.id} />
               <div className="md:hidden">
                 <MoneyCard userId={user.id} />
               </div>
