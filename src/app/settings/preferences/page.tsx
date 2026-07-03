@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { usePushSubscription } from '@/hooks/use-push-subscription'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { IANA_TIMEZONES } from '@/lib/iana-timezones'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ export default function PreferencesPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
   const { prefs, savePrefs } = useUserPrefs()
+  const { status: pushStatus, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription()
   const [state, setState] = useState({
     primaryCurrency: prefs.primary_currency,
     tz: prefs.tz,
@@ -123,6 +125,41 @@ export default function PreferencesPage() {
             Detect from browser
           </button>
         </p>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <label className="text-sm font-medium">Notifications</label>
+        {pushStatus === 'unsupported' && (
+          <p className="text-xs text-muted-foreground">
+            Web Push is not supported on this device.
+          </p>
+        )}
+        {pushStatus === 'denied' && (
+          <p className="text-xs text-rose-500">
+            Notifications are blocked in your browser settings. Unblock &quot;Pulse&quot; in notification permissions to enable.
+          </p>
+        )}
+        {pushStatus === 'subscribed' && (
+          <button
+            type="button"
+            onClick={pushUnsubscribe}
+            className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
+          >
+            ✓ Notifications enabled — tap to disable
+          </button>
+        )}
+        {pushStatus === 'unsubscribed' && (
+          <button
+            type="button"
+            onClick={pushSubscribe}
+            className="rounded-md bg-accent px-3 py-2 text-sm font-medium hover:bg-accent/80"
+          >
+            Enable notifications
+          </button>
+        )}
+        {pushStatus === 'pending' && (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        )}
       </section>
 
       <div className="flex gap-2">
