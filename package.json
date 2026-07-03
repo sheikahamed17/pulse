@@ -26,6 +26,7 @@
     "dexie": "^4.4.3",
     "dexie-react-hooks": "^4.4.0",
     "groq-sdk": "^1.2.1",
+    "jose": "^6.2.3",
     "kysely": "^0.29.2",
     "kysely-d1": "^0.4.0",
     "lucide-react": "^1.18.0",

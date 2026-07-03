@@ -44,6 +44,9 @@ importers:
       groq-sdk:
         specifier: ^1.2.1
         version: 1.2.1
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
       kysely:
         specifier: ^0.29.2
         version: 0.29.2
