@@ -248,5 +248,48 @@ describe('web-push', () => {
       expect(result.pruned).toBe(1) // Deleted at 5th failure
       expect(deletes.length).toBe(1)
     })
+
+    it('increments failed_count on intermediate failures', async () => {
+      const subs = [
+        { id: 'sub1', user_id: 'user1', endpoint: 'https://p1', p256dh: 'key1', auth: 'auth1', failed_count: 2, created_at: '2026-01-01T00:00:00Z' },
+      ]
+
+      const deletes: string[] = []
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updates: any[] = []
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fakeDb: any = {
+        selectFrom: () => ({
+          where: () => ({
+            selectAll: () => ({
+              execute: async () => subs,
+            }),
+          }),
+        }),
+        deleteFrom: () => ({
+          where: () => ({
+            execute: async () => { deletes.push('deleted') },
+          }),
+        }),
+        updateTable: () => ({
+          set: (vals: { failed_count: number }) => ({
+            where: () => ({
+              execute: async () => { updates.push(vals) },
+            }),
+          }),
+        }),
+      }
+
+      global.fetch = vi.fn().mockResolvedValueOnce(new Response('', { status: 503 }))
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await sendPushToUser(fakeDb as unknown as any, TEST_ENV, 'user1')
+      expect(result.pruned).toBe(0) // Not deleted; failed_count < 5
+      expect(result.sent).toBe(0)
+      expect(updates.length).toBe(1)
+      expect(updates[0].failed_count).toBe(3) // 2 + 1
+      expect(deletes.length).toBe(0)
+    })
   })
 })

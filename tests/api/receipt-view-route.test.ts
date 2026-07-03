@@ -4,8 +4,10 @@ const fakeR2 = {
   get: vi.fn(),
 }
 
+const mockEnv: { RECEIPTS?: typeof fakeR2 } = { RECEIPTS: fakeR2 }
+
 vi.mock('@opennextjs/cloudflare', () => ({
-  getCloudflareContext: () => ({ env: { RECEIPTS: fakeR2 } }),
+  getCloudflareContext: () => ({ env: mockEnv }),
 }))
 
 // Proven mock pattern (mirrors tests/api/receipt-route.test.ts): a vi.fn()
@@ -73,5 +75,20 @@ describe('/api/receipt/[...key]', () => {
     } as never)
 
     expect(fakeR2.get).toHaveBeenCalledWith('user123/uuid/nested.jpg')
+  })
+
+  it('returns 500 when R2 is not configured', async () => {
+    const originalReceipts = mockEnv.RECEIPTS
+    try {
+      mockEnv.RECEIPTS = undefined
+      const res = await GET(new Request('http://x/api/receipt/user123/abc.jpg'), {
+        params: Promise.resolve({ key: ['user123', 'abc.jpg'] }),
+      } as never)
+      expect(res.status).toBe(500)
+      const body = await res.json() as { error: string }
+      expect(body.error).toBe('r2_not_configured')
+    } finally {
+      mockEnv.RECEIPTS = originalReceipts
+    }
   })
 })

@@ -30,6 +30,7 @@ export async function GET(
   const obj = await r2.get(key)
   if (!obj) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
+  // R2's obj.body is a ReadableStream<Uint8Array> — a valid BodyInit at runtime; the cast is only to satisfy TS narrowing.
   return new Response(obj.body as BodyInit, {
     status: 200,
     headers: {
