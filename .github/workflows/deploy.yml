@@ -45,6 +45,12 @@ jobs:
       - name: Build for Cloudflare (Next.js + OpenNext)
         run: pnpm cf:build
 
+      - name: Verify CRON_SECRET provisioned
+        run: |
+          wrangler secret list | grep -q CRON_SECRET || (echo "ERROR: CRON_SECRET not found in wrangler secrets" && exit 1)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
