@@ -31,6 +31,7 @@ const eslintConfig = defineConfig([
     // Generated files:
     "public/sw.js",
     ".open-next/**",
+    "worker.ts",
   ]),
 ]);
 

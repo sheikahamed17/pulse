@@ -1,5 +1,5 @@
 name = "pulse"
-main = ".open-next/worker.js"
+main = "worker.ts"
 compatibility_date = "2026-06-15"
 compatibility_flags = ["nodejs_compat"]
 
@@ -21,7 +21,9 @@ enabled = true
 [triggers]
 # Phase 1.4: daily recurring-rules materializer
 # Phase 2.4: daily ECB fx-rates fetcher (one hour later to avoid overlap)
-crons = ["0 2 * * *", "0 3 * * *"]
+# Phase 3.1: 15-min due-tasks cache updater
+# Phase 3.2: weekly digest (Mon 2:30 AM + Mon 2:30 PM)
+crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1"]
 
 # Local-dev notes:
 # - `pnpm exec wrangler dev` uses --persist by default for D1 (file under .wrangler/)
