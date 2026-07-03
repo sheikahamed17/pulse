@@ -110,6 +110,59 @@ describe('CategoryPayloadSchema', () => {
   })
 })
 
+describe('MoneyPayloadSchema receipt fields', () => {
+  it('accepts receipt_key when present', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'receipt',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      receipt_key: 'user-1/abc-def-ghi.jpg',
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts null receipt_key', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      receipt_key: null,
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts receipt as source', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'receipt',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects empty receipt_key', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'receipt',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      receipt_key: '',
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(false)
+  })
+})
+
 describe('getPayloadSchemaForKind dispatcher', () => {
   it('returns the right schema per entity_kind', () => {
     expect(getPayloadSchemaForKind('money')).toBe(MoneyPayloadSchema)

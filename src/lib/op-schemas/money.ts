@@ -10,7 +10,8 @@ export const MoneyPayloadSchema = z.object({
   category_id: z.string().min(1).nullable().optional(),
   description: z.string().max(120).nullable().optional(),
   occurred_at: z.string().datetime(),
-  source: z.enum(['voice', 'manual', 'recurring']),
+  source: z.enum(['voice', 'manual', 'recurring', 'receipt']),
+  receipt_key: z.string().min(1).nullable().optional(),
   raw_input: z.string().nullable().optional(),
   recurring_rule_id: z.string().min(1).nullable().optional(),
 })
