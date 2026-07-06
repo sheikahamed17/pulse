@@ -156,14 +156,27 @@ async function materializeRow_LWW(
     created_at: merged.created_at,
     updated_at: merged.updated_at,
   }
-  for (const f of fields) row[f] = merged[f] ?? null
+  // Only write fields the merged entity actually carries. The previous
+  // `merged[f] ?? null` coerced an ABSENT optional field (e.g. a category
+  // create that omits `is_archived`) to an explicit NULL — which violates a
+  // NOT NULL column even when it has a DEFAULT, because an explicit NULL
+  // bypasses the default (SQLITE_CONSTRAINT in prod). Omitting the key lets the
+  // column DEFAULT apply on INSERT and preserves the existing value on UPDATE;
+  // nullable columns the client explicitly set to null still come through
+  // (merged[f] === null, not undefined). This also matches per-field LWW —
+  // an op that never touched a field must not clobber it.
+  for (const f of fields) {
+    if (merged[f] !== undefined) row[f] = merged[f]
+  }
 
   const updates: Record<string, unknown> = {
     field_hlcs: row.field_hlcs,
     deleted_at: row.deleted_at,
     updated_at: row.updated_at,
   }
-  for (const f of fields) updates[f] = row[f]
+  for (const f of fields) {
+    if (merged[f] !== undefined) updates[f] = merged[f]
+  }
 
   await db
     .insertInto(tableName as never)

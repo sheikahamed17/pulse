@@ -293,6 +293,31 @@ describe('/api/sync — Phase 1 entity kinds', () => {
     })
   })
 
+  it('materializes a category create that omits is_archived without writing an explicit NULL', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      // Category create ops omit the optional is_archived (op schema: .optional()).
+      const op = {
+        id: 'op-c2',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'category',
+        entity_id: 'c2',
+        op_type: 'create' as const,
+        payload: { name: 'Groceries', kind: 'spend' as const, sort_order: 1 },
+        schema_version: 1,
+      }
+      await callSync({ device_id: 'd1', new_ops: [op] })
+      const rows = await testDb.selectFrom('categories').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      // Regression (prod SQLITE_CONSTRAINT: NOT NULL categories.is_archived):
+      // the old `merged[f] ?? null` wrote an explicit NULL for the omitted
+      // is_archived, bypassing the column DEFAULT 0. The materialized row must
+      // NOT carry an explicit null — the field is omitted so the DB default applies.
+      expect(rows[0].is_archived).not.toBeNull()
+    })
+  })
+
   it('persists a recurring rule', async () => {
     await withTestUser(async ({ userId, callSync, testDb }) => {
       const op = {
