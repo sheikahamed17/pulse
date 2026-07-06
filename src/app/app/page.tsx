@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
@@ -49,7 +49,7 @@ function nextDueFromAnchor(anchorIso: string, period: 'daily'|'weekly'|'monthly'
   })
 }
 
-export default function AppPage() {
+function AppPageInner() {
   const router = useRouter()
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [text, setText] = useState('')
@@ -403,5 +403,18 @@ export default function AppPage() {
         <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
       </div>
     </>
+  )
+}
+
+// AppPageInner reads the URL via useTabState → useSearchParams, which makes it a
+// CSR-bailout component. `next build` requires such a component to sit under a
+// Suspense boundary during static prerender of /app — without this wrapper the
+// route fails to build and the Cloudflare deploy fails. (Missed until now
+// because the gate ran typecheck/lint/test but never `next build`.)
+export default function AppPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+      <AppPageInner />
+    </Suspense>
   )
 }
