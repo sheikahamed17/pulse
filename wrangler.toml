@@ -37,4 +37,4 @@ crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1"]
 # VAPID_PUBLIC_KEY is the public ES256 key for Web Push. Generated once via:
 #   node scripts/generate-vapid-keys.mjs
 # The value is set by Sheik during push setup; see docs/runbooks/push-setup.md
-# VAPID_PUBLIC_KEY = "base64url_BH5VGzzuOLA0Yd3wBR3lUC9m2dnioSRcXiqozaok46NF4r2WFnhetHYoNQTCE6iFiO9RA2xES-2ri45ZMufwUJw"
+VAPID_PUBLIC_KEY = "BH5VGzzuOLA0Yd3wBR3lUC9m2dnioSRcXiqozaok46NF4r2WFnhetHYoNQTCE6iFiO9RA2xES-2ri45ZMufwUJw"
