@@ -31,3 +31,12 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      # Catch production-build failures (e.g. a useSearchParams/CSR-bailout that
+      # `next build` rejects during static prerender) on every push/PR — these
+      # are invisible to lint/typecheck/test and previously only surfaced at
+      # deploy time, silently blocking releases.
+      - name: Build
+        env:
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+        run: pnpm build
