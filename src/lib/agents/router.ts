@@ -12,7 +12,7 @@ export async function routeIntent({ client, text }: Args): Promise<RouterRespons
   const raw = await withRetry(
     () => callGroqJSON<unknown>({
       client,
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       system: ROUTER_SYSTEM_PROMPT,
       user: text,
       temperature: 0,

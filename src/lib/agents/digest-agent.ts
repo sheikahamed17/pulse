@@ -28,7 +28,7 @@ export async function writeDigestNarrative({
   const userMessage = JSON.stringify(metrics)
 
   const completion = await client.chat.completions.create({
-    model: 'llama-3.1-70b-versatile',
+    model: 'openai/gpt-oss-120b',
     temperature: 0.3,
     max_tokens: 512,
     messages: [

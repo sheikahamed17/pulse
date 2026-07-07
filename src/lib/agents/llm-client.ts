@@ -1,8 +1,11 @@
 import Groq from 'groq-sdk'
 
 export type GroqModel =
-  | 'llama-3.1-8b-instant'
-  | 'llama-3.1-70b-versatile'
+  // 2026-07-07: migrated off the decommissioned llama-3.1-* line. Groq
+  // recommends gpt-oss as the replacement; json_object response_format (used by
+  // callGroqJSON) is supported. Vision model lives in receipt-agent.ts.
+  | 'openai/gpt-oss-20b'
+  | 'openai/gpt-oss-120b'
   | 'whisper-large-v3-turbo'
 
 export function makeGroqClient(apiKey: string): Groq {

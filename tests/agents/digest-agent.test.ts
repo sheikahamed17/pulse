@@ -95,7 +95,7 @@ describe('digest-agent', () => {
       expect(narrative).toBe('You had a solid week with strong income and focused spending on food.')
       expect(mockGroq.chat.completions.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'llama-3.1-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           temperature: 0.3,
           max_tokens: 512,
         }),

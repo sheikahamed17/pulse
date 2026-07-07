@@ -25,7 +25,7 @@ export async function parseMoneyEntry({
   const raw = await withRetry(
     () => callGroqJSON<unknown>({
       client,
-      model: 'llama-3.1-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       system,
       user: text,
       temperature: 0,

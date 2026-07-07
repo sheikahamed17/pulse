@@ -12,7 +12,7 @@ describe('callGroqJSON', () => {
     }
     const out = await callGroqJSON({
       client: fakeGroq as never,
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       system: 'sys', user: 'usr',
     })
     expect(out).toEqual({ intent: 'log_money', confidence: 0.9 })
@@ -26,7 +26,7 @@ describe('callGroqJSON', () => {
     }
     await expect(callGroqJSON({
       client: fakeGroq as never,
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       system: 'sys', user: 'usr',
     })).rejects.toThrow(/parse/i)
   })
@@ -37,7 +37,7 @@ describe('callGroqJSON', () => {
     }
     await expect(callGroqJSON({
       client: fakeGroq as never,
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       system: 'sys', user: 'usr',
     })).rejects.toThrow(/no choice/i)
   })
