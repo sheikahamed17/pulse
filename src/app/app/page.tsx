@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Settings } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
+import { LockGate } from '@/components/lock-gate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AuroraBackground } from '@/components/aurora-background'
@@ -424,7 +425,9 @@ function AppPageInner() {
 export default function AppPage() {
   return (
     <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-      <AppPageInner />
+      <LockGate>
+        <AppPageInner />
+      </LockGate>
     </Suspense>
   )
 }
