@@ -1,5 +1,6 @@
 import { betterAuth, type BetterAuthOptions } from 'better-auth'
 import { magicLink } from 'better-auth/plugins'
+import { passkey } from '@better-auth/passkey'
 import { kyselyAdapter } from '@better-auth/kysely-adapter'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { z } from 'zod'
@@ -121,6 +122,11 @@ function buildAuth() {
           }
           await sendMagicLinkEmail({ apiKey, from, to: email, url })
         },
+      }),
+      passkey({
+        rpID: new URL(parsed.data.BETTER_AUTH_URL).hostname,
+        rpName: 'Pulse',
+        origin: parsed.data.BETTER_AUTH_URL,
       }),
     ],
   } satisfies BetterAuthOptions)
