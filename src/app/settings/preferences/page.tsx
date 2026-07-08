@@ -9,6 +9,8 @@ import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { IANA_TIMEZONES } from '@/lib/iana-timezones'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { AuroraBackground } from '@/components/aurora-background'
+import { Label } from '@/components/ui/label'
 
 export default function PreferencesPage() {
   const router = useRouter()
@@ -75,119 +77,118 @@ export default function PreferencesPage() {
   if (!userId) return <p className="p-8">Loading…</p>
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Preferences</h1>
-        <Button size="sm" variant="ghost" onClick={() => router.push('/settings')}>← Settings</Button>
-      </header>
+    <>
+      <AuroraBackground />
+      <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Preferences</h1>
+          <Button size="sm" variant="ghost" onClick={() => router.push('/settings')}>← Settings</Button>
+        </header>
 
-      <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Primary currency</label>
-        <select
-          value={state.primaryCurrency}
-          onChange={e => { setState(s => ({ ...s, primaryCurrency: e.target.value })); setDirty(true); setSaveError(null) }}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
-        >
-          {SUPPORTED_CURRENCIES.map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <p className="text-xs text-muted-foreground">
-          Dashboard sums convert non-primary entries via ECB rates (Phase 2.4).
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Time zone</label>
-        <Input
-          value={tzQuery}
-          onChange={e => setTzQuery(e.target.value)}
-          placeholder="Search timezones…"
-        />
-        <div role="listbox" aria-label="Time zone" className="max-h-48 overflow-y-auto rounded-md border bg-background">
-          {filteredTzs.map(z => (
-            <button
-              key={z}
-              type="button"
-              role="option"
-              aria-selected={state.tz === z}
-              onClick={() => { setState(s => ({ ...s, tz: z })); setTzQuery(''); setDirty(true); setSaveError(null) }}
-              className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition hover:bg-accent ${
-                state.tz === z ? 'bg-accent font-medium' : ''
-              }`}
-            >
-              <span>{z}</span>
-              {state.tz === z && <span aria-hidden>✓</span>}
-            </button>
-          ))}
-          {filteredTzs.length === 0 && (
-            <p className="px-3 py-2 text-xs text-muted-foreground">No matches.</p>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Current: <code>{state.tz}</code>.
-          {' '}
-          <button type="button" className="underline" onClick={detectBrowserTz}>
-            Detect from browser
-          </button>
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Notifications</label>
-        {pushStatus === 'unsupported' && (
+        <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+          <Label className="uppercase text-xs">Primary currency</Label>
+          <select
+            value={state.primaryCurrency}
+            onChange={e => { setState(s => ({ ...s, primaryCurrency: e.target.value })); setDirty(true); setSaveError(null) }}
+            className="glass-soft rounded-lg border border-input px-3 py-2 text-sm transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-accent-2"
+          >
+            {SUPPORTED_CURRENCIES.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
           <p className="text-xs text-muted-foreground">
-            Web Push is not supported on this device.
+            Dashboard sums convert non-primary entries via ECB rates (Phase 2.4).
           </p>
-        )}
-        {pushStatus === 'denied' && (
-          <p className="text-xs text-rose-500">
-            Notifications are blocked in your browser settings. Unblock &quot;Pulse&quot; in notification permissions to enable.
-          </p>
-        )}
-        {pushStatus === 'subscribed' && (
-          <button
-            type="button"
-            onClick={pushUnsubscribe}
-            className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
-          >
-            ✓ Notifications enabled — tap to disable
-          </button>
-        )}
-        {pushStatus === 'unsubscribed' && (
-          <button
-            type="button"
-            onClick={pushSubscribe}
-            className="rounded-md bg-accent px-3 py-2 text-sm font-medium hover:bg-accent/80"
-          >
-            Enable notifications
-          </button>
-        )}
-        {pushStatus === 'pending' && (
-          <p className="text-xs text-muted-foreground">Loading…</p>
-        )}
-      </section>
+        </section>
 
-      <div className="flex flex-col gap-2">
-        {saveError && (
-          <p role="alert" className="text-sm text-rose-600">{saveError}</p>
-        )}
-        <div className="flex gap-2">
-          <Button onClick={save} disabled={!dirty || busy}>
-            {busy ? 'Saving…' : 'Save'}
-          </Button>
-          {dirty && (
-            <Button variant="ghost" onClick={() => {
-              setState({
-                primaryCurrency: prefs.primary_currency,
-                tz: prefs.tz,
-              })
-              setDirty(false)
-              setSaveError(null)
-            }}>Discard</Button>
+        <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+          <Label className="uppercase text-xs">Time zone</Label>
+          <Input
+            value={tzQuery}
+            onChange={e => setTzQuery(e.target.value)}
+            placeholder="Search timezones…"
+          />
+          <div role="listbox" aria-label="Time zone" className="glass-soft max-h-48 overflow-y-auto rounded-lg border border-input">
+            {filteredTzs.map(z => (
+              <button
+                key={z}
+                type="button"
+                role="option"
+                aria-selected={state.tz === z}
+                onClick={() => { setState(s => ({ ...s, tz: z })); setTzQuery(''); setDirty(true); setSaveError(null) }}
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition hover:bg-white/10 ${
+                  state.tz === z ? 'bg-white/15 font-medium' : ''
+                }`}
+              >
+                <span>{z}</span>
+                {state.tz === z && <span aria-hidden>✓</span>}
+              </button>
+            ))}
+            {filteredTzs.length === 0 && (
+              <p className="px-3 py-2 text-xs text-muted-foreground">No matches.</p>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Current: <code className="font-mono">{state.tz}</code>.
+            {' '}
+            <button type="button" className="underline" onClick={detectBrowserTz}>
+              Detect from browser
+            </button>
+          </p>
+        </section>
+
+        <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+          <Label className="uppercase text-xs">Notifications</Label>
+          {pushStatus === 'unsupported' && (
+            <p className="text-xs text-muted-foreground">
+              Web Push is not supported on this device.
+            </p>
           )}
+          {pushStatus === 'denied' && (
+            <p className="text-xs text-rose-500">
+              Notifications are blocked in your browser settings. Unblock &quot;Pulse&quot; in notification permissions to enable.
+            </p>
+          )}
+          {pushStatus === 'subscribed' && (
+            <button
+              type="button"
+              onClick={pushUnsubscribe}
+              className="glass rounded-lg px-3 py-2 text-sm font-medium text-emerald-400 hover:bg-white/15 transition"
+            >
+              ✓ Notifications enabled — tap to disable
+            </button>
+          )}
+          {pushStatus === 'unsubscribed' && (
+            <Button onClick={pushSubscribe}>
+              Enable notifications
+            </Button>
+          )}
+          {pushStatus === 'pending' && (
+            <p className="text-xs text-muted-foreground">Loading…</p>
+          )}
+        </section>
+
+        <div className="flex flex-col gap-2">
+          {saveError && (
+            <p role="alert" className="text-sm text-rose-600">{saveError}</p>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={save} disabled={!dirty || busy}>
+              {busy ? 'Saving…' : 'Save'}
+            </Button>
+            {dirty && (
+              <Button variant="ghost" onClick={() => {
+                setState({
+                  primaryCurrency: prefs.primary_currency,
+                  tz: prefs.tz,
+                })
+                setDirty(false)
+                setSaveError(null)
+              }}>Discard</Button>
+            )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   )
 }

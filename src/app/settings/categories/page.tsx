@@ -7,6 +7,7 @@ import { useCategories } from '@/hooks/use-categories'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { AuroraBackground } from '@/components/aurora-background'
 
 export default function CategoriesPage() {
   const router = useRouter()
@@ -56,30 +57,33 @@ export default function CategoriesPage() {
   if (!userId) return <p className="p-8">Loading…</p>
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Categories</h1>
-        <Button size="sm" variant="ghost" onClick={() => router.push('/settings')}>← Settings</Button>
-      </header>
+    <>
+      <AuroraBackground />
+      <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Categories</h1>
+          <Button size="sm" variant="ghost" onClick={() => router.push('/settings')}>← Settings</Button>
+        </header>
 
-      <section className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New category…" />
-          <select
-            value={kind}
-            onChange={e => setKind(e.target.value as 'spend' | 'income')}
-            className="rounded-md border bg-background px-2 text-sm"
-          >
-            <option value="spend">Spend</option>
-            <option value="income">Income</option>
-          </select>
-          <Button onClick={addCategory}>Add</Button>
-        </div>
-      </section>
+        <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+          <div className="flex gap-2">
+            <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New category…" />
+            <select
+              value={kind}
+              onChange={e => setKind(e.target.value as 'spend' | 'income')}
+              className="glass-soft rounded-lg border border-input px-2 text-sm transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-accent-2"
+            >
+              <option value="spend">Spend</option>
+              <option value="income">Income</option>
+            </select>
+            <Button onClick={addCategory}>Add</Button>
+          </div>
+        </section>
 
-      <CategorySection title="Spend" categories={spend} onArchive={archiveCategory} />
-      <CategorySection title="Income" categories={income} onArchive={archiveCategory} />
-    </main>
+        <CategorySection title="Spend" categories={spend} onArchive={archiveCategory} />
+        <CategorySection title="Income" categories={income} onArchive={archiveCategory} />
+      </main>
+    </>
   )
 }
 
@@ -87,9 +91,9 @@ function CategorySection({
   title, categories, onArchive,
 }: { title: string; categories: ReturnType<typeof useCategories>; onArchive: (id: string) => void }) {
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-semibold text-muted-foreground">{title}</h2>
-      <ul className="divide-y divide-border rounded-md border">
+    <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+      <h2 className="text-sm font-semibold uppercase text-muted-foreground">{title}</h2>
+      <ul className="glass-soft divide-y divide-white/10 rounded-lg border border-white/10">
         {categories.length === 0 && <li className="p-3 text-sm text-muted-foreground">No {title.toLowerCase()} categories.</li>}
         {categories.map(c => (
           <li key={c.id} className="flex items-center justify-between p-3">

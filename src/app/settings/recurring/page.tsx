@@ -10,6 +10,7 @@ import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { currencySymbol } from '@/lib/currency'
 import { formatLocalDateOnly } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { AuroraBackground } from '@/components/aurora-background'
 
 export default function RecurringSettingsPage() {
   const router = useRouter()
@@ -52,47 +53,50 @@ export default function RecurringSettingsPage() {
   if (!userId) return <p className="p-8">Loading…</p>
 
   return (
-    <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Recurring</h1>
-        <Button size="sm" variant="ghost" onClick={() => router.push('/settings')}>← Settings</Button>
-      </header>
+    <>
+      <AuroraBackground />
+      <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Recurring</h1>
+          <Button size="sm" variant="ghost" onClick={() => router.push('/settings')}>← Settings</Button>
+        </header>
 
-      <ul className="divide-y divide-border rounded-md border">
-        {rules.length === 0 && (
-          <li className="p-4 text-sm text-muted-foreground">
-            No recurring rules. Toggle &quot;Make recurring&quot; on any entry to create one.
-          </li>
-        )}
-        {rules.map(r => {
-          const cat = r.category_id ? categoryById.get(r.category_id) : undefined
-          const major = (r.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
-          const sym = currencySymbol(r.currency)
-          const PERIOD_NOUN = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' } as const
-          const periodText = `every ${r.interval_count > 1 ? `${r.interval_count} ` : ''}${PERIOD_NOUN[r.period]}${r.interval_count > 1 ? 's' : ''}`
-          return (
-            <li key={r.id} className="flex flex-col gap-1 p-3">
-              <div className="flex items-center justify-between">
-                <span className={r.direction === 'out' ? 'text-rose-600' : 'text-emerald-600'}>
-                  {r.direction === 'out' ? '-' : '+'}{sym}{major}
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] ${r.is_active ? 'bg-emerald-500/20 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
-                  {r.is_active ? 'active' : 'paused'}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {cat ? `${cat.icon ?? ''} ${cat.name} · ` : ''}{periodText} · next {formatLocalDateOnly(r.next_due_at, prefs.tz)}
-              </span>
-              <div className="mt-1 flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setActive(r.id, r.is_active ? 0 : 1)}>
-                  {r.is_active ? 'Pause' : 'Resume'}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => deleteRule(r.id)}>Delete</Button>
-              </div>
+        <ul className="glass divide-y divide-white/10 rounded-2xl border border-white/10">
+          {rules.length === 0 && (
+            <li className="p-4 text-sm text-muted-foreground">
+              No recurring rules. Toggle &quot;Make recurring&quot; on any entry to create one.
             </li>
-          )
-        })}
-      </ul>
-    </main>
+          )}
+          {rules.map(r => {
+            const cat = r.category_id ? categoryById.get(r.category_id) : undefined
+            const major = (r.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
+            const sym = currencySymbol(r.currency)
+            const PERIOD_NOUN = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' } as const
+            const periodText = `every ${r.interval_count > 1 ? `${r.interval_count} ` : ''}${PERIOD_NOUN[r.period]}${r.interval_count > 1 ? 's' : ''}`
+            return (
+              <li key={r.id} className="flex flex-col gap-1 p-3">
+                <div className="flex items-center justify-between">
+                  <span className={`font-mono ${r.direction === 'out' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    {r.direction === 'out' ? '-' : '+'}{sym}{major}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${r.is_active ? 'bg-emerald-500/30 text-emerald-400' : 'bg-white/10 text-muted-foreground'}`}>
+                    {r.is_active ? 'active' : 'paused'}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {cat ? `${cat.icon ?? ''} ${cat.name} · ` : ''}{periodText} · next <span className="font-mono">{formatLocalDateOnly(r.next_due_at, prefs.tz)}</span>
+                </span>
+                <div className="mt-1 flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setActive(r.id, r.is_active ? 0 : 1)}>
+                    {r.is_active ? 'Pause' : 'Resume'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => deleteRule(r.id)}>Delete</Button>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </main>
+    </>
   )
 }
