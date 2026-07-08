@@ -63,7 +63,7 @@ function ConfirmationChipMoney({
   }
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm">
+    <div className="glass rounded-2xl p-5">
       <div className="mb-3 flex items-center justify-between text-xs">
         <span className={cn(
           'font-semibold uppercase tracking-wide',
@@ -102,13 +102,13 @@ function ConfirmationChipMoney({
             if (!Number.isNaN(v) && v >= 0) setD(s => ({ ...s, amount: Math.round(v * 100) }))
             setEditingField(null)
           }}
-          className="mb-3 text-3xl font-semibold"
+          className="mb-3 font-mono text-3xl font-semibold"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditingField('amount')}
-          className="mb-3 block text-3xl font-semibold tabular-nums"
+          className="mb-3 block font-mono text-3xl font-semibold tabular-nums"
         >
           {symbol}{major}
         </button>
@@ -174,7 +174,7 @@ function ConfirmationChipMoney({
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
-        <Button className="flex-[2]" onClick={handleConfirm} disabled={busy}>
+        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy}>
           Confirm {symbol}{major}
         </Button>
       </div>
@@ -210,7 +210,7 @@ function ConfirmationChipTask({
     : 'no due date'
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm">
+    <div className="glass rounded-2xl p-5">
       <div className="mb-3 flex items-center justify-between text-xs">
         <span className="font-semibold uppercase tracking-wide text-violet-500">
           ✅ Task
@@ -227,13 +227,13 @@ function ConfirmationChipTask({
             if (v) setD(s => ({ ...s, title: v }))
             setEditingTitle(false)
           }}
-          className="mb-3 text-2xl font-semibold"
+          className="mb-3 font-mono text-2xl font-semibold"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditingTitle(true)}
-          className="mb-3 block text-2xl font-semibold text-left"
+          className="mb-3 block font-mono text-2xl font-semibold text-left"
         >
           {d.title}
         </button>
@@ -275,7 +275,7 @@ function ConfirmationChipTask({
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
-        <Button className="flex-[2]" onClick={handleConfirm} disabled={busy || !d.title.trim()}>
+        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.title.trim()}>
           Confirm task
         </Button>
       </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { Sparkles } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/dexie'
 import { currencySymbol } from '@/lib/currency'
@@ -51,9 +52,12 @@ export function DigestCard({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
+    <div className="glass-accent rounded-lg p-4">
       <div className="mb-3 flex items-start justify-between">
-        <h3 className="text-sm font-semibold">Your week in review</h3>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-accent-2" />
+          <h3 className="text-sm font-semibold">Your week in review</h3>
+        </div>
         <button type="button" className="text-muted-foreground hover:text-foreground" onClick={dismiss} aria-label="Dismiss">×</button>
       </div>
       <p className="mb-3 text-sm text-foreground">{row.summary}</p>
@@ -61,22 +65,22 @@ export function DigestCard({ userId }: { userId: string }) {
         <div className="mb-3 flex flex-wrap gap-2">
           <div className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
             <span className="text-muted-foreground">Spend</span>
-            <span className="font-semibold tabular-nums">{symbol}{(metrics.spend_total / div).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            <span className="font-mono font-semibold tabular-nums">{symbol}{(metrics.spend_total / div).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
           </div>
           <div className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
             <span className="text-muted-foreground">Income</span>
-            <span className="font-semibold tabular-nums">{symbol}{(metrics.income_total / div).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            <span className="font-mono font-semibold tabular-nums">{symbol}{(metrics.income_total / div).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
           </div>
           {metrics.tasks_completed > 0 && (
             <div className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
               <span className="text-muted-foreground">Done</span>
-              <span className="font-semibold tabular-nums">{metrics.tasks_completed}</span>
+              <span className="font-mono font-semibold tabular-nums">{metrics.tasks_completed}</span>
             </div>
           )}
           {metrics.tasks_overdue > 0 && (
             <div className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
               <span className="text-rose-600">Overdue</span>
-              <span className="font-semibold tabular-nums">{metrics.tasks_overdue}</span>
+              <span className="font-mono font-semibold tabular-nums">{metrics.tasks_overdue}</span>
             </div>
           )}
         </div>
