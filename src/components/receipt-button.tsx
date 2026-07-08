@@ -61,7 +61,7 @@ export function ReceiptButton({ disabled, onParsed }: Props) {
         disabled={disabled || state !== 'idle'}
         onClick={() => inputRef.current?.click()}
         className={cn(
-          'flex h-8 w-8 items-center justify-center rounded-lg transition disabled:opacity-50 disabled:pointer-events-none',
+          'flex h-8 w-8 items-center justify-center rounded-lg transition disabled:opacity-50 disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-accent-2 outline-none',
           'glass',
         )}
         aria-label="Upload receipt"

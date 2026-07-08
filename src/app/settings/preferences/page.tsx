@@ -116,7 +116,7 @@ export default function PreferencesPage() {
                 role="option"
                 aria-selected={state.tz === z}
                 onClick={() => { setState(s => ({ ...s, tz: z })); setTzQuery(''); setDirty(true); setSaveError(null) }}
-                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition hover:bg-white/10 ${
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-sm transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none ${
                   state.tz === z ? 'bg-white/15 font-medium' : ''
                 }`}
               >
@@ -131,7 +131,7 @@ export default function PreferencesPage() {
           <p className="text-xs text-muted-foreground">
             Current: <code className="font-mono">{state.tz}</code>.
             {' '}
-            <button type="button" className="underline" onClick={detectBrowserTz}>
+            <button type="button" className="underline focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded" onClick={detectBrowserTz}>
               Detect from browser
             </button>
           </p>
@@ -153,7 +153,7 @@ export default function PreferencesPage() {
             <button
               type="button"
               onClick={pushUnsubscribe}
-              className="glass rounded-lg px-3 py-2 text-sm font-medium text-emerald-400 hover:bg-white/15 transition"
+              className="glass rounded-lg px-3 py-2 text-sm font-medium text-emerald-400 hover:bg-white/15 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
             >
               ✓ Notifications enabled — tap to disable
             </button>

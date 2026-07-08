@@ -73,7 +73,7 @@ export function TaskList({ userId, filter }: Props) {
             <button
               type="button"
               onClick={() => toggleComplete(t)}
-              className="flex flex-1 items-start gap-2 text-left"
+              className="flex flex-1 items-start gap-2 text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
               aria-label={isCompleted ? `Mark "${t.title}" open` : `Complete "${t.title}"`}
             >
               {isCompleted ? (
@@ -105,14 +105,14 @@ export function TaskList({ userId, filter }: Props) {
               <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
                 <button
                   type="button"
-                  className="px-3 py-1.5 text-xs hover:bg-accent"
+                  className="px-3 py-1.5 text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                   onClick={() => deleteTask(t)}
                 >
                   Delete
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+                  className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                   onClick={() => setMenuFor(null)}
                 >
                   Cancel

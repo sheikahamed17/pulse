@@ -25,7 +25,7 @@ export function TaskFilter({ active, onChange }: Props) {
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            'flex-1 rounded-full px-3 py-1 transition',
+            'flex-1 rounded-full px-3 py-1 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none',
             active === o.value
               ? 'bg-[linear-gradient(150deg,rgb(111_123_255/.35),rgb(52_230_255/.22))] border border-[rgb(120_190_255/.4)] text-foreground drop-shadow-[0_0_12px_rgb(52_230_255/.3)]'
               : 'text-muted-foreground hover:text-foreground',

@@ -58,7 +58,7 @@ export function DigestCard({ userId }: { userId: string }) {
           <Sparkles className="h-4 w-4 text-accent-2" />
           <h3 className="text-sm font-semibold">Your week in review</h3>
         </div>
-        <button type="button" className="text-muted-foreground hover:text-foreground" onClick={dismiss} aria-label="Dismiss">×</button>
+        <button type="button" className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded" onClick={dismiss} aria-label="Dismiss">×</button>
       </div>
       <p className="mb-3 text-sm text-foreground">{row.summary}</p>
       {metrics && (

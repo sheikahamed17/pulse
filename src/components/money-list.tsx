@@ -100,7 +100,7 @@ export function MoneyList({ userId }: Props) {
                   {e.currency !== prefs.primary_currency && (
                     <button
                       type="button"
-                      className="text-[10px] text-muted-foreground hover:text-accent-2 transition text-left"
+                      className="text-[10px] text-muted-foreground hover:text-accent-2 transition text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
                       onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
                     >
                       {expandedFx === e.id ? (() => {
@@ -114,7 +114,7 @@ export function MoneyList({ userId }: Props) {
                   {e.receipt_key && (
                     <button
                       type="button"
-                      className="text-[10px] border border-white/20 rounded-full px-1.5 py-0.5 text-muted-foreground hover:text-accent-2 hover:border-accent-2 transition"
+                      className="text-[10px] border border-white/20 rounded-full px-1.5 py-0.5 text-muted-foreground hover:text-accent-2 hover:border-accent-2 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                       onClick={(ev) => {
                         ev.stopPropagation()
                         window.open(`/api/receipt/${e.receipt_key}`, '_blank', 'noopener')
@@ -139,7 +139,7 @@ export function MoneyList({ userId }: Props) {
                 <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
                   <button
                     type="button"
-                    className="px-3 py-1.5 text-xs hover:bg-accent"
+                    className="px-3 py-1.5 text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                     onClick={() => { deleteEntry(e); setMenuFor(null) }}
                   >
                     Delete
@@ -147,7 +147,7 @@ export function MoneyList({ userId }: Props) {
                   {e.recurring_rule_id && (
                     <button
                       type="button"
-                      className="px-3 py-1.5 text-xs hover:bg-accent"
+                      className="px-3 py-1.5 text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                       onClick={() => { router.push('/settings/recurring'); setMenuFor(null) }}
                     >
                       Edit recurring rule
@@ -155,7 +155,7 @@ export function MoneyList({ userId }: Props) {
                   )}
                   <button
                     type="button"
-                    className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+                    className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                     onClick={() => setMenuFor(null)}
                   >
                     Cancel
@@ -171,8 +171,8 @@ export function MoneyList({ userId }: Props) {
         {undo.entries.map(u => (
           <div key={u.id} className="flex items-center gap-3 rounded-md border bg-background px-3 py-1.5 text-xs shadow">
             <span>{u.label}</span>
-            <button type="button" className="font-semibold text-blue-600" onClick={() => undo.trigger(u.id)}>Undo</button>
-            <button type="button" className="text-muted-foreground" onClick={() => undo.dismiss(u.id)}>×</button>
+            <button type="button" className="font-semibold text-blue-600 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded" onClick={() => undo.trigger(u.id)}>Undo</button>
+            <button type="button" className="text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded" onClick={() => undo.dismiss(u.id)}>×</button>
           </div>
         ))}
       </div>

@@ -73,7 +73,7 @@ function ConfirmationChipMoney({
         </span>
         <button
           type="button"
-          className="text-muted-foreground hover:underline"
+          className="text-muted-foreground hover:underline focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
           onClick={() => setD(s => ({ ...s, direction: s.direction === 'out' ? 'in' : 'out' }))}
         >
           flip
@@ -108,7 +108,7 @@ function ConfirmationChipMoney({
         <button
           type="button"
           onClick={() => setEditingField('amount')}
-          className="mb-3 block font-mono text-3xl font-semibold tabular-nums"
+          className="mb-3 block font-mono text-3xl font-semibold tabular-nums focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
         >
           {symbol}{major}
         </button>
@@ -118,7 +118,7 @@ function ConfirmationChipMoney({
         <button
           type="button"
           onClick={() => setEditingField('category')}
-          className="rounded-md border bg-muted px-2 py-0.5 text-xs"
+          className="rounded-md border bg-muted px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
         >
           {cat ? `${cat.icon ?? ''} ${cat.name}` : 'Pick category…'}
         </button>
@@ -136,7 +136,7 @@ function ConfirmationChipMoney({
           <button
             type="button"
             onClick={() => setEditingField('description')}
-            className="rounded-md border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+            className="rounded-md border bg-muted px-2 py-0.5 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
           >
             {d.description || '+ description'}
           </button>
@@ -233,7 +233,7 @@ function ConfirmationChipTask({
         <button
           type="button"
           onClick={() => setEditingTitle(true)}
-          className="mb-3 block font-mono text-2xl font-semibold text-left"
+          className="mb-3 block font-mono text-2xl font-semibold text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
         >
           {d.title}
         </button>
@@ -256,7 +256,7 @@ function ConfirmationChipTask({
           <button
             type="button"
             onClick={() => setEditingDue(true)}
-            className="rounded-md border bg-muted px-2 py-0.5 text-xs"
+            className="rounded-md border bg-muted px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
           >
             {d.due_at ? `📅 ${dueDisplay}` : '+ due date'}
           </button>
