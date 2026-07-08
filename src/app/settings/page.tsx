@@ -26,6 +26,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/security">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Security</CardTitle>
+              <CardDescription>Passkeys (Face ID sign-in) and app PIN lock.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/settings/preferences">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>
