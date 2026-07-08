@@ -25,7 +25,7 @@ export function CategoryPicker({ userId, kind, selectedId, onSelect }: Props) {
         value={query}
         onChange={e => setQuery(e.target.value)}
         placeholder="Search categories…"
-        className="rounded-md border bg-background px-3 py-1 text-sm"
+        className="glass-soft rounded-md px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground"
       />
       <div className="flex flex-wrap gap-1.5">
         {filtered.map(c => (
@@ -34,10 +34,10 @@ export function CategoryPicker({ userId, kind, selectedId, onSelect }: Props) {
             type="button"
             onClick={() => onSelect(c.id)}
             className={cn(
-              'rounded-md border px-2.5 py-1 text-xs transition',
+              'glass-soft rounded-md px-2.5 py-1 text-xs transition',
               selectedId === c.id
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border bg-background hover:bg-accent',
+                ? 'bg-[linear-gradient(150deg,rgb(111_123_255/.35),rgb(52_230_255/.22))] border border-[rgb(120_190_255/.4)] text-accent-2'
+                : 'hover:border-accent-2/50',
             )}
           >
             {c.icon && <span className="mr-1">{c.icon}</span>}{c.name}

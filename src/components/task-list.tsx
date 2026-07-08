@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { Circle, CheckCircle2 } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { formatLocalDateTime } from '@/lib/format'
@@ -48,7 +49,7 @@ export function TaskList({ userId, filter }: Props) {
 
   if (tasks.length === 0) {
     return (
-      <div className="rounded-md border bg-muted/30 p-4 text-center text-sm text-muted-foreground">
+      <div className="glass-soft rounded-2xl p-4 text-center text-sm text-muted-foreground">
         {filter === 'open' && 'No open tasks. Add one by saying or typing "remind me to…"'}
         {filter === 'completed' && 'No completed tasks yet.'}
         {filter === 'all' && 'No tasks yet.'}
@@ -57,14 +58,14 @@ export function TaskList({ userId, filter }: Props) {
   }
 
   return (
-    <ul className="divide-y divide-border rounded-md border">
+    <ul className="flex flex-col gap-2">
       {tasks.map(t => {
         const isCompleted = !!t.completed_at
         const isOverdue = !isCompleted && t.due_at && t.due_at < new Date().toISOString()
         return (
           <li
             key={t.id}
-            className="relative flex items-start justify-between gap-3 p-3"
+            className="glass-soft rounded-2xl relative flex items-start justify-between gap-3 p-3"
             onPointerDown={() => longPress.onPointerDown(t)}
             onPointerUp={longPress.onPointerUp}
             onPointerLeave={longPress.onPointerLeave}
@@ -75,24 +76,23 @@ export function TaskList({ userId, filter }: Props) {
               className="flex flex-1 items-start gap-2 text-left"
               aria-label={isCompleted ? `Mark "${t.title}" open` : `Complete "${t.title}"`}
             >
-              <span
-                aria-hidden
-                className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border-2 ${
-                  isCompleted ? 'border-foreground bg-foreground' : 'border-muted-foreground'
-                }`}
-              />
+              {isCompleted ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-2" />
+              ) : (
+                <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              )}
               <div className="flex flex-col">
                 <span className={isCompleted ? 'text-muted-foreground line-through' : ''}>
                   {t.title}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {t.priority !== 'medium' && (
-                    <span className={`mr-2 ${t.priority === 'high' ? 'text-rose-500' : ''}`}>
+                    <span className={`mr-2 ${t.priority === 'high' ? 'text-destructive' : ''}`}>
                       {t.priority}
                     </span>
                   )}
                   {t.due_at && (
-                    <span className={isOverdue ? 'text-rose-500' : ''}>
+                    <span className={`font-mono tabular-nums ${isOverdue ? 'text-warning' : ''}`}>
                       due {formatLocalDateTime(t.due_at, prefs.tz)}
                       {isOverdue && ' · overdue'}
                     </span>

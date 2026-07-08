@@ -16,7 +16,7 @@ const OPTIONS: { value: TaskFilterValue; label: string }[] = [
 
 export function TaskFilter({ active, onChange }: Props) {
   return (
-    <div role="tablist" aria-label="Task filter" className="flex gap-1 rounded-full border bg-muted/30 p-1 text-xs">
+    <div role="tablist" aria-label="Task filter" className="flex gap-1 rounded-full glass-soft p-1 text-xs">
       {OPTIONS.map(o => (
         <button
           key={o.value}
@@ -27,7 +27,7 @@ export function TaskFilter({ active, onChange }: Props) {
           className={cn(
             'flex-1 rounded-full px-3 py-1 transition',
             active === o.value
-              ? 'bg-background text-foreground shadow-sm'
+              ? 'bg-[linear-gradient(150deg,rgb(111_123_255/.35),rgb(52_230_255/.22))] border border-[rgb(120_190_255/.4)] text-foreground drop-shadow-[0_0_12px_rgb(52_230_255/.3)]'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >

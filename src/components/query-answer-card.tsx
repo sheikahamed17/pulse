@@ -72,9 +72,9 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
   const major = (total / divisor).toLocaleString(undefined, { maximumFractionDigits: prefs.primary_currency === 'JPY' ? 0 : 2 })
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-sm">
+    <div className="glass rounded-2xl p-5">
       <div className="mb-2 flex items-center justify-between text-xs">
-        <span className="font-semibold uppercase tracking-wide text-blue-500">
+        <span className="font-semibold uppercase tracking-wide text-accent-2">
           {plan.direction === 'out' ? '💸 Spent' : '💰 Earned'}
           {plan.category_name && ` in ${plan.category_name}`}
           {' · '}
@@ -82,7 +82,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
         </span>
       </div>
 
-      <div className="mb-2 text-4xl font-semibold tabular-nums">
+      <div className="mb-2 text-4xl font-semibold font-mono tabular-nums text-accent-2">
         {currencySymbol(prefs.primary_currency)}{major}
       </div>
 
@@ -91,7 +91,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
       </p>
 
       {plan.category_name && !targetCategoryId && (
-        <p className="mb-3 text-[10px] text-rose-500">
+        <p className="mb-3 text-[10px] text-destructive">
           Category &quot;{plan.category_name}&quot; not found — showing all categories instead.
         </p>
       )}

@@ -24,30 +24,30 @@ export function TaskSummary({ userId }: Props) {
   }, [tasks])
 
   return (
-    <section className="flex flex-col gap-2 rounded-2xl border bg-card p-4">
+    <section className="glass flex flex-col gap-2 rounded-2xl p-4">
       <header>
         <span className="text-xs uppercase tracking-wide text-muted-foreground">Tasks</span>
       </header>
       <ul className="flex flex-col gap-1.5 text-sm">
         <li className="flex items-center justify-between">
-          <span className={overdue > 0 ? 'text-rose-500' : ''}>Overdue</span>
-          <span className="tabular-nums">{overdue}</span>
+          <span className={overdue > 0 ? 'text-warning' : ''}>Overdue</span>
+          <span className="font-mono tabular-nums">{overdue}</span>
         </li>
         <li className="flex items-center justify-between">
           <span>Today</span>
-          <span className="tabular-nums">{today}</span>
+          <span className="font-mono tabular-nums">{today}</span>
         </li>
         <li className="flex items-center justify-between">
           <span>Upcoming</span>
-          <span className="tabular-nums">{upcoming}</span>
+          <span className="font-mono tabular-nums">{upcoming}</span>
         </li>
         <li className="flex items-center justify-between">
           <span>No due date</span>
-          <span className="tabular-nums">{noDate}</span>
+          <span className="font-mono tabular-nums">{noDate}</span>
         </li>
       </ul>
-      <div className="border-t pt-2 text-xs text-muted-foreground">
-        {tasks.length === 0 ? 'No open tasks.' : `${tasks.length} open`}
+      <div className="border-t border-white/10 pt-2 text-xs text-muted-foreground">
+        <span className="font-mono tabular-nums">{tasks.length === 0 ? 'No open tasks.' : `${tasks.length} open`}</span>
       </div>
     </section>
   )
