@@ -5,6 +5,8 @@ const EnvSchema = z.object({
   BETTER_AUTH_URL: z.string().url(),
   GROQ_API_KEY: z.string().min(1),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(1).optional(),
 })
 
 export type Env = z.infer<typeof EnvSchema>
@@ -35,4 +37,6 @@ export const env: Env = {
   get BETTER_AUTH_URL() { return loadEnv().BETTER_AUTH_URL },
   get GROQ_API_KEY() { return loadEnv().GROQ_API_KEY },
   get NODE_ENV() { return loadEnv().NODE_ENV },
+  get RESEND_API_KEY() { return loadEnv().RESEND_API_KEY },
+  get EMAIL_FROM() { return loadEnv().EMAIL_FROM },
 } as Env

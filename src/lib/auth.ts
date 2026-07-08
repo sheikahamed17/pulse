@@ -4,6 +4,7 @@ import { kyselyAdapter } from '@better-auth/kysely-adapter'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { z } from 'zod'
 import { createDb } from '@/lib/db'
+import { sendMagicLinkEmail } from '@/lib/email'
 import type { D1Database } from '@cloudflare/workers-types'
 
 // Auth secrets live in the Workers runtime env (set via `wrangler secret put`
@@ -17,12 +18,16 @@ import type { D1Database } from '@cloudflare/workers-types'
 const AuthEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be ≥ 32 chars'),
   BETTER_AUTH_URL: z.string().url(),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().min(1).optional(),
 })
 
 type AuthEnvBindings = {
   DB: D1Database
   BETTER_AUTH_SECRET?: string
   BETTER_AUTH_URL?: string
+  RESEND_API_KEY?: string
+  EMAIL_FROM?: string
 }
 
 function buildAuth() {
@@ -31,6 +36,8 @@ function buildAuth() {
   const parsed = AuthEnvSchema.safeParse({
     BETTER_AUTH_SECRET: cfEnv.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: cfEnv.BETTER_AUTH_URL,
+    RESEND_API_KEY: cfEnv.RESEND_API_KEY,
+    EMAIL_FROM: cfEnv.EMAIL_FROM,
   })
   if (!parsed.success) {
     const issues = parsed.error.issues
@@ -70,6 +77,8 @@ function buildAuth() {
       },
     },
     session: {
+      expiresIn: 60 * 60 * 24 * 365, // 1 year — durable across daily PWA opens
+      updateAge: 60 * 60 * 24,       // sliding refresh once per day
       fields: {
         userId: 'user_id',
         expiresAt: 'expires_at',
@@ -103,7 +112,14 @@ function buildAuth() {
     plugins: [
       magicLink({
         sendMagicLink: async ({ email, url }) => {
-          console.log(`[magic-link] for ${email}: ${url}`)
+          const apiKey = parsed.data.RESEND_API_KEY
+          const from = parsed.data.EMAIL_FROM
+          if (!apiKey || !from) {
+            // Email not configured (e.g. local dev) — log so the flow still works.
+            console.log(`[magic-link] email not configured; link for ${email}: ${url}`)
+            return
+          }
+          await sendMagicLinkEmail({ apiKey, from, to: email, url })
         },
       }),
     ],
