@@ -105,7 +105,7 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
           <div className="absolute inset-0 rounded-full border-2 border-[var(--accent-2)]/50 motion-safe:animate-pulse" />
         )}
       </div>
-      <p className={`text-xs ${state === 'error' ? 'text-destructive' : state === 'idle' && error ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+      <p className={`text-xs ${state === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
         {state === 'idle'         && 'tap to record'}
         {state === 'recording'    && 'tap again to stop'}
         {state === 'transcribing' && 'Listening to your voice…'}
