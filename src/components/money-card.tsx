@@ -63,21 +63,61 @@ export function MoneyCard({ userId }: Props) {
   const topCategories = useMemo(() => topNByCategoryWithConversion(current, catName, prefs.primary_currency, rates, 3), [current, catName, prefs.primary_currency, rates])
   const topMax = Math.max(1, ...topCategories.map(([, amt]) => amt))
 
+  // Compute sparkline data: group entries into daily totals (last 7 days)
+  const sparklinePoints = useMemo(() => {
+    const dailyTotals = new Map<string, number>()
+    const now = new Date(range.to)
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now)
+      d.setUTCDate(d.getUTCDate() - i)
+      const dateKey = d.toISOString().split('T')[0]
+      dailyTotals.set(dateKey, 0)
+    }
+
+    for (const e of current) {
+      if (e.direction !== 'out') continue
+      const dateKey = e.occurred_at.split('T')[0]
+      if (dailyTotals.has(dateKey)) {
+        let amount = e.amount
+        if (e.currency !== prefs.primary_currency) {
+          const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+          if (conv) amount = conv.amount
+        }
+        dailyTotals.set(dateKey, (dailyTotals.get(dateKey) ?? 0) + amount)
+      }
+    }
+
+    return Array.from(dailyTotals.values())
+  }, [current, prefs.primary_currency, rates, range.to])
+
   return (
-    <section className="flex flex-col gap-2 rounded-2xl border bg-card p-4">
+    <section className="glass flex flex-col gap-4 rounded-2xl p-4">
       <header className="flex items-baseline justify-between">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground">This month</span>
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">Spent · this month</span>
         {delta !== null && (
-          <span className={`text-xs font-medium ${delta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+          <span className={`text-xs font-medium font-mono ${delta > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
             {delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(0)}% vs last
           </span>
         )}
       </header>
-      <div className="text-3xl font-semibold tabular-nums">
-        {currencySymbol(prefs.primary_currency)}
-        {(primarySpend / (prefs.primary_currency === 'JPY' ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-[38px] font-semibold font-mono tabular-nums leading-tight" style={{
+            textShadow: '0 0 20px rgb(52 230 255 / 0.4), 0 0 40px rgb(52 230 255 / 0.2)'
+          }}>
+            <span className="text-accent-2">{currencySymbol(prefs.primary_currency)}</span>
+            {(primarySpend / (prefs.primary_currency === 'JPY' ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </div>
+        </div>
+
+        {sparklinePoints.length > 0 && (
+          <Sparkline points={sparklinePoints} width={80} height={48} />
+        )}
       </div>
-      <ul className="flex flex-col gap-1.5 pt-1">
+
+      <ul className="flex flex-col gap-1.5">
         {topCategories.length === 0 && (
           <li className="text-xs text-muted-foreground">No entries yet this {period}.</li>
         )}
@@ -90,12 +130,13 @@ export function MoneyCard({ userId }: Props) {
                 style={{ width: `${(amt / topMax) * 100}%` }}
               />
             </div>
-            <span className="tabular-nums">{currencySymbol(prefs.primary_currency)}{(amt / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(0)}</span>
+            <span className="font-mono tabular-nums">{currencySymbol(prefs.primary_currency)}{(amt / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(0)}</span>
           </li>
         ))}
       </ul>
+
       {(conversionApplied || skippedCurrencies.size > 0) && (
-        <p className="border-t pt-2 text-[10px] text-muted-foreground">
+        <p className="border-t border-white/10 pt-2 text-[10px] text-muted-foreground">
           {conversionApplied && conversionDate && (
             <>Includes conversion via ECB {conversionDate}. </>
           )}
@@ -105,6 +146,38 @@ export function MoneyCard({ userId }: Props) {
         </p>
       )}
     </section>
+  )
+}
+
+function Sparkline({ points, width = 80, height = 48 }: { points: number[], width?: number, height?: number }) {
+  if (points.length < 2) return null
+
+  const max = Math.max(...points, 1)
+  const min = 0
+  const range = max - min
+
+  const padding = 4
+  const chartWidth = width - 2 * padding
+  const chartHeight = height - 2 * padding
+
+  const xs = points.map((_, i) => padding + (i / (points.length - 1)) * chartWidth)
+  const ys = points.map(p => padding + chartHeight - (((p - min) / range) * chartHeight))
+
+  const pathPoints = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
+  const areaPath = `M${padding},${height - padding} ${pathPoints} L${width - padding},${height - padding}`
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="flex-shrink-0">
+      <defs>
+        <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style={{ stopColor: 'rgb(52 230 255)', stopOpacity: 0.3 }} />
+          <stop offset="100%" style={{ stopColor: 'rgb(52 230 255)', stopOpacity: 0.05 }} />
+        </linearGradient>
+      </defs>
+      <polyline points={pathPoints} fill="none" stroke="rgb(52 230 255)" strokeWidth="1.5" />
+      <path d={areaPath} fill="url(#sparkGradient)" />
+      <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="2.5" fill="rgb(52 230 255)" />
+    </svg>
   )
 }
 

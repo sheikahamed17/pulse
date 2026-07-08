@@ -93,6 +93,18 @@
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
+@utility text-destructive {
+  color: var(--color-destructive);
+}
+@utility text-income {
+  color: var(--color-income);
+}
+@utility text-accent-2 {
+  color: var(--color-accent-2);
+}
+@utility text-muted-foreground {
+  color: var(--color-muted-foreground);
+}
 @keyframes aurora-drift { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(3vw,3vw) scale(1.1)} }
 
 @layer base {

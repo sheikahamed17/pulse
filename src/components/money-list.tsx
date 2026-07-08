@@ -69,7 +69,7 @@ export function MoneyList({ userId }: Props) {
 
   return (
     <>
-      <ul className="divide-y divide-border rounded-md border">
+      <ul className="flex flex-col gap-2">
         {entries.length === 0 && (
           <li className="p-4 text-sm text-muted-foreground">No entries yet. Tap the mic above (Phase 1.3) or type below.</li>
         )}
@@ -78,49 +78,62 @@ export function MoneyList({ userId }: Props) {
           return (
             <li
               key={e.id}
-              className="relative flex items-center justify-between p-3 text-sm"
+              className="glass-soft relative flex items-start justify-between gap-3 rounded-2xl p-3 text-sm transition-colors hover:bg-white/8"
               onPointerDown={() => longPress.onPointerDown(e)}
               onPointerUp={longPress.onPointerUp}
               onPointerLeave={longPress.onPointerLeave}
             >
-              <div className="flex flex-col">
-                <span className={e.direction === 'out' ? 'text-rose-600' : 'text-emerald-600'}>
+              <div className="flex flex-col flex-1 min-w-0">
+                {cat && (
+                  <div className="mb-1.5 inline-flex w-fit items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs">
+                    <span>{cat.icon ?? ''}</span>
+                    <span className="text-muted-foreground">{cat.name}</span>
+                  </div>
+                )}
+                <div className="text-sm font-medium text-foreground">
+                  {e.description ? e.description : (cat ? cat.name : 'Uncategorized')}
+                </div>
+                {e.description && cat && (
+                  <span className="text-xs text-muted-foreground">{cat.name}</span>
+                )}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {e.currency !== prefs.primary_currency && (
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted-foreground hover:text-accent-2 transition text-left"
+                      onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
+                    >
+                      {expandedFx === e.id ? (() => {
+                        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+                        return conv
+                          ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
+                          : 'No FX rate yet for this date'
+                      })() : '≈ convert'}
+                    </button>
+                  )}
+                  {e.receipt_key && (
+                    <button
+                      type="button"
+                      className="text-[10px] border border-white/20 rounded-full px-1.5 py-0.5 text-muted-foreground hover:text-accent-2 hover:border-accent-2 transition"
+                      onClick={(ev) => {
+                        ev.stopPropagation()
+                        window.open(`/api/receipt/${e.receipt_key}`, '_blank', 'noopener')
+                      }}
+                    >
+                      📎 receipt
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-2">
+                <span className={`font-mono tabular-nums text-sm font-medium whitespace-nowrap ${
+                  e.direction === 'out' ? 'text-destructive' : 'text-income'
+                }`}>
                   {formatAmount(e)}
                 </span>
-                {e.currency !== prefs.primary_currency && (
-                  <button
-                    type="button"
-                    className="text-[10px] text-muted-foreground hover:underline text-left"
-                    onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
-                  >
-                    {expandedFx === e.id ? (() => {
-                      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
-                      return conv
-                        ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
-                        : 'No FX rate yet for this date'
-                    })() : '≈ convert'}
-                  </button>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {cat ? `${cat.icon ?? ''} ${cat.name}` : 'no category'}{e.description ? ` · ${e.description}` : ''}
-                </span>
-                {e.receipt_key && (
-                  <button
-                    type="button"
-                    className="mt-0.5 self-start text-xs text-blue-600 hover:underline"
-                    onClick={(ev) => {
-                      ev.stopPropagation()
-                      // Same-origin authenticated GET (cookie session) that returns the
-                      // image directly — navigate to it. No fetch/blob/object-URL, so
-                      // there is nothing to leak or revoke.
-                      window.open(`/api/receipt/${e.receipt_key}`, '_blank', 'noopener')
-                    }}
-                  >
-                    📎 Receipt
-                  </button>
-                )}
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => deleteEntry(e)}>Delete</Button>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => deleteEntry(e)}>Delete</Button>
 
               {menuFor === e.id && (
                 <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
