@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { Mic } from 'lucide-react'
 import { callVoiceApiStreaming, type VoiceStreamEvent } from '@/lib/voice-sse'
 import { enqueueVoice } from '@/lib/voice-queue'
 
@@ -90,20 +91,21 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <button
-        type="button"
-        disabled={disabled || state !== 'idle' && state !== 'recording'}
-        onClick={state === 'recording' ? stop : start}
-        className={`flex h-16 w-16 items-center justify-center rounded-full border-2 text-2xl transition ${
-          state === 'recording'
-            ? 'border-rose-500 bg-rose-500/20 text-rose-600 animate-pulse'
-            : 'border-foreground bg-background hover:bg-accent'
-        }`}
-        aria-label={state === 'recording' ? 'Stop recording' : 'Start recording'}
-      >
-        {state !== 'idle' && state !== 'recording' ? '…' : '🎙️'}
-      </button>
-      <p className="text-xs text-muted-foreground">
+      <div className="relative">
+        <button
+          type="button"
+          disabled={disabled || state !== 'idle' && state !== 'recording'}
+          onClick={state === 'recording' ? stop : start}
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] text-[#06111f] shadow-[0_0_24px_rgb(52_230_255/.35)] transition disabled:opacity-50 disabled:pointer-events-none"
+          aria-label={state === 'recording' ? 'Stop recording' : 'Start recording'}
+        >
+          {state !== 'idle' && state !== 'recording' ? '…' : <Mic className="h-6 w-6" />}
+        </button>
+        {state === 'recording' && (
+          <div className="absolute inset-0 rounded-full border-2 border-[var(--accent-2)]/50 motion-safe:animate-pulse" />
+        )}
+      </div>
+      <p className={`text-xs ${state === 'error' ? 'text-destructive' : state === 'idle' && error ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
         {state === 'idle'         && 'tap to record'}
         {state === 'recording'    && 'tap again to stop'}
         {state === 'transcribing' && 'Listening to your voice…'}
