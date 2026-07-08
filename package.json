@@ -25,6 +25,7 @@
     "date-fns": "^4.4.0",
     "dexie": "^4.4.3",
     "dexie-react-hooks": "^4.4.0",
+    "geist": "^1.7.2",
     "groq-sdk": "^1.2.1",
     "jose": "^6.2.3",
     "kysely": "^0.29.2",
