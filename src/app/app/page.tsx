@@ -3,9 +3,11 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Settings } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { AuroraBackground } from '@/components/aurora-background'
 import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip'
 import { QueryAnswerCard, type QueryPlan } from '@/components/query-answer-card'
 import { MoneyCard } from '@/components/money-card'
@@ -266,12 +268,18 @@ function AppPageInner() {
 
   return (
     <>
+      <AuroraBackground />
       <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 pb-24 md:pb-6 md:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           <header className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold">Pulse</h1>
             <div className="flex items-center gap-2">
-              <Link href="/settings" className="text-xs text-muted-foreground hover:underline">Settings</Link>
+              <h1 className="text-2xl font-semibold">Pulse</h1>
+              <div className="h-2 w-2 rounded-full bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] shadow-lg shadow-cyan-500/20" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Link href="/settings" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors">
+                <Settings className="h-5 w-5" />
+              </Link>
               <Button size="sm" variant="outline"
                 onClick={() => authClient.signOut().then(() => router.replace('/login'))}>
                 Sign out
@@ -281,43 +289,45 @@ function AppPageInner() {
           <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
 
           {/* Shared input header — voice + text — dispatches to either tab */}
-          <div className="flex justify-center gap-2 py-2">
-            <VoiceRecorder
-              disabled={draft !== null || parsing || queryPlan !== null}
-              onParsed={(payload, transcript) => {
-                if (!payload) {
-                  setDraft({
-                    kind: 'money',
-                    amount: 0, currency: 'INR', direction: 'out',
-                    occurred_at: new Date().toISOString(),
-                    source: 'voice', raw_input: transcript,
-                  })
-                } else if ((payload as QueryPlan).kind === 'query_money') {
-                  setQueryPlan(payload as QueryPlan)
-                } else {
-                  setDraft(payload as ChipDraft)
-                }
-              }}
-            />
-            <ReceiptButton
-              disabled={draft !== null || parsing || queryPlan !== null}
-              onParsed={(payload, previewUrl) => {
-                setDraft({ ...(payload as unknown as ChipDraft), receiptPreviewUrl: previewUrl } as ChipDraft)
-              }}
-            />
+          <div className="glass rounded-2xl flex items-center justify-between gap-2 p-3">
+            <div className="flex items-center gap-2">
+              <VoiceRecorder
+                disabled={draft !== null || parsing || queryPlan !== null}
+                onParsed={(payload, transcript) => {
+                  if (!payload) {
+                    setDraft({
+                      kind: 'money',
+                      amount: 0, currency: 'INR', direction: 'out',
+                      occurred_at: new Date().toISOString(),
+                      source: 'voice', raw_input: transcript,
+                    })
+                  } else if ((payload as QueryPlan).kind === 'query_money') {
+                    setQueryPlan(payload as QueryPlan)
+                  } else {
+                    setDraft(payload as ChipDraft)
+                  }
+                }}
+              />
+              <ReceiptButton
+                disabled={draft !== null || parsing || queryPlan !== null}
+                onParsed={(payload, previewUrl) => {
+                  setDraft({ ...(payload as unknown as ChipDraft), receiptPreviewUrl: previewUrl } as ChipDraft)
+                }}
+              />
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); parseText() }} className="flex flex-1 gap-2 ml-2">
+              <Input
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder='spent 80 on chai — or — remind me to call mom'
+                disabled={parsing || draft !== null || queryPlan !== null}
+                className="bg-transparent placeholder:text-muted-foreground border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+              <Button type="submit" disabled={parsing || draft !== null || queryPlan !== null || !text.trim()}>
+                {parsing ? 'Parsing…' : 'Parse'}
+              </Button>
+            </form>
           </div>
-
-          <form onSubmit={(e) => { e.preventDefault(); parseText() }} className="flex gap-2">
-            <Input
-              value={text}
-              onChange={e => setText(e.target.value)}
-              placeholder='spent 80 on chai — or — remind me to call mom'
-              disabled={parsing || draft !== null || queryPlan !== null}
-            />
-            <Button type="submit" disabled={parsing || draft !== null || queryPlan !== null || !text.trim()}>
-              {parsing ? 'Parsing…' : 'Parse'}
-            </Button>
-          </form>
 
           {draft && (
             <ConfirmationChip
@@ -373,13 +383,13 @@ function AppPageInner() {
 
           {/* Conditional tab content */}
           {activeTab === 'money' && (
-            <>
+            <div className="flex flex-col gap-3">
               <DigestCard userId={user.id} />
               <div className="md:hidden">
                 <MoneyCard userId={user.id} />
               </div>
               <MoneyList userId={user.id} />
-            </>
+            </div>
           )}
           {activeTab === 'tasks' && (
             <div className="flex flex-col gap-3">
