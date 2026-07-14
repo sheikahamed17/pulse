@@ -38,3 +38,11 @@ crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1"]
 #   node scripts/generate-vapid-keys.mjs
 # The value is set by Sheik during push setup; see docs/runbooks/push-setup.md
 VAPID_PUBLIC_KEY = "BH5VGzzuOLA0Yd3wBR3lUC9m2dnioSRcXiqozaok46NF4r2WFnhetHYoNQTCE6iFiO9RA2xES-2ri45ZMufwUJw"
+
+# EMAIL_FROM is the sender for Better Auth magic-link emails (Resend).
+# On the free tier without a verified domain, use Resend's shared sender
+# `onboarding@resend.dev`, which can only deliver to the Resend account's
+# own signup email. To send to any address, verify a domain in Resend and
+# change this to e.g. "Pulse <login@yourdomain.com>". RESEND_API_KEY is a
+# secret (wrangler secret put), NOT here.
+EMAIL_FROM = "Pulse <onboarding@resend.dev>"
