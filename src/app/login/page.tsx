@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuroraBackground } from '@/components/aurora-background'
 import { authClient } from '@/lib/auth-client'
+import { PulseLogo } from '@/components/pulse-logo'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -48,7 +49,8 @@ export default function LoginPage() {
       <AuroraBackground />
       <main className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-sm">
-          <CardHeader>
+          <CardHeader className="items-center gap-2">
+            <PulseLogo className="size-12" />
             <CardTitle>Sign in to Pulse</CardTitle>
           </CardHeader>
           <CardContent>

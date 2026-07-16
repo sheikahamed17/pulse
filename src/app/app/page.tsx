@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Settings } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { LockGate } from '@/components/lock-gate'
+import { PulseLogo } from '@/components/pulse-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AuroraBackground } from '@/components/aurora-background'
@@ -274,8 +275,8 @@ function AppPageInner() {
         <div className="flex flex-col gap-6">
           <header className="flex items-center justify-between">
             <div className="flex items-center gap-2">
+              <PulseLogo className="size-6" />
               <h1 className="text-2xl font-semibold">Pulse</h1>
-              <div className="h-2 w-2 rounded-full bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] shadow-lg shadow-cyan-500/20" />
             </div>
             <div className="flex items-center gap-3">
               <Link href="/settings" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors">
