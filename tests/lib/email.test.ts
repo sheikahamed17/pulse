@@ -8,6 +8,9 @@ describe('buildMagicLinkEmail', () => {
     expect(subject.length).toBeGreaterThan(0)
     expect(html).toContain(url)
     expect(text).toContain(url)
+    // Logo is a hosted PNG whose origin is derived from the magic-link URL.
+    expect(html).toContain('https://pulse.sdsheikahamed.workers.dev/icons/icon-192.png')
+    expect(html).toContain('alt="Pulse"')
   })
 })
 
@@ -26,7 +29,7 @@ describe('sendMagicLinkEmail', () => {
 
   it('throws on a non-2xx Resend response', async () => {
     const fetchImpl = vi.fn(async () => new Response('bad', { status: 422 })) as unknown as typeof fetch
-    await expect(sendMagicLinkEmail({ apiKey: 'k', from: 'a', to: 'b', url: 'c', fetchImpl }))
+    await expect(sendMagicLinkEmail({ apiKey: 'k', from: 'a', to: 'b', url: 'https://x.co/verify?token=abc', fetchImpl }))
       .rejects.toThrow(/Resend send failed: 422/)
   })
 })
