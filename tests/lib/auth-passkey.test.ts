@@ -21,5 +21,7 @@ describe('auth with passkey plugin', () => {
       'https://pulse.sdsheikahamed.workers.dev/api/auth/passkey/generate-register-options',
     ))
     expect(res.status).not.toBe(404)
-  })
+    // Full Better Auth instantiation (+ passkey/SimpleWebAuthn) is slow to
+    // import; raise the 5s vitest default so it doesn't flake under load.
+  }, 30000)
 })

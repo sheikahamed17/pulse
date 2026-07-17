@@ -40,7 +40,9 @@ describe('pin-lock', () => {
       await setPin(pin, s)
       expect(await verifyPin(pin, s)).toBe(true)
     }), { numRuns: 25 })
-  })
+    // 25 fast-check runs × two 210k-iteration PBKDF2 derivations each is
+    // CPU-heavy; raise the 5s vitest default so it doesn't flake under load.
+  }, 30000)
 
   it('shouldRelock: locked when never active, or when idle beyond the timeout', () => {
     expect(shouldRelock(null, 1000)).toBe(true)
