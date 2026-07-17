@@ -1,0 +1,874 @@
+{
+  "summary": "Map how Pulse builds a feature domain (Money/Tasks) to seed the Learning/Notes design",
+  "agentCount": 7,
+  "logs": [
+    "mapped 6/6 dimensions"
+  ],
+  "result": {
+    "blueprint": "# Pulse New-Domain Blueprint\n\n## Executive Summary\n\nAdding a new domain (entity_kind) to Pulse requires coordinated changes across **8 logical layers** and **35+ files**, all following the Money/Task LWW sync pattern. This blueprint provides the ordered recipe, exact symbols, and divergence points for two concrete examples (Learning, Notes).\n\n---\n\n## Part 1: Generic Recipe (Order of Execution)\n\n### Layer 0: Type & Schema Registration (Order-independent, source of truth)\n\n**File 1: `src/types/ops.ts`**\n- **Current state**: ENTITY_KINDS const (line 6), OpSchema with entity_kind Zod enum (line 17)\n- **Action**: Add to ENTITY_KINDS array\n  ```typescript\n  export const ENTITY_KINDS = ['widget', 'money', 'recurring', 'task', 'project', 'learning', 'note', 'category', 'budget', 'insight'] as const;\n  // Your domain is already in the placeholder list; ensure exact spelling\n  ```\n- **Mirror pattern**: Look at how 'money' and 'task' are there; your domain uses same const pattern\n- **Symbols exported**: ENTITY_KINDS tuple, EntityRow base type\n\n**File 2: `src/lib/op-schemas/[domain].ts` (Create NEW)**\n- **Purpose**: Define Zod schema + TypeScript type for domain's mutable payload\n- **Pattern**: Copy `src/lib/op-schemas/money.ts` (lines 1-30) or `task.ts` (lines 1-20)\n- **Template**:\n  ```typescript\n  import { z } from 'zod';\n  import { SUPPORTED_CURRENCIES } from '@/lib/currencies'; // if domain uses currency\n  \n  export const [Domain]PayloadSchema = z.object({\n    field1: z.string().min(1).max(200),           // Required string\n    field2: z.number().int().nonnegative(),       // Required integer\n    field3: z.enum(['option_a', 'option_b']),    // Required enum\n    field4: z.string().nullable().default(null),  // Optional field\n    occurred_at: z.string().datetime(),            // ISO UTC timestamp\n    source: z.enum(['voice', 'manual', 'receipt']), // Source enum\n  }).strict();\n  \n  export type [Domain]Payload = z.infer<typeof [Domain]PayloadSchema>;\n  ```\n- **Include these fields**: All mutable columns you'll store in D1 (exclude id, user_id, timestamps, field_hlcs, deleted_at)\n- **source enum**: Include values your domain will actually use (voice/manual/recurring/receipt as applicable)\n\n**File 3: `src/lib/op-schemas/index.ts`**\n- **Current state**: Exports all schema unions + getPayloadSchemaForKind() switch statement (lines 1-30)\n- **Action**: \n  - Add import at top: `import { [Domain]PayloadSchema, [Domain]Payload } from './[domain]';`\n  - Add to exports (line 9): `export type { [Domain]Payload } from './[domain]';`\n  - Add case to switch (line 25+):\n    ```typescript\n    case '[domain]':\n      return [Domain]PayloadSchema;\n    ```\n- **Verify**: `getPayloadSchemaForKind('[domain]')` now returns your schema\n\n---\n\n### Layer 1: Client Dexie Store (Order matters: increases version number)\n\n**File 4: `src/lib/dexie.ts`**\n\n**Part A: Define Row type (lines 1-60, alongside other Row types)**\n```typescript\nexport type [Domain]Row = {\n  id: string;                           // UUID primary key\n  user_id: string;                      // FK to user table\n  field1: string;                       // Matches PayloadSchema.field1\n  field2: number;                       // Matches PayloadSchema.field2\n  field3: 'option_a' | 'option_b';     // Matches PayloadSchema.field3\n  field4: string | null;                // Optional field (nullable)\n  field_hlcs: Record<string, string>;   // Per-field HLC timestamps (JSON string in D1, Record here)\n  deleted_at: string | null;            // ISO tombstone (soft delete marker)\n  created_at: string;                   // ISO UTC timestamp (derived from op.hlc)\n  updated_at: string;                   // ISO UTC timestamp (derived from op.hlc)\n};\n```\n- **Mirror pattern**: Copy from MoneyEntryRow (lines 8-18) or TaskRow (lines 32-42)\n- **HLC tracking**: field_hlcs must track each field independently; deleted_at has its own HLC entry\n- **No defaults in Row type**: All fields present; nullability explicit\n\n**Part B: Add EntityTable property to PulseDb class (lines 67+)**\n```typescript\nexport class PulseDb extends Dexie {\n  op_log!: EntityTable<Op, 'id'>;\n  widgets!: EntityTable<WidgetRow, 'id'>;\n  // ... existing tables ...\n  [domain]_entries!: EntityTable<[Domain]Row, 'id'>;  // ADD THIS LINE\n  \n  constructor() {\n    super('pulse', { autoOpen: false });\n    this.version(1).stores({...}); // existing versions\n    this.version(N).stores({       // NEW VERSION BLOCK (N = max version + 1)\n      [domain]_entries: 'id, user_id, [user_id+updated_at]', // Add composite index if querying by date/sort\n    });\n  }\n}\n```\n- **Table naming**: Use `[domain]_entries` (singular entity name + `_entries` suffix; mirrors money_entries, task_entries pattern)\n- **Version bump**: Each new table requires NEW version() block with incremented N\n- **Indices**: At minimum `'id, user_id'`; add compound indices for your query patterns (e.g., `[user_id+occurred_at]` for date range queries)\n- **DON'T modify existing versions**: Dexie migration is additive; old versions persist\n\n**Part C: Add resetDb() entry (line 180+)**\n```typescript\nexport async function resetDb() {\n  await db.transaction('rw', [db.op_log, db.widgets, db.money_entries, db.recurring_rules, db.categories, db.tasks, db.insights, db.[domain]_entries], async () => {\n    await db.[domain]_entries.clear();  // ADD THIS\n    // ... other clears ...\n  });\n}\n```\n\n---\n\n### Layer 2: Server D1 Schema (Order matters: must sync with Dexie)\n\n**File 5: `migrations/000N_[domain].sql` (Create NEW, where N = next available number)**\n- **Pattern**: Copy structure from `migrations/0002_phase_1_money.sql` or `0003_phase_2_tasks.sql`\n- **Template**:\n  ```sql\n  CREATE TABLE IF NOT EXISTS [domain]_entries (\n    id TEXT PRIMARY KEY NOT NULL,\n    user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,\n    field1 TEXT NOT NULL,                      -- Matches [Domain]Payload field types\n    field2 INTEGER NOT NULL,\n    field3 TEXT NOT NULL CHECK (field3 IN ('option_a', 'option_b')),\n    field4 TEXT,                               -- Nullable\n    field_hlcs TEXT NOT NULL,                  -- JSON Record<string, string> serialized as TEXT\n    deleted_at TEXT,                           -- ISO tombstone (nullable)\n    created_at TEXT NOT NULL,                  -- ISO UTC timestamp\n    updated_at TEXT NOT NULL,                  -- ISO UTC timestamp\n    -- Add domain-specific constraints/defaults as needed\n  );\n  \n  CREATE INDEX idx_[domain]_user_id ON [domain]_entries(user_id);\n  CREATE INDEX idx_[domain]_user_updated ON [domain]_entries(user_id, updated_at);\n  -- Add additional indices for your query patterns (e.g., user_id + date range)\n  ```\n- **Key points**:\n  - **field_hlcs**: Always TEXT, will store JSON.stringify() of Record<string, string>\n  - **deleted_at**: Always nullable TEXT (tombstone marker)\n  - **created_at / updated_at**: Always TEXT NOT NULL (ISO format)\n  - **CHECK constraints**: Enforce enum values for fields like priority, direction, source\n  - **Indices**: At least (user_id, deleted_at) for querying live rows; add compound for sort keys\n\n**File 6: `src/lib/db.ts`**\n- **Current state**: Kysely DB interface (lines 1-100) with table unions\n- **Action**:\n  - Add interface (e.g., after MoneyEntryTable):\n    ```typescript\n    export interface [Domain]EntryTable {\n      id: string;\n      user_id: string;\n      field1: string;\n      field2: number;\n      field3: 'option_a' | 'option_b';\n      field4: string | null;\n      field_hlcs: string;    // JSON serialized in D1\n      deleted_at: string | null;\n      created_at: string;\n      updated_at: string;\n    }\n    ```\n  - Update DB union (line 95+):\n    ```typescript\n    export interface DB {\n      user: UserTable;\n      [domain]_entries: [Domain]EntryTable;  // ADD THIS\n      // ... other tables ...\n    }\n    ```\n\n---\n\n### Layer 3: Sync Engine (Client & Server)\n\n**File 7: `src/lib/sync-client.ts`**\n\n**Part A: Update applyLocalOp() transaction scope (line 60-65)**\n```typescript\nawait db.transaction(\n  'rw',\n  [\n    db.op_log,\n    db.widgets,\n    db.money_entries,\n    db.recurring_rules,\n    db.categories,\n    db.tasks,\n    db.insights,\n    db.[domain]_entries,  // ADD THIS LINE\n  ],\n  async () => {\n    // ... rest of transaction ...\n  }\n);\n```\n- **Critical**: applyLocalOp will silently skip tables not in this list\n\n**Part B: Add case in applyLocalOp() switch (line 90-120, after 'task' case)**\n```typescript\ncase '[domain]': {\n  const current = await db.[domain]_entries.get(op.entity_id);\n  const next = applyOp(current as never, op);\n  if (next) {\n    await db.[domain]_entries.put(next as never);\n  }\n  return;\n}\n```\n- **Mirror**: Copy from the 'task' case (lines 108-112) exactly, change table name and entity type\n- **applyOp**: Handles HLC merge + field-level LWW; no domain logic needed here\n\n**File 8: `src/lib/entity-fields.ts`**\n- **Current state**: Field arrays for each entity_kind (MONEY_FIELDS, TASK_FIELDS, etc.)\n- **Action**: Add your field array (line 30+):\n  ```typescript\n  export const [DOMAIN]_FIELDS = ['field1', 'field2', 'field3', 'field4'] as const;\n  // Only mutable fields; exclude id, user_id, timestamps, field_hlcs, deleted_at\n  ```\n- **Order**: Match your [Domain]PayloadSchema field order\n- **Don't include system fields**: Those are handled by materializeRow_LWW()\n\n**File 9: `src/lib/materialize.ts`**\n- **Current state**: materializeRow() dispatch by entity_kind (line 15-30)\n- **Action**:\n  - Add import (line 1):\n    ```typescript\n    import { [DOMAIN]_FIELDS } from '@/lib/entity-fields';\n    ```\n  - Add case (line 30+):\n    ```typescript\n    case '[domain]':\n      return materializeRow_LWW(db, op, userId, '[domain]_entries', [DOMAIN]_FIELDS);\n    ```\n- **Pattern**: All simple LWW domains use materializeRow_LWW(); only Money uses custom logic (materializeWidget)\n\n**File 10: `src/app/api/admin/backfill/route.ts`**\n- **No changes needed**: Already loops all ops and calls materializeRow()\n- **Verify**: Your case in materializeRow() will auto-fire when backfill runs\n\n---\n\n### Layer 4: Groq Agent Pipeline (If domain needs LLM parsing)\n\n**File 11: `src/lib/agents/schemas/[domain]-agent-response.ts` (Create NEW)**\n```typescript\nimport { z } from 'zod';\n\nexport const [Domain]AgentResponseSchema = z.object({\n  field1: z.string().min(1).max(200),\n  field2: z.number().int().nonnegative().optional(),\n  field3: z.enum(['option_a', 'option_b']).optional(),\n  field4: z.string().nullable().optional(),\n  occurred_at: z.string().datetime(),  // ISO UTC; agent infers from context if omitted in input\n}).strict();\n\nexport type [Domain]AgentResponse = z.infer<typeof [Domain]AgentResponseSchema>;\n```\n- **Mirror**: Copy structure from `src/lib/agents/schemas/money-agent-response.ts` or `task-agent-response.ts`\n- **DO NOT include source field**: Added by API route, not agent\n- **occurred_at / due_at**: Always ISO UTC; agent receives nowIso + userTz for context\n\n**File 12: `src/lib/agents/prompts/[domain].ts` (Create NEW)**\n```typescript\nexport function build[Domain]AgentSystemPrompt(args: {\n  nowIso: string;\n  userTz: string;\n  // Add context params specific to your domain (e.g., categories, currency)\n}): string {\n  const { nowIso, userTz } = args;\n  \n  return `You are a parser for [Domain] entries. Extract the following JSON structure:\n\nFIELDS:\n- field1 (string, 1-200 chars): [description]\n- field2 (integer, >= 0): [description]\n- field3 (enum: 'option_a' or 'option_b'): [description]\n- field4 (string or null): [description]\n- occurred_at (ISO datetime UTC): [description, or null if user didn't specify time]\n\nRULES:\n- [Domain]-specific parsing rules]\n- Current time: ${nowIso} (UTC)\n- User timezone: ${userTz}\n- [Example: \"today\" means ${new Date(nowIso).toISOString().split('T')[0]}]\n\nEXAMPLES:\nInput: \"log learning about React hooks\"\nOutput: {\n  \"field1\": \"React hooks\",\n  \"field2\": null,\n  \"field3\": \"option_a\",\n  \"field4\": null,\n  \"occurred_at\": \"${nowIso}\"\n}\n\nReturn ONLY this JSON object (no prose, no markdown, no explanation).`;\n}\n```\n- **Mirror pattern**: Copy from `src/lib/agents/prompts/task-agent.ts` (lines 1-50) or `money-agent.ts` (lines 1-70)\n- **Must end with**: \"Return ONLY this JSON object (no prose, no markdown).\"\n- **Include examples**: Show 2-3 realistic input→output pairs\n\n**File 13: `src/lib/agents/[domain]-agent.ts` (Create NEW)**\n```typescript\nimport { Groq } from '@anthropic-ai/sdk';\nimport { withRetry } from '@/lib/retry';\nimport { callGroqJSON } from '@/lib/agents/llm-client';\nimport { build[Domain]AgentSystemPrompt } from '@/lib/agents/prompts/[domain]';\nimport { [Domain]AgentResponseSchema, type [Domain]AgentResponse } from '@/lib/agents/schemas/[domain]-agent-response';\n\nexport async function parse[Domain]Entry(args: {\n  client: Groq;\n  text: string;\n  nowIso?: string;\n  userTz?: string;\n  // Add other context params (categories, currency, etc.)\n}): Promise<[Domain]AgentResponse> {\n  const { client, text, nowIso = new Date().toISOString(), userTz = 'UTC' } = args;\n  \n  const system = build[Domain]AgentSystemPrompt({ nowIso, userTz });\n  \n  return withRetry(\n    () =>\n      callGroqJSON<unknown>({\n        client,\n        model: 'openai/gpt-oss-120b',\n        system,\n        user: text,\n        temperature: 0,\n        maxTokens: 256,\n      }),\n    { attempts: 3, baseMs: 500 }\n  ).then((response) => {\n    const parsed = [Domain]AgentResponseSchema.safeParse(response);\n    if (!parsed.success) {\n      throw new Error(\n        `[domain]-agent: invalid response — ${parsed.error.message}\\nRaw: ${JSON.stringify(response)}`\n      );\n    }\n    return parsed.data;\n  });\n}\n```\n- **Mirror**: Copy from `src/lib/agents/task-agent.ts` (lines 1-50) exactly, swap function/schema names\n- **Model choice**: gpt-oss-120b for reasoning; gpt-oss-20b only for router\n- **Temperature**: Always 0 except digest (0.3)\n- **maxTokens**: 256 typical for domain parsers; increase if complex output\n\n**File 14: `src/lib/agents/router.ts`**\n- **Current state**: Calls routeIntent() with 5 intents (line 10-30, ROUTER_SYSTEM_PROMPT)\n- **Action (if domain has logging intent)**:\n  - Update INTENTS in router response schema reference (implicit via prompt)\n  - Update system prompt (line 5-50): Add new intent to the Intents list with 3-4 examples\n  - Example addition:\n    ```typescript\n    // In ROUTER_SYSTEM_PROMPT (line 6-20):\n    \"log_[domain]\": \"User is logging a new [domain] entry; extract key info\",\n    \n    // In Examples (line 30-50):\n    \"User says 'I learned about React hooks today' → intent: log_learning, confidence: 0.95\"\n    ```\n- **Update src/lib/agents/schemas/router-response.ts**: Add to INTENTS enum\n  ```typescript\n  export const INTENTS = ['log_money', 'log_task', 'query_money', 'query_task', 'log_[domain]', 'chat'] as const;\n  ```\n\n---\n\n### Layer 5: API Routes (Voice & Text Input)\n\n**File 15: `src/app/api/voice/route.ts`**\n- **Current state**: SSE handler with router + domain-specific conditionals (lines 80-130)\n- **Action**: Add case after 'log_task' (line ~110):\n  ```typescript\n  if (router.intent === 'log_[domain]') {\n    const [domain]Entry = await parse[Domain]Entry({\n      client,\n      text: transcript,\n      nowIso: new Date().toISOString(),\n      userTz: userPrefs?.tz || 'UTC',\n      // Add other context (categories, currency) if needed\n    });\n    \n    controller.enqueue(\n      encodeToString(\n        `data: ${JSON.stringify({\n          step: 'payload',\n          intent: 'log_[domain]',\n          payload: {\n            kind: '[domain]',\n            source: 'voice',\n            ...([domain]Entry),\n          },\n        })}\\n\\n`\n      )\n    );\n    return response;\n  }\n  ```\n- **Mirror**: Copy from 'log_task' case (lines 105-120) exactly\n- **source field**: Always 'voice' for voice route; set in route, not agent\n\n**File 16: `src/app/api/agent/route.ts`**\n- **Current state**: JSON text input handler (lines 40-100)\n- **Action**: Add case after 'log_task' (line ~80):\n  ```typescript\n  if (router.intent === 'log_[domain]') {\n    const [domain]Entry = await parse[Domain]Entry({\n      client,\n      text,\n      nowIso: new Date().toISOString(),\n      userTz: userPrefs?.tz || 'UTC',\n    });\n    \n    return NextResponse.json({\n      transcript: text,\n      intent: 'log_[domain]',\n      confidence: router.confidence,\n      payload: {\n        kind: '[domain]',\n        source: 'manual',\n        ...([domain]Entry),\n      },\n    });\n  }\n  ```\n- **Difference from voice**: No SSE, returns JSON; source is 'manual'\n\n---\n\n### Layer 6: UI Components & Hooks\n\n**File 17: `src/hooks/use-[domain].ts` (Create NEW)**\n```typescript\nimport { useLiveQuery } from 'dexie-react-hooks';\nimport { db } from '@/lib/dexie';\nimport type { [Domain]Row } from '@/lib/dexie';\n\nexport function use[Domain](userId?: string): [Domain]Row[] {\n  return (\n    useLiveQuery(\n      async () => {\n        if (!userId) return [];\n        const all = await db.[domain]_entries\n          .where('user_id')\n          .equals(userId)\n          .toArray();\n        return all.filter((r) => !r.deleted_at);  // Exclude tombstones\n      },\n      [userId],\n      []\n    ) ?? []\n  );\n}\n```\n- **Mirror**: Copy from `src/hooks/use-tasks.ts` (lines 1-25) or `use-money-entries.ts`\n- **Filtering**: Always filter out deleted_at !== null rows\n- **Dependencies**: [userId] array ensures re-query on userId change\n\n**File 18: `src/components/[domain]-card.tsx` (Create NEW, if domain needs desktop summary card)**\n```typescript\nimport { cn } from '@/lib/utils';\nimport { use[Domain] } from '@/hooks/use-[domain]';\n\ninterface [Domain]CardProps {\n  userId?: string;\n}\n\nexport function [Domain]Card({ userId }: [Domain]CardProps) {\n  const entries = use[Domain](userId);\n  \n  return (\n    <aside className=\"glass rounded-2xl p-4 w-80 sticky top-6 h-fit\">\n      <h3 className=\"text-sm font-semibold text-foreground/70 mb-3\">[Domain] Summary</h3>\n      {/* Add domain-specific stats (total, categories, etc.) */}\n    </aside>\n  );\n}\n```\n- **Mirror**: Copy from `src/components/money-card.tsx` (lines 1-50) structure\n- **Glass styling**: Use .glass + .glass-soft + accent colors from globals.css\n- **Optional**: Not all domains need a card; use if you want persistent sidebar stats\n\n**File 19: `src/components/[domain]-list.tsx` (Create NEW)**\n```typescript\nimport { use[Domain] } from '@/hooks/use-[domain]';\nimport { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client';\nimport { useUser } from '@/hooks/use-user';\n\ninterface [Domain]ListProps {\n  userId: string;\n}\n\nexport function [Domain]List({ userId }: [Domain]ListProps) {\n  const entries = use[Domain](userId);\n  \n  const handleDelete = async (id: string) => {\n    const op = generateOp({\n      entity_kind: '[domain]',\n      entity_id: id,\n      op_type: 'delete',\n      payload: {},\n      user_id: userId,\n    });\n    await applyLocalOp(op);\n    await pushPullOnce({ userId });\n  };\n  \n  return (\n    <div className=\"space-y-2\">\n      {entries.map((entry) => (\n        <div\n          key={entry.id}\n          className=\"glass-soft rounded-2xl p-3 flex justify-between items-center cursor-pointer\"\n          onContextMenu={() => handleDelete(entry.id)}\n        >\n          <div>{/* Render entry fields */}</div>\n        </div>\n      ))}\n    </div>\n  );\n}\n```\n- **Mirror**: Copy from `src/components/task-list.tsx` (lines 1-80) structure\n- **delete pattern**: generateOp + applyLocalOp + pushPullOnce\n- **Long-press**: Add setTimeout on onPointerDown; clear on onPointerUp/Leave for mobile\n\n**File 20: `src/components/confirmation-chip.tsx` (Update existing)**\n- **Current state**: ChipDraft discriminated union, renders ConfirmationChipMoney or ConfirmationChipTask\n- **Action**:\n  - Update type (line 17-20):\n    ```typescript\n    export type ChipDraft =\n      | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string })\n      | (TaskPayload & { kind: 'task' })\n      | ([Domain]Payload & { kind: '[domain]' });  // ADD THIS\n    ```\n  - Update render switch (line 30-45):\n    ```typescript\n    if (draft.kind === '[domain]') {\n      return <ConfirmationChip[Domain] draft={draft} onConfirm={onConfirm} />;\n    }\n    ```\n\n**File 21: `src/components/confirmation-chip-[domain].tsx` (Create NEW)**\n```typescript\nimport { type [Domain]Payload } from '@/lib/op-schemas/[domain]';\nimport type { RecurringConfig } from '@/components/confirmation-chip';\n\ninterface ConfirmationChip[Domain]Props {\n  draft: [Domain]Payload & { kind: '[domain]' };\n  onConfirm: (final: [Domain]Payload, recurring?: RecurringConfig) => void;\n}\n\nexport function ConfirmationChip[Domain]({ draft, onConfirm }: ConfirmationChip[Domain]Props) {\n  return (\n    <div className=\"glass rounded-2xl p-4 space-y-3\">\n      <h3 className=\"text-sm font-semibold\">[Domain] Entry</h3>\n      {/* Render editable fields matching [Domain]Payload */}\n      <button\n        onClick={() => onConfirm(draft)}\n        className=\"glass-accent w-full py-2 rounded-lg text-sm font-medium\"\n      >\n        Confirm\n      </button>\n    </div>\n  );\n}\n```\n- **Mirror**: Copy from `src/components/confirmation-chip-task.tsx` structure\n- **onConfirm callback**: Called with final payload; app orchestrates op creation\n\n**File 22: `src/components/tab-bar.tsx`**\n- **Current state**: TABS array with {id, icon, label} (line 5-15), renders buttons with activeTab styling\n- **Action**: Add to TABS array:\n  ```typescript\n  { id: '[domain]', icon: Icon[Domain], label: '[Domain]' }\n  ```\n- **Icon**: Use lucide-react icon matching domain semantics (e.g., Brain for Learning, BookOpen for Notes)\n\n**File 23: `src/hooks/use-tab-state.ts`**\n- **Current state**: type Tab = 'money' | 'tasks', VALID_TABS array, URL sync logic\n- **Action**:\n  - Update type (line 3):\n    ```typescript\n    export type Tab = 'money' | 'tasks' | '[domain]';\n    ```\n  - Update VALID_TABS (line 5):\n    ```typescript\n    const VALID_TABS = ['money', 'tasks', '[domain]'] as const;\n    ```\n\n**File 24: `src/app/app/page.tsx` (Update existing main shell)**\n- **Current state**: useTabState hook, renders Money/Tasks conditionally, orchestrates voice/text input\n- **Action**:\n  - Import components (line 1-15):\n    ```typescript\n    import { [Domain]Card } from '@/components/[domain]-card';\n    import { [Domain]List } from '@/components/[domain]-list';\n    ```\n  - Add conditional render in main content (line ~150, after TaskList block):\n    ```typescript\n    {activeTab === '[domain]' && (\n      <div className=\"flex flex-col gap-3 flex-1 px-4 py-6\">\n        <[Domain]List userId={user.id} />\n      </div>\n    )}\n    ```\n  - Add to desktop aside (line ~100, after TaskSummary):\n    ```typescript\n    {activeTab === '[domain]' && <[Domain]Card userId={user.id} />}\n    ```\n  - Wire confirmEntry switch (line ~180, after 'task' case):\n    ```typescript\n    if (final.kind === '[domain]') {\n      const op = await generateOp({\n        entity_kind: '[domain]',\n        entity_id: crypto.randomUUID(),\n        op_type: 'create',\n        payload: { ...final },\n        user_id: user.id,\n      });\n      await applyLocalOp(op);\n      if (activeTab !== '[domain]') setTab('[domain]');\n    }\n    ```\n\n---\n\n### Layer 7: Testing\n\n**File 25: `tests/op-schemas-[domain].test.ts` (Create NEW)**\n```typescript\nimport { describe, it, expect } from 'vitest';\nimport { [Domain]PayloadSchema } from '@/lib/op-schemas/[domain]';\n\ndescribe('[Domain]PayloadSchema', () => {\n  it('validates minimal payload', () => {\n    const result = [Domain]PayloadSchema.safeParse({\n      field1: 'value1',\n      field2: 100,\n      field3: 'option_a',\n      field4: null,\n      occurred_at: '2026-07-17T10:00:00Z',\n      source: 'voice',\n    });\n    expect(result.success).toBe(true);\n  });\n\n  it('rejects missing required field', () => {\n    const result = [Domain]PayloadSchema.safeParse({\n      field1: 'value1',\n      // Missing field2\n      field3: 'option_a',\n      occurred_at: '2026-07-17T10:00:00Z',\n      source: 'voice',\n    });\n    expect(result.success).toBe(false);\n  });\n\n  it('rejects invalid enum value', () => {\n    const result = [Domain]PayloadSchema.safeParse({\n      field1: 'value1',\n      field2: 100,\n      field3: 'invalid_option',  // Not in enum\n      field4: null,\n      occurred_at: '2026-07-17T10:00:00Z',\n      source: 'voice',\n    });\n    expect(result.success).toBe(false);\n  });\n\n  it('allows partial updates via .partial()', () => {\n    const partial = [Domain]PayloadSchema.partial();\n    const result = partial.safeParse({\n      field1: 'updated',\n    });\n    expect(result.success).toBe(true);\n  });\n});\n```\n\n**File 26: `tests/fixtures/[domain]-agent-cases.ts` (Create NEW)**\n```typescript\nimport type { [Domain]AgentResponse } from '@/lib/agents/schemas/[domain]-agent-response';\n\nexport interface Case {\n  id: string;\n  text: string;\n  bucket: 'happy' | 'edge' | 'failure';\n  expect: Partial<[Domain]AgentResponse>;\n  expectNull?: boolean; // If agent should return null/error\n}\n\nexport const CASES: Case[] = [\n  {\n    id: 'h-01',\n    text: 'I learned about React hooks today',\n    bucket: 'happy',\n    expect: {\n      field1: 'React hooks',\n      field3: 'option_a',\n    },\n  },\n  {\n    id: 'h-02',\n    text: '[more happy case]',\n    bucket: 'happy',\n    expect: { /* ... */ },\n  },\n  // ... 20-30 more cases covering edge cases, failure modes\n];\n```\n\n**File 27: `tests/agents/[domain]-agent.test.ts` (Create NEW)**\n```typescript\nimport { describe, it, expect, beforeEach, vi } from 'vitest';\nimport { parse[Domain]Entry } from '@/lib/agents/[domain]-agent';\nimport { CASES } from '@/tests/fixtures/[domain]-agent-cases';\nimport type { Groq } from '@anthropic-ai/sdk';\n\ndescribe('[Domain]Agent', () => {\n  let mockClient: Groq;\n\n  beforeEach(() => {\n    mockClient = {\n      chat: {\n        completions: {\n          create: vi.fn(),\n        },\n      },\n    } as unknown as Groq;\n  });\n\n  CASES.forEach((c) => {\n    it(`case ${c.id}: ${c.bucket}`, async () => {\n      const response = {\n        choices: [\n          {\n            message: {\n              content: JSON.stringify({\n                field1: c.expect.field1 || 'default',\n                field2: c.expect.field2 || 0,\n                field3: c.expect.field3 || 'option_a',\n                field4: c.expect.field4 || null,\n                occurred_at: c.expect.occurred_at || '2026-07-17T10:00:00Z',\n              }),\n            },\n          },\n        ],\n      };\n\n      vi.mocked(mockClient.chat.completions.create).mockResolvedValue(response as any);\n\n      const result = await parse[Domain]Entry({\n        client: mockClient,\n        text: c.text,\n        nowIso: '2026-07-17T10:00:00Z',\n        userTz: 'UTC',\n      });\n\n      expect(result.field1).toBe(c.expect.field1);\n      expect(result.field3).toBe(c.expect.field3);\n    });\n  });\n});\n```\n\n**File 28: `tests/dexie.test.ts` (Update existing)**\n- **Action**: Add new phase block (after last phase):\n  ```typescript\n  describe('Dexie vX: [domain] — Phase Y', () => {\n    it('persists [domain] row', async () => {\n      await db.[domain]_entries.put({\n        id: 'test-1',\n        user_id: 'user-1',\n        field1: 'value1',\n        field_hlcs: { field1: '0000000000000001-000000-device1' },\n        deleted_at: null,\n        created_at: '2026-07-17T10:00:00Z',\n        updated_at: '2026-07-17T10:00:00Z',\n      });\n\n      const row = await db.[domain]_entries.get('test-1');\n      expect(row?.field1).toBe('value1');\n    });\n\n    it('queries [domain] by user_id', async () => {\n      const rows = await db.[domain]_entries\n        .where('user_id')\n        .equals('user-1')\n        .toArray();\n      expect(rows).toHaveLength(1);\n    });\n  });\n  ```\n\n**File 29: `tests/sync-client.test.ts` (Update existing)**\n- **Action**: Add new phase block:\n  ```typescript\n  describe('applyLocalOp — Phase X: [domain]', () => {\n    it('creates [domain] entry', async () => {\n      const op = generateOp({\n        entity_kind: '[domain]',\n        entity_id: 'test-1',\n        op_type: 'create',\n        payload: { field1: 'value1', field3: 'option_a', occurred_at: '2026-07-17T10:00:00Z' },\n        user_id: 'user-1',\n      });\n\n      await applyLocalOp(op);\n\n      const row = await db.[domain]_entries.get('test-1');\n      expect(row?.field1).toBe('value1');\n      expect(row?.field_hlcs.field1).toBe(op.hlc);\n    });\n\n    it('applies LWW on concurrent ops', async () => {\n      const op1 = generateOp({\n        entity_kind: '[domain]',\n        entity_id: 'test-2',\n        op_type: 'create',\n        payload: { field1: 'value1' },\n        user_id: 'user-1',\n      });\n      \n      const op2 = {\n        ...op1,\n        hlc: '0000000000000002-000000-device1', // Later HLC\n        payload: { field1: 'value2' },\n      };\n\n      await applyLocalOp(op1);\n      await applyLocalOp(op2);\n\n      const row = await db.[domain]_entries.get('test-2');\n      expect(row?.field1).toBe('value2');  // Later op wins\n    });\n  });\n  ```\n\n**File 30: `tests/api/[domain]-route.test.ts` (Create NEW, if domain has API route)**\n```typescript\nimport { describe, it, expect, beforeEach, vi } from 'vitest';\nimport { POST as voiceHandler } from '@/app/api/voice/route';\nimport { POST as agentHandler } from '@/app/api/agent/route';\n\ndescribe('/api/voice & /api/agent — [domain]', () => {\n  beforeEach(() => {\n    vi.mock('@/lib/auth', () => ({\n      getSession: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),\n    }));\n    vi.mock('@/lib/agents/router', () => ({\n      routeIntent: vi.fn().mockResolvedValue({ intent: 'log_[domain]', confidence: 0.95 }),\n    }));\n  });\n\n  it('/api/agent: log_[domain] intent returns payload', async () => {\n    const req = new Request('http://localhost/api/agent', {\n      method: 'POST',\n      body: JSON.stringify({ text: 'I learned about React hooks', categories: [] }),\n    });\n\n    const res = await agentHandler(req);\n    const json = await res.json();\n\n    expect(res.status).toBe(200);\n    expect(json.intent).toBe('log_[domain]');\n    expect(json.payload.kind).toBe('[domain]');\n    expect(json.payload.source).toBe('manual');\n  });\n});\n```\n\n---\n\n## Part 2: Domain-Specific Breakdowns\n\n### A. Learning Domain (Day-to-Day Learning Capture)\n\n**What Learning Needs (Divergences from Generic Recipe)**\n\n1. **Payload Fields** (src/lib/op-schemas/learning.ts):\n   ```typescript\n   export const LearningPayloadSchema = z.object({\n     topic: z.string().min(1).max(100),           // Core: what was learned\n     subject: z.enum(['technology', 'business', 'personal', 'other']).optional(),\n     key_insight: z.string().max(500).nullable(), // Optional deep insight\n     source: z.enum(['article', 'video', 'discussion', 'experience', 'voice']).optional(),\n     confidence: z.enum(['beginner', 'intermediate', 'advanced']).optional(),\n     tags: z.array(z.string()).optional(),\n     created_at: z.string().datetime(),\n   }).strict();\n   ```\n\n2. **Dexie Row** (src/lib/dexie.ts):\n   ```typescript\n   export type LearningRow = {\n     id: string;\n     user_id: string;\n     topic: string;\n     subject?: 'technology' | 'business' | 'personal' | 'other';\n     key_insight: string | null;\n     source?: 'article' | 'video' | 'discussion' | 'experience' | 'voice';\n     confidence?: 'beginner' | 'intermediate' | 'advanced';\n     tags: string[];\n     field_hlcs: Record<string, string>;\n     deleted_at: string | null;\n     created_at: string;\n     updated_at: string;\n   };\n   ```\n   - **Index strategy**: `[user_id+created_at]` for chronological listing, `[user_id+subject]` for filtering by subject\n\n3. **Agent Response** (src/lib/agents/schemas/learning-agent-response.ts):\n   ```typescript\n   export const LearningAgentResponseSchema = z.object({\n     topic: z.string().min(1).max(100),\n     subject: z.enum(['technology', 'business', 'personal', 'other']).optional(),\n     key_insight: z.string().max(500).nullable().optional(),\n     source: z.enum(['article', 'video', 'discussion', 'experience', 'voice']).optional(),\n     confidence: z.enum(['beginner', 'intermediate', 'advanced']).optional(),\n     tags: z.array(z.string()).optional(),\n   }).strict();\n   ```\n\n4. **System Prompt** (src/lib/agents/prompts/learning.ts):\n   - Instructs Groq to extract topic (what was learned), subject category, optional key_insight (deeper understanding), source (how learned)\n   - Auto-tags based on topic keywords (e.g., \"React hooks\" → tags: ['React', 'hooks'])\n   - Infers confidence from language (e.g., \"I understand\" → intermediate; \"just started\" → beginner)\n\n5. **UI Specifics** (src/components/learning-*):\n   - **LearningCard** (desktop): Shows count by subject, recent topics, sparkline of learning frequency\n   - **LearningList**: Rows grouped by subject with dates; tap to view key_insight\n   - **LearningFilter**: Tabs for subject (Technology / Business / Personal / All)\n   - **LearningChip**: Editable fields: topic, subject picker, key_insight textarea, confidence radio buttons, tags input\n\n6. **Router Intent**:\n   - Add to ROUTER_SYSTEM_PROMPT: \"log_learning — User shares something they learned, studied, or discovered\"\n   - Examples: \"I learned about React hooks\", \"just read an article on AWS Lambda\", \"discovered that TypeScript has union types\"\n\n7. **Recurring NOT applicable**: Learning entries are one-off captures; no recurring_rule_id field\n\n8. **Query patterns** (src/hooks/use-learning.ts):\n   ```typescript\n   export function useLearningBySubject(userId?: string, subject?: string): LearningRow[] {\n     // Filter by subject if provided; otherwise return all\n   }\n   ```\n\n9. **Cron Jobs**: Optional weekly digest of learnings (e.g., \"You learned 5 new things this week in Technology\")\n\n10. **Backfill**: No special logic; standard materializeRow_LWW handles all fields\n\n---\n\n### B. Notes Domain (Quick Freeform Note Capture)\n\n**What Notes Needs (Divergences from Generic Recipe)**\n\n1. **Payload Fields** (src/lib/op-schemas/note.ts):\n   ```typescript\n   export const NotePayloadSchema = z.object({\n     title: z.string().min(1).max(200).nullable(),    // Optional title\n     body: z.string().min(1).max(5000),               // Main content (longer than learning)\n     color: z.enum(['yellow', 'blue', 'pink', 'green', 'gray']).optional(),\n     pinned: z.boolean().optional().default(false),   // Pinnable to top\n     archived: z.boolean().optional().default(false), // Soft archive (not deleted)\n     attachments: z.array(z.object({ url: z.string(), type: z.string() })).optional(),\n     created_at: z.string().datetime(),\n   }).strict();\n   ```\n\n2. **Dexie Row** (src/lib/dexie.ts):\n   ```typescript\n   export type NoteRow = {\n     id: string;\n     user_id: string;\n     title: string | null;\n     body: string;\n     color?: 'yellow' | 'blue' | 'pink' | 'green' | 'gray';\n     pinned: boolean;\n     archived: boolean;\n     attachments?: Array<{ url: string; type: string }>;\n     field_hlcs: Record<string, string>;\n     deleted_at: string | null;\n     created_at: string;\n     updated_at: string;\n   };\n   ```\n   - **Index strategy**: `[user_id+pinned]` (pinned notes first), `[user_id+archived]` (for archival queries)\n\n3. **Agent Response** (src/lib/agents/schemas/note-agent-response.ts):\n   ```typescript\n   export const NoteAgentResponseSchema = z.object({\n     title: z.string().min(1).max(200).nullable().optional(),\n     body: z.string().min(1).max(5000),\n     color: z.enum(['yellow', 'blue', 'pink', 'green', 'gray']).optional(),\n   }).strict();\n   ```\n   - Agent infers color from sentiment/urgency (e.g., \"urgent bug fix\" → pink; \"research task\" → blue)\n\n4. **System Prompt** (src/lib/agents/prompts/note.ts):\n   - Extracts title (if multi-word note) or null (single-sentence notes)\n   - Body is the full note content\n   - Color inference: urgent/important → pink; question/research → blue; reminder → yellow; etc.\n   - No tags, source, or confidence (simpler than Learning)\n\n5. **UI Specifics** (src/components/note-*):\n   - **NoteCard** (desktop): Shows pinned count, recent notes, total count\n   - **NoteList**: Rows with color-coded left border; drag-to-reorder pinned; swipe-to-archive\n   - **NoteFilter**: Tabs for (All / Pinned / Active / Archived)\n   - **NoteChip**: Editable fields: title input, body textarea, color swatch picker, pinned toggle\n\n6. **Router Intent**:\n   - Add to ROUTER_SYSTEM_PROMPT: \"log_note — User is saving a quick memo, reminder, or freeform thought\"\n   - Examples: \"remind me to fix the bug\", \"note to buy groceries\", \"quick reminder: meeting at 3pm\"\n\n7. **Archival Pattern**: Notes have archived flag (not deleted); query filters archived=false by default. Soft archive is distinct from deleted_at tombstone.\n\n8. **Attachment Support**: Optional R2 upload for note attachments (images, PDFs); Groq vision agent can parse note from image if provided\n\n9. **Cron Jobs**: Optional midnight cleanup (archive notes older than 90 days with archived=true)\n\n10. **Backfill**: Standard materializeRow_LWW; archived flag is just another field with HLC\n\n---\n\n## Part 3: Top 5 Open Design Questions\n\n1. **Shared Dexie Storage or Separate Databases?**\n   - **Current**: All entities (Money, Tasks, Widgets, Insights, Learning, Notes) share one PulseDb instance\n   - **Question**: Should new domains continue this monolithic approach, or would you prefer domain-specific databases (db.learning, db.notes as separate Dexie instances)?\n   - **Implications**: Monolithic = simpler sync/transactions; separate = better isolation but requires cross-DB coordination\n   - **Recommendation**: Stick with monolithic until transaction isolation becomes a blocker\n\n2. **Shared Router or Domain-Specific Entrypoints?**\n   - **Current**: Single routeIntent() classifier dispatches to 5+ domain agents; router confidence is global\n   - **Question**: Should notes/learning enter via voice-recorder UI, or have dedicated input buttons (NoteButton, LearningButton) that skip the router?\n   - **Implications**: Via router = unified UX but router must be trained on all domains; dedicated buttons = more UI surface but faster parsing (no intent ambiguity)\n   - **Recommendation**: Start with router (unified); add dedicated buttons if router misclassification becomes a user pain point\n\n3. **Recurring Rules for Learning/Notes?**\n   - **Current**: Only Money entries support recurring rules (daily expenses, weekly subscriptions)\n   - **Question**: Should Learning/Notes support recurring capture (e.g., \"remind me to log daily learning\", \"daily standup notes\")?\n   - **Implications**: Yes = add recurring_rule_id to Learning/Notes, wire cron job to auto-generate entries; No = simpler but users must manually re-enter\n   - **Recommendation**: No for MVP; add if users request \"I want to log learning every day at 10am\"\n\n4. **Digest/Cron for Every Domain?**\n   - **Current**: Money has weekly digest (spending summary); Tasks have no cron job\n   - **Question**: Should Learning/Notes get push notifications/digests (e.g., \"You learned 5 things this week\", \"You have 3 unarchived notes\")?\n   - **Implications**: Yes = add src/app/api/cron/[domain]/route.ts endpoints, wire to push-notifications table; No = passive read-only\n   - **Recommendation**: Start with No; ship digest after Learning/Notes MVP stabilizes\n\n5. **Query/Search Capabilities vs. Simple List?**\n   - **Current**: Money has query_money agent (free-text search + filtering); Tasks have only simple list\n   - **Question**: Should Learning/Notes support Groq-powered search agents (e.g., \"show me all notes about React from last week\")?\n   - **Implications**: Yes = add query-learning, query-note to router; query agents parse natural language to SQL; No = filter tabs only\n   - **Recommendation**: Start with No (filter tabs suffice); add query agents if users request advanced search\n\n---\n\n## Summary: Files Touched Per Domain (Quick Reference)\n\n**Minimum viable domain requires changes to these 30 files:**\n\n| Layer | Files | Count |\n|-------|-------|-------|\n| Types/Schema | ops.ts, op-schemas/[domain].ts, op-schemas/index.ts, db.ts | 4 |\n| Dexie | dexie.ts (Row + table + version + resetDb) | 1 |\n| D1 Migration | migrations/000N_[domain].sql | 1 |\n| Sync Engine | sync-client.ts, entity-fields.ts, materialize.ts | 3 |\n| Groq Agent | schemas/[domain]-agent-response.ts, prompts/[domain].ts, [domain]-agent.ts, router.ts | 4 |\n| API Routes | api/voice/route.ts, api/agent/route.ts | 2 |\n| UI Components | components/[domain]-card.tsx, [domain]-list.tsx, confirmation-chip-[domain].tsx, confirmation-chip.tsx (update), tab-bar.tsx (update) | 5 |\n| UI Hooks | hooks/use-[domain].ts, use-tab-state.ts (update) | 2 |\n| App Shell | app/app/page.tsx (update) | 1 |\n| Tests | op-schemas-[domain].test.ts, fixtures/[domain]-agent-cases.ts, agents/[domain]-agent.test.ts, dexie.test.ts (update), sync-client.test.ts (update), api/[domain]-route.test.ts | 6 |\n| **TOTAL** | | **30** |\n\n---\n\n## Implementation Sequencing (Recommended Order)\n\n1. **Commit 1**: Types + schema registration (files 1-3, 6)\n2. **Commit 2**: Dexie + D1 (files 4, 5)\n3. **Commit 3**: Sync engine (files 7-10)\n4. **Commit 4**: Groq agent (files 11-14)\n5. **Commit 5**: API routes (files 15-16)\n6. **Commit 6**: UI components + hooks (files 17-24)\n7. **Commit 7**: Tests (files 25-30)\n8. **Commit 8 (Optional)**: Cron/digest job, if needed\n\nEach commit is independently testable; sync engine can be verified before UI is built.\n\n---\n\nThis blueprint is your spec. Use it as a checklist: ✓ files created, ✓ patterns mirrored, ✓ tests passing.",
+    "dimensionMaps": [
+      {
+        "dimension": "data-dexie",
+        "keyFiles": [
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/dexie.ts",
+            "role": "Client IndexedDB schema definition. Exports Row types (TaskRow, MoneyEntryRow, CategoryRow, RecurringRuleRow, WidgetRow, InsightRow, FxRateRow) + db instance. Uses .version() chaining for migrations. Currently at version 4."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/types/ops.ts",
+            "role": "Operation schema + entity kinds. Exports ENTITY_KINDS array ['widget','money','recurring','task','project','learning','note','category','budget','insight'], OP_TYPES, OpSchema (Zod), and EntityRow base type with id/user_id/field_hlcs/deleted_at/created_at/updated_at."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/entity-fields.ts",
+            "role": "Declares field arrays per entity kind (MONEY_FIELDS, RECURRING_FIELDS, CATEGORY_FIELDS, TASK_FIELDS, INSIGHT_FIELDS). Used by materializeRow_LWW() to know which fields to upsert. Add new domain fields array here."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/db.ts",
+            "role": "Server D1 schema (Kysely interfaces). Mirrors dexie.ts + migration tables. Keep DB interface in sync when adding tables. Export new XyzTable interface here."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/sync-client.ts",
+            "role": "Client-side sync engine. generateOp() creates ops, applyLocalOp() applies to Dexie. Must update applyLocalOp() transaction scope + case block for new entity_kind."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/materialize.ts",
+            "role": "Server-side materialization (LWW projection). materializeRow() dispatches by entity_kind; add new case that calls materializeRow_LWW() with table name + field array."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/migrations/0001_initial.sql",
+            "role": "Base schema (auth tables, op_log, widgets). Create new migration file for new domain."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/op-log.ts",
+            "role": "Per-field LWW merge logic. applyOp() reads field_hlcs HLC strings, compares timestamps. No changes needed per domain (reusable)."
+          }
+        ],
+        "patterns": [
+          "Row types inherit EntityRow base: {id, user_id, field_hlcs: Record<string, string>, deleted_at: string | null, created_at: string, updated_at: string, ...domain-specific fields}",
+          "Dexie indices via .stores(): Primary key 'id', secondary indexes on 'user_id', 'updated_at', or compound [user_id+field] for multi-key queries",
+          "Version bumps: Dexie.version(N).stores({new_table: '...'}) for EACH new table, cumulative not replacement. Compare with previous migration.",
+          "Operations: generateOp({entity_kind, entity_id, op_type: 'create'|'update'|'delete', payload: Record<string, unknown>, user_id}) → Op. Payload only includes fields being set.",
+          "Server materialization: For each entity_kind, export const XYZ_FIELDS = [...field names...] from entity-fields.ts; case in materializeRow() calls materializeRow_LWW(db, op, userId, 'table_name', XYZ_FIELDS)",
+          "Client application: In sync-client.ts applyLocalOp(), add case for new entity_kind that gets current row from db.{table_name}, calls applyOp(), then puts result back",
+          "D1 schema: Create table with id PRIMARY KEY, user_id NOT NULL, domain fields, field_hlcs TEXT NOT NULL (JSON), deleted_at TEXT (tombstone), created_at TEXT, updated_at TEXT. Add indexes on user_id and frequently-queried fields.",
+          "Hooks query pattern: useLiveQuery(async () => { await db.{table}.where('user_id').equals(userId).toArray() }) then filter deleted_at and apply business logic sort/filter",
+          "Field HLCs for per-field LWW: Record<string, hlc_string> tracks each field's last-modified HLC independently. Deletes marked via deleted_at field with its own HLC."
+        ],
+        "gotchas": [
+          "ENTITY_KINDS in ops.ts must be updated BEFORE adding a case in sync-client.ts applyLocalOp() — if an unknown entity_kind arrives, it silently falls through (line 102-103 comment shows 'project'/'learning'/'note'/'budget' placeholders)",
+          "Dexie version() calls are cumulative: version(2) does NOT replace version(1) stores, it ADDS to them. Each .version(N).stores({...}) only declares NEW/MODIFIED stores for that version. Old stores implicitly carry forward.",
+          "field_hlcs must be Record<string, string> in TypeScript but serialized as JSON string in D1 (TEXT column). Parse when reading, stringify when writing. materializeRow_LWW handles this.",
+          "deleted_at is both a tombstone marker (field with its own HLC in field_hlcs) AND a nullable column. Set to ISO string on delete, null on undelete (resurrection). Queries must filter deleted_at IS NULL.",
+          "Row types exported from dexie.ts but applyOp() in op-log.ts returns generic EntityRow — cast with `as never` in sync-client to satisfy TypeScript when the shape doesn't exactly match yet.",
+          "Compound indices in Dexie use [key1+key2] syntax with square brackets; in D1 migrations use UNIQUE or separate indices. Example: Dexie '[user_id+kind]' vs D1 'UNIQUE (user_id, name, kind)'",
+          "Materialization is server-only; client Dexie tables are the source of truth. Ops sync bidirectionally but materialized D1 rows are projections used only by cron/digest jobs.",
+          "schema_version in Op payload (ops.ts line 15, set to SCHEMA_VERSION=1 in sync-client.ts) must increment if op_type='create' or 'update' changes the schema for an entity_kind. For new domains, start at schema_version 1.",
+          "When adding a field to an existing entity (not a new domain), old ops won't include that field in payload, so materializeRow_LWW checks 'merged[f] !== undefined' to avoid explicit NULLs clobbering DB defaults (line 77).",
+          "FxRateRow is unique: no user_id, uses compound primary key [date+target], stored as Table<FxRateRow> not EntityTable<>. Don't follow FxRate pattern for domain entities."
+        ],
+        "newDomainSteps": [
+          "1. Add entity kind to ENTITY_KINDS const in src/types/ops.ts (e.g., 'learning')",
+          "2. Define XyzRow type in src/lib/dexie.ts, extending {id, user_id, field_hlcs, deleted_at, created_at, updated_at} with domain-specific fields (e.g. export type LearningRow = {id, user_id, ..., topic?: string, ...})",
+          "3. Declare Dexie store in next version: In dexie.ts, increment class PulseDb constructor to new version (e.g. version(5)), add .stores({learning: 'id, user_id, updated_at, [user_id+topic]'}) with indexes",
+          "4. Export field array in src/lib/entity-fields.ts: const LEARNING_FIELDS = ['topic', 'content', ...] as const (only mutable fields, not id/user_id/timestamps)",
+          "5. Create D1 migration file (e.g. migrations/0005_learning.sql) with CREATE TABLE IF NOT EXISTS learning (..., field_hlcs TEXT NOT NULL, deleted_at TEXT, created_at TEXT, updated_at TEXT) + indexes",
+          "6. Add LearningTable interface in src/lib/db.ts, add to DB union interface: export interface DB { ..., learning: LearningTable }",
+          "7. Update sync-client.ts applyLocalOp() transaction scope: Add db.learning to line 61 table list. Add case in switch (line 90+): case 'learning': { const current = await db.learning.get(op.entity_id); const next = applyOp(current as never, op); await db.learning.put(next as never); return }",
+          "8. Update materialize.ts: Import LEARNING_FIELDS, add case: case 'learning': return materializeRow_LWW(db, op, userId, 'learning', LEARNING_FIELDS)",
+          "9. Add resetDb() entry in dexie.ts (line 176+): await db.learning.clear()",
+          "10. Create hook in src/hooks/use-learning.ts: export function useLearning(userId?: string): LearningRow[] { return useLiveQuery(async () => { if (!userId) return []; return db.learning.where('user_id').equals(userId).toArray().then(all => all.filter(l => !l.deleted_at)) }, [userId], []) ?? [] }",
+          "11. Create component(s) that call generateOp({entity_kind: 'learning', ...}) + applyLocalOp() + pushPullOnce() to mutate (see src/components/task-list.tsx for pattern)",
+          "12. Backfill: POST /api/admin/backfill existing (once per prod) replays op_log → materializeRow, so no separate backfill logic needed if migration creates table + backfill runs"
+        ]
+      },
+      {
+        "dimension": "sync-oplog: Hybrid Logical Clock + per-field LWW + server materialization via op-log",
+        "keyFiles": [
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/types/ops.ts",
+            "role": "Central type definitions: ENTITY_KINDS array, Op schema, EntityRow type; entity_kind is a Zod enum sourced from this const."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/sync-client.ts",
+            "role": "Client sync orchestration: generateOp() creates ops with HLC, applyLocalOp() applies to Dexie with entity_kind switch, pushPullOnce() fetches /api/sync. SCHEMA_VERSION = 1 constant."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/op-log.ts",
+            "role": "Per-field LWW logic: applyOp(existing, op) merges via compareHlc; field only updates if op.hlc > existing.field_hlcs[field]; handles create/update/delete + resurrection."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/materialize.ts",
+            "role": "Server materialization: materializeRow() dispatches by entity_kind to specific or generic LWW upsert; rebinds JSON field_hlcs, applies applyOp, INSERT ... ON CONFLICT upserts to D1."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/hlc.ts",
+            "role": "HLC (Hybrid Logical Clock) primitives: createHlc, serializeHlc (format: 16-digit-0-6-digit-0-deviceId), parseHlc, compareHlc, tickHlc, receiveHlc."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/entity-fields.ts",
+            "role": "Per-entity_kind field lists (MONEY_FIELDS, RECURRING_FIELDS, TASK_FIELDS, CATEGORY_FIELDS, INSIGHT_FIELDS); used by materializeRow_LWW to decide which columns to write."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/dexie.ts",
+            "role": "Client IndexedDB schema via Dexie v4; EntityTable<T, 'id'> for each entity_kind; includes version() blocks with indexes; db.transactions in applyLocalOp touch all tables at once."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/db.ts",
+            "role": "Server Kysely<DB> schema types (UserTable, CategoryTable, TaskTable, etc.); mirrors D1 SQL; used in /api/sync and materializeRow."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/app/api/sync/route.ts",
+            "role": "POST /api/sync endpoint: accepts device_id, last_synced_hlc, new_ops; merges via mergeOpsForUser; inserts to op_log; calls materializeRow; returns server_hlc, new_ops_from_server (> lastSyncedHlc), applied_ack."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/app/api/admin/backfill/route.ts",
+            "role": "POST /api/admin/backfill endpoint: idempotent replay of caller's entire op_log in HLC order; calls materializeRow for each op; used for one-time server materialization after schema migrations."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/sync-server.ts",
+            "role": "mergeOpsForUser(existingOps, incomingOps, lastSyncedHlc): deduplicates by op.id, returns newOps and opsForClient (filtered by HLC > lastSyncedHlc)."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/migrations/0001_initial.sql",
+            "role": "Phase 0 schema: user, session, account, verification, devices, op_log (PK=id, FK=user_id; CHECK op_type IN), widgets (with field_hlcs JSON, deleted_at tombstone, created_at/updated_at ISO strings)."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/migrations/0002_phase_1_money.sql",
+            "role": "Phase 1 schema: categories, recurring_rules, money_entries; all with field_hlcs TEXT, deleted_at, created_at/updated_at ISO, user_id FK."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/migrations/0003_phase_2_tasks.sql",
+            "role": "Phase 2 schema: tasks table with title, due_at, priority, completed_at, source, field_hlcs, deleted_at ISO timestamps, indexes on (user_id, due_at) and (user_id, completed_at)."
+          },
+          {
+            "path": "C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/migrations/0004_phase_3_insight_push_receipts.sql",
+            "role": "Phase 3 schema: insights table (period, starts_at/ends_at, summary, metrics JSON, field_hlcs, deleted_at, created_at/updated_at), push_subscriptions, push_notifications; added receipt_key to money_entries."
+          }
+        ],
+        "patterns": [
+          "ENTITY_KINDS: Const array in src/types/ops.ts; must add new entity_kind string here before any use. Example: ENTITY_KINDS = [..., 'note'] as const.",
+          "Op flow: generateOp(entity_kind, entity_id, op_type, payload, user_id) → applyLocalOp(op) → pushPullOnce() → /api/sync POST → server merges + materializes.",
+          "Client apply: applyLocalOp() switches on entity_kind and db.transaction(['rw', [tables...], async () => { db.op_log.add(op); switch(op.entity_kind) { case 'new': db.tables.put(applyOp(...)) } }])",
+          "Server apply: POST /api/sync calls materializeRow(db, op, userId) which switches on entity_kind and upserts to D1 via INSERT ... ON CONFLICT.",
+          "Per-field LWW: field_hlcs is JSON Record<string, string> (client) or TEXT (D1); each field carries its own HLC; applyOp only writes field if op.hlc > existing.field_hlcs[field].",
+          "HLC serialization: 16-digit physicalMs (padded), 6-digit logical counter, deviceId; lexicographically sortable; tickHlc increments logical if same ms, resets logical if time advances.",
+          "Timestamp derivation: hlcToIso(hlc) in applyOp converts HLC.physicalMs to ISO string for created_at/updated_at; deterministic across replicas.",
+          "Tombstoning: deleted_at is a special 'field' in field_hlcs; delete op sets field_hlcs.deleted_at = op.hlc; update with later HLC clears tombstone (resurrection).",
+          "Optional fields: In materializeRow_LWW, only write merged[f] to row if !== undefined; avoids explicit NULL which bypasses SQL DEFAULT; matches per-field LWW (op never touching field must not clobber it).",
+          "D1 table shape: id (PK), user_id (FK + index), field_hlcs (TEXT JSON), deleted_at (ISO tombstone), created_at/updated_at (ISO strings), domain-specific fields, indexes on (user_id, sort_key).",
+          "Dexie table shape: EntityTable<T, 'id'> with T extending { field_hlcs: Record<string, string>; deleted_at: string | null; created_at: string; updated_at: string; } + domain fields.",
+          "Synchronization checkpoint: lastSyncedHlc tracked in sync_meta; client sends it on POST /api/sync; server returns ops where hlc > lastSyncedHlc; idempotent if same lastSyncedHlc resent.",
+          "Schema versioning: schema_version: integer in Op, currently = 1 constant in sync-client.ts; incremented only when Op format itself changes, not per entity_kind.",
+          "Materialization idempotency: materializeRow calls applyOp on existing row (if any) then upserts; safe to replay same op multiple times; /api/admin/backfill uses this for one-time recovery.",
+          "Entity-fields definition: For each new entity_kind, create const FOO_FIELDS = [...field names...] in entity-fields.ts; passed to materializeRow_LWW to control which columns are written (skip undefined ones).",
+          "Device tracking: getDeviceId() generates 12-char hex ID on first call, stores in sync_meta; all ops tagged with this device_id; allows multi-device HLC ordering."
+        ],
+        "gotchas": [
+          "field_hlcs mismatch: D1 stores as TEXT with JSON.stringify(), applyOp expects Record<string, string>; materializeRow_LWW does JSON.parse(existing.field_hlcs) on read, JSON.stringify() on write; mismatched types cause silent failures.",
+          "Explicit NULL vs undefined: In materializeRow_LWW, if merged[f] === null (user explicitly set to null), it WILL be written to row; but merged[f] === undefined skips the key, allowing SQL DEFAULT or existing value to apply. Ops that never touched a field must send payload with field absent, not payload[field]: null.",
+          "Dexie transaction scope: applyLocalOp uses db.transaction('rw', [op_log, widgets, money_entries, recurring_rules, categories, tasks, insights], () => {...}); must add NEW entity table here or applyLocalOp won't touch it. Forgetting this silently skips the update.",
+          "applyOp resurrection: if existing.deleted_at is set and op.hlc > field_hlcs.deleted_at, applyOp clears deleted_at; this resurrects tombstoned rows. Don't double-delete if re-applying ops.",
+          "HLC overflow: Serialized HLC is padStart(16, '0') for ms and padStart(6, '0') for logical; Year 10000 (ts ~253402300799999) will overflow 16 digits; not a practical concern for ~7980 years but worth noting.",
+          "schema_version bump: If Op wire format ever changes (new fields, renamed fields), increment SCHEMA_VERSION in sync-client.ts AND the const in every Op; clients with old version will send ops server won't parse. No auto-versioning migration logic yet.",
+          "mergeOpsForUser deduplication: Deduplicates by op.id; if client sends same op.id twice, only first is new, second filtered out. But if server rejects one op and client retries, op.id must stay the same (idempotency key).",
+          "lastSyncedHlc comparison: Uses compareHlc(parseHlc(op.hlc), parseHlc(lastSyncedHlc)) > 0; lexicographic sort on serialized string also works but compareHlc is explicit; if lastSyncedHlc is missing, ALL known ops sent to client.",
+          "Dexie versioning: Each version() block is additive; when adding a new table, add a new version() block with incremented version number and all prior tables' indexes. Don't reuse an existing version() number.",
+          "D1 foreign keys: Categories referenced by money_entries and recurring_rules; if FK referenced table doesn't exist on server at materialize time, SQLITE_CONSTRAINT. Phase 3 backfill relied on HLC ordering to ensure categories materialized before money entries.",
+          "Insight metrics JSON: metrics field is TEXT (JSON string) in D1 but InsightRow on client carries it as string too (not deserialized); caller must JSON.parse(metrics) on client; inconsistent with other JSON fields.",
+          "Device ID generation: crypto.randomUUID().replace(/-/g, '').slice(0, 12); takes first 12 hex chars; collision risk is negligible but not cryptographically unique. Used in HLC serialization so must be stable.",
+          "HLC device ordering: compareHlc breaks ties with deviceId < comparison; lexicographically later device_id wins in case of identical physical + logical; not a semantic ordering, just deterministic tiebreaker.",
+          "POST /api/sync no transaction: Server loop calls materializeRow in separate upserts, NOT in a transaction; if one fails partway, op_log row inserted but D1 row not. Backfill route should be called after to retry.",
+          "Empty op_log: If no ops exist for user, serverHlc defaults to '0000000000000000-000000-server'; if comparing, ensure this string is handled correctly in HLC parsing.",
+          "Timezone in timestamps: created_at/updated_at are ISO strings derived from HLC.physicalMs (milliseconds since epoch UTC); they're in UTC regardless of user timezone; user_prefs.tz is separate, not used in sync engine.",
+          "Multi-entity transactions: If one entity's op should trigger an operation on another entity, you must generate two ops and apply both locally in same transaction; sync engine has no cross-entity consistency, only per-field LWW."
+        ],
+        "newDomainSteps": [
+          "Step 1: Add entity_kind to ENTITY_KINDS const in src/types/ops.ts. Example: export const ENTITY_KINDS = ['widget', 'money', 'recurring', 'task', 'project', 'learning', 'note', 'category', 'budget', 'insight', 'FOO'] as const. This is the source of truth for the Zod enum OpSchema.entity_kind.",
+          "Step 2: Define field list in src/lib/entity-fields.ts. Create: export const FOO_FIELDS = ['field1', 'field2', 'field3'] as const. These fields will be the only columns written to D1 during materializeRow_LWW; ensure they match your D1 schema.",
+          "Step 3: Create D1 migration file migrations/000N_foo_domain.sql (increment N after highest existing). Include: CREATE TABLE foo (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, field1 TEXT, field2 TEXT, ... field_hlcs TEXT NOT NULL, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL); CREATE INDEX idx_foo_user ON foo(user_id); add any domain-specific indexes on (user_id, sort_key).",
+          "Step 4: Add Dexie table type in src/lib/dexie.ts. Create export type FooRow = { id: string; user_id: string; field1: string; field2?: string; field_hlcs: Record<string, string>; deleted_at: string | null; created_at: string; updated_at: string; }.",
+          "Step 5: Add Dexie EntityTable to PulseDb class in src/lib/dexie.ts. Add line: foo!: EntityTable<FooRow, 'id'> after other entity tables.",
+          "Step 6: Add Dexie version() block in PulseDb constructor. Add a new this.version(N+1).stores({ foo: 'id, user_id, [user_id+sort_key]' }) after the highest existing version, with appropriate indexes for your queries.",
+          "Step 7: Add Kysely table type in src/lib/db.ts. Create interface FooTable { id: string; user_id: string; field1: string; field2: string | null; field_hlcs: string; deleted_at: string | null; created_at: string; updated_at: string; }. Add to DB interface: foo: FooTable.",
+          "Step 8: Add case in applyLocalOp switch in src/lib/sync-client.ts. Pattern: case 'foo': { const current = await db.foo.get(op.entity_id); const next = applyOp(current as never, op); await db.foo.put(next as never); return; }",
+          "Step 9: Add db.foo to transaction scope in applyLocalOp. Modify line: await db.transaction('rw', [db.op_log, db.widgets, db.money_entries, db.recurring_rules, db.categories, db.tasks, db.insights, db.foo], async () => { ... });",
+          "Step 10: Add case in materializeRow switch in src/lib/materialize.ts. If simple LWW: case 'foo': return materializeRow_LWW(db, op, userId, 'foo', FOO_FIELDS). If special logic (like widgets), create materializeFoo function following materializeWidget pattern.",
+          "Step 11: Ensure FOO_FIELDS exported from entity-fields.ts and imported at top of materialize.ts. Add: import { MONEY_FIELDS, ..., FOO_FIELDS } from '@/lib/entity-fields'.",
+          "Step 12: (Optional) If entity has special creation/application logic, extend op-log.ts applyUpdate or create custom merge function. Default applyOp handles standard LWW; only override if needed.",
+          "Step 13: Test cycle: (a) Run migrations in D1 (managed via wrangler). (b) Run db.foo.clear() in resetDb() in src/lib/dexie.ts if needed for test isolation. (c) Call generateOp({ entity_kind: 'foo', entity_id: 'test-123', op_type: 'create', payload: { field1: 'value' }, user_id: 'user-xyz' }). (d) Await applyLocalOp(op) to check Dexie table updated. (e) Await pushPullOnce({ userId: 'user-xyz' }) to sync to server. (f) Query D1 foo table to verify materialization.",
+          "Step 14: (Optional) Add POST /api/admin/backfill support: no code change needed if case added to materializeRow. The backfill route already loops all ops and calls materializeRow; if entity_kind FOO is recognized, it will materialize.",
+          "Step 15: (Optional) If entity has server-side cron jobs (like digest, recur, due-tasks), create src/app/api/cron/foo/route.ts querying foo table from D1. Follow pattern in src/app/api/cron/digest/route.ts.",
+          "Step 16: Update TypeScript types: Run tsc or your build tool to verify no type errors. Dexie, Kysely, and Op types should all align. Check that applyLocalOp and materializeRow compile with new case branch.",
+          "Step 17: (Optional but recommended) Add test in tests/sync-integration.test.ts or new tests/foo-sync.test.ts: create op, apply locally, call pushPullOnce, query server D1, assert field_hlcs and data match expected LWW merge. Test idempotency by calling pushPullOnce twice."
+        ]
+      },
+      {
+        "dimension": "Agents (Groq LLM Pipeline for Intent Routing & Extraction)",
+        "keyFiles": [
+          {
+            "path": "src/lib/agents/llm-client.ts",
+            "role": "Core LLM client: exports makeGroqClient(apiKey), callGroqJSON<T>() with json_object response_format, withRetry() exponential backoff wrapper; defines GroqModel union = 'openai/gpt-oss-20b' | 'openai/gpt-oss-120b' | 'whisper-large-v3-turbo'"
+          },
+          {
+            "path": "src/lib/agents/router.ts",
+            "role": "Intent classifier: routeIntent({client, text}) → RouterResponse; calls callGroqJSON with model gpt-oss-20b, temp=0, maxTokens=64; validates against RouterResponseSchema; returns {intent, confidence}"
+          },
+          {
+            "path": "src/lib/agents/schemas/router-response.ts",
+            "role": "Zod enum INTENTS = ['log_money','log_task','query_money','query_task','chat']; RouterResponseSchema validates {intent: enum, confidence: 0-1}"
+          },
+          {
+            "path": "src/lib/agents/prompts/router.ts",
+            "role": "System prompt builder ROUTER_SYSTEM_PROMPT; lists 5 intents with rules & examples; expects JSON {intent, confidence} only; tie-breaker logic for ambiguous inputs"
+          },
+          {
+            "path": "src/lib/agents/task-agent.ts",
+            "role": "Domain agent parseTaskEntry({client, text, nowIso?, userTz?}) → TaskAgentResponse; model gpt-oss-120b, temp=0, maxTokens=256; extracts {title, due_at (ISO UTC), priority (low/medium/high)}"
+          },
+          {
+            "path": "src/lib/agents/schemas/task-agent-response.ts",
+            "role": "Zod TaskAgentResponseSchema = {title: string[1-200], due_at: datetime | null, priority: enum[low/medium/high]}"
+          },
+          {
+            "path": "src/lib/agents/prompts/task-agent.ts",
+            "role": "System prompt builder buildTaskAgentSystemPrompt({nowIso, userTz}); rules for title extraction (strip 'remind me to'), due_at parsing (relative dates → UTC), priority cue detection; returns JSON-only"
+          },
+          {
+            "path": "src/lib/agents/money-agent.ts",
+            "role": "Domain agent parseMoneyEntry({client, text, categories, nowIso?, userTz?, defaultCurrency?}) → MoneyAgentResponse; model gpt-oss-120b; extracts {amount (int paise/cents), currency (ISO 4217), direction (out/in), category_name (exact match), description, occurred_at (ISO UTC)}"
+          },
+          {
+            "path": "src/lib/agents/schemas/money-agent-response.ts",
+            "role": "Zod MoneyAgentResponseSchema = {amount: int ≥0, currency: enum(SUPPORTED_CURRENCIES), direction: enum[out/in], category_name: string | null, description: string | null, occurred_at: datetime}"
+          },
+          {
+            "path": "src/lib/agents/prompts/money-agent.ts",
+            "role": "System prompt builder buildMoneyAgentSystemPrompt({categories, nowIso, userTz, defaultCurrency}); rules for amount conversion (rupees→paise, dollars→cents, lakhs, 'k' suffix, JPY no minor unit), direction cues (spent/paid→out, earned/got→in), category matching from active list, occurred_at timezone conversion"
+          },
+          {
+            "path": "src/lib/agents/query-money-agent.ts",
+            "role": "Query agent parseMoneyQuery({client, text, categories, nowIso?, userTz?}) → QueryMoneyResponse; model gpt-oss-120b; parses free-text query into structured search plan {direction, category_name, period: {from/to ISO UTC, label}}"
+          },
+          {
+            "path": "src/lib/agents/schemas/query-money-response.ts",
+            "role": "Zod QueryMoneyResponseSchema = {direction: enum[out/in], category_name: string | null, period: {from: datetime, to: datetime, label: string}}"
+          },
+          {
+            "path": "src/lib/agents/prompts/query-money-agent.ts",
+            "role": "System prompt builder buildQueryMoneySystemPrompt({nowIso, userTz, categories}); rules for period extraction (this week→Mon-Mon, last month→calendar, last N days→rolling), direction inference, category exact matching (case-insensitive), label humanization"
+          },
+          {
+            "path": "src/lib/agents/receipt-agent.ts",
+            "role": "Vision agent parseReceiptImage({client, imageBase64, mime, categories, nowIso, userTz, defaultCurrency}) → MoneyAgentResponse & {source:'receipt'}; uses model llama-4-scout-17b-16e-instruct (fallback qwen3.6-27b); extracts merchant, amount, currency, date, category from image"
+          },
+          {
+            "path": "src/lib/agents/whisper.ts",
+            "role": "Voice transcription groqWhisper({client, blob, filename}) → WhisperResult = {transcript, lang?, duration_ms?}; model whisper-large-v3-turbo, response_format='verbose_json', language='en'"
+          },
+          {
+            "path": "src/lib/agents/digest-agent.ts",
+            "role": "Narrative generator writeDigestNarrative({client, metrics, weekLabel}) → string; model gpt-oss-120b, temp=0.3 (not deterministic like others); builds human financial summary from DigestMetrics; buildDigestSystemPrompt()/fallbackSummary() for fallback"
+          },
+          {
+            "path": "src/app/api/voice/route.ts",
+            "role": "Voice input handler: multipart/form-data audio → groqWhisper() → routeIntent() → conditional agent calls (log_money, log_task, query_money, else null) → SSE stream {step, payload, intent}; loads user prefs, categories from DB"
+          },
+          {
+            "path": "src/app/api/agent/route.ts",
+            "role": "Text input handler: JSON {text, categories} → routeIntent() → conditional agent calls → JSON {transcript, intent, confidence, payload}; same conditionals as voice route; no streaming; used by manual/text entry"
+          },
+          {
+            "path": "src/lib/voice-sse.ts",
+            "role": "SSE parser callVoiceApiStreaming(blob, onEvent) → VoiceFinalPayload | null; consumes /api/voice stream events {step, payload, transcript, error}; parses 'data: {json}' SSE format"
+          },
+          {
+            "path": "src/lib/op-schemas/task.ts",
+            "role": "Op-level schema TaskPayloadSchema = {title, due_at?, priority?, completed_at?, source: enum[voice/manual], raw_input?}; extends agent TaskAgentResponse with source tracking"
+          },
+          {
+            "path": "src/lib/op-schemas/money.ts",
+            "role": "Op-level schema MoneyPayloadSchema; extends agent response with op-specific fields; used in op_log for sync"
+          },
+          {
+            "path": "src/types/ops.ts",
+            "role": "Core type definitions: ENTITY_KINDS = [...'money','task','learning','note',...]; OpSchema validates {entity_kind, payload, entity_id, hlc}; defines entity_kind enum for all domain types"
+          },
+          {
+            "path": "src/components/confirmation-chip.tsx",
+            "role": "UI type ChipDraft = (MoneyPayload & {kind:'money',...}) | (TaskPayload & {kind:'task'}); maps agent payload to confirmation UI; defines what agent response becomes in UI"
+          }
+        ],
+        "patterns": [
+          "Every agent follows: (1) agent.ts exports async function parse*(args) returning typed response; (2) schemas/*.ts defines Zod schema for that agent's response; (3) prompts/*.ts exports buildSystemPrompt(context) returning string. All three are imported by the agent.ts file.",
+          "All agent functions take (client: Groq, text: string, ...context?) and call callGroqJSON<unknown>({client, model: string, system: string, user: text, temperature: 0, maxTokens: N}) wrapped in withRetry({attempts: 3, baseMs: 300-500}). Response is parsed via Zod.safeParse(); throws if invalid.",
+          "Router is entry point: routeIntent({client, text}) classifies utterance into INTENTS enum, returns {intent, confidence}. Then /api/agent or /api/voice branches on intent === 'log_money' | 'log_task' | 'query_money' etc., calling corresponding agent.",
+          "System prompts embed dynamic context: nowIso (ISO UTC current time), userTz (timezone string), categories (active list for matching), currency/lang hints. Prompts always end with 'Return ONLY this JSON object (no prose...)' + example shape. Temperature always 0 except digest (0.3).",
+          "Response schema validation: all agent responses must Zod.safeParse(raw).success === true. If false, throw error with parsed.error.message + raw JSON for debugging. Schema field types (int, enum, datetime, string) are strict.",
+          "Intent-to-domain mapping: 'log_money' → money domain → MoneyPayloadSchema → op_log kind:'money'; 'log_task' → task domain → TaskPayloadSchema → op_log kind:'task'. Each intent maps to exactly one domain and op kind.",
+          "Category/entity exact matching: money agent matches category_name against active categories array; if no match, sets to null (never invents). Query agent requires exact spelling or null. Case matching varies: money is case-sensitive by list, query is case-insensitive string comparison.",
+          "Timestamp handling: all due_at/occurred_at fields are ISO 8601 UTC strings. Agent prompts receive userTz and interpret relative times (tomorrow, last Tuesday) in that timezone, then convert to UTC. DB stores UTC; UI converts back to userTz on read.",
+          "Amount unit conversion: agents work in smallest currency units: INR 1 rupee = 100 paise (so ₹80 → 8000), USD $1 = 100 cents (so $5.50 → 550), JPY has no minor unit (so ¥1500 → 1500). MoneyPayloadSchema enforces amount: z.number().int().nonnegative().",
+          "Agent chaining: router → domain agent only. No agent calls another agent. Digest agent is async only (called from cron, not user input). Receipt vision is separate from voice pipeline; both map to MoneyPayloadSchema eventually.",
+          "Error messages include raw response for debugging: 'agent_name: invalid response — {validation error message}\\nRaw: {JSON.stringify(raw)}'. Thrown errors bubble to API route and return {error: message, status: 502 or 400}.",
+          "User context loaded once per request: loadUserPrefs(db, userId) fetches primary_currency and tz; these are passed to all agents in that request. Prefs are per-user singleton in user_prefs table.",
+          "Response format mandatory: all callGroqJSON calls explicitly set response_format: {type: 'json_object'}. No streaming; each agent waits for full completion.",
+          "Model selection: router uses gpt-oss-20b (cheaper, faster, 64 token max); domain agents use gpt-oss-120b (reasoning, 256 token max); receipt vision uses llama-4-scout-17b-16e-instruct; whisper is dedicated audio model.",
+          "Intent confidence: router returns 0.0-1.0; /api/agent includes in response; used by UI for post-parsing review prompts. Voice route discards confidence (streaming; payload only).",
+          "Fall-through logic for unimplemented intents: if intent === 'query_task' | 'chat', return {transcript, intent, confidence, payload: null}. No agent runs; UI handles null payload (no confirmation chip created)."
+        ],
+        "gotchas": [
+          "Category name matching is case-sensitive in money agent but the prompt says to pick from 'active spend categories' list passed as JSON strings — user utterance 'Food' must exactly match list name 'Food', or result is null. Query agent uses case-insensitive comparison ('food' → 'Food' if same letters).",
+          "Amount is integer in smallest unit, never float. Groq may return 8000 or '8000' (string); MoneyAgentResponseSchema.amount = z.number().int() will coerce and fail on '8000.5'. Ensure prompt says 'integer in smallest unit'.",
+          "UTC conversion trap: prompts receive nowIso as ISO UTC and userTz as string like 'Asia/Kolkata'. Groq has NO timezone library — it can't actually convert. It's a reasoning problem. If prompt says 'tomorrow at 15:00 local → ISO UTC', you must verify with examples that Groq is doing math correctly (e.g., 'Asia/Kolkata is UTC+5:30, so 15:00 local is 09:30 UTC'). Hard-code examples in prompts.",
+          "Retry logic uses exponential backoff: baseMs * Math.pow(3, i). For baseMs=300, retries are 0ms, 300ms, 900ms. For baseMs=500, retries are 0ms, 500ms, 1500ms. Total wait ≈1.2s per agent. If Groq rate-limits (429), all 3 attempts fire sequentially.",
+          "JSON parse failure: if Groq returns 'I cannot process that' or partial JSON, JSON.parse() throws. Error message is 'groq: failed to parse JSON response'. No fallback; request fails entirely. Always catch and log the raw response.",
+          "Empty transcript from whisper: if Groq returns empty or whitespace-only transcript, groqWhisper() throws 'whisper: empty transcript'. Voice route will catch and SSE error event. No silent fallback.",
+          "Categories list is not validated by agent before use — if categories = [] (no active categories), money agent will receive spendList='(none)' in prompt and correctly return category_name: null. But if caller passes duplicate category names, agent has no guard; deduplication is caller's responsibility.",
+          "Router classification not perfect at low confidence: if router.confidence < 0.5 but returns an intent anyway, agent will run. UI should warn user on low confidence but won't reject. Tie-breaker rules in ROUTER_SYSTEM_PROMPT are best-effort heuristics.",
+          "Source field tracking: money agent response does NOT include source field. It's added by /api/agent or /api/voice routes ('voice' or 'manual'). Receipt agent hard-codes source: 'receipt'. If new agent doesn't get source injected by route, op will be missing source field and may fail validation.",
+          "Model migration risk: Groq deprecated llama-3.1-* in July 2026. Code now uses gpt-oss-20b/120b. If Groq deprecates these, all agents break silently (Groq returns 503 or 404, withRetry exhausts, error thrown). Monitor Groq status page or add fallback model logic.",
+          "Streaming response in /api/voice is fragile: if controller.enqueue() fails mid-stream, SSE parser sees incomplete JSON and warns but doesn't crash. Client may not receive final payload event. Server logs error but doesn't retry.",
+          "Digest agent uses temperature=0.3 (non-zero): fallback summary is hardcoded string, not agent call. If agent fails 3x or takes >10s, route should call fallbackSummary(metrics) instead. Check cron/digest route for this fallback.",
+          "Op schema version: each new domain agent must match op_log schema_version. If you add a new intent ('log_learning') but forget to bump op schema, op validation fails silently. Check /lib/op-schemas/index.ts getPayloadSchemaForKind(kind) switch statement.",
+          "Duplicate intent handling: if you add 'log_learning' to INTENTS enum but forget to add it to /api/agent route conditionals, intent will route correctly but then fall through to chat fallback (payload: null). Silent degradation; no error.",
+          "Voice route loads categories on every request: even for 'chat' or 'query_task' intents that don't need categories. Not a bug but inefficient; caller can't skip prefetch. For new domain that doesn't need categories, you'll pay the DB query anyway.",
+          "Confidence not returned in voice route: /api/voice only emits {intent, payload}; router.confidence is calculated but discarded. If you want user to see 'low confidence, confirm?', you must add confidence to SSE payload.",
+          "Receipt agent fallback model qwen/qwen3.6-27b: if primary vision model fails, code retries with fallback. But if both fail, error bubbles and no op created. Consider adding a manual fallback response (e.g., amount=0, category=null) for severe failures.",
+          "Retry attempts hardcoded: router uses 3 attempts with 300ms backoff; agents use 3 attempts with 500ms backoff; receipt agent uses 2 attempts with 800ms backoff. If you need longer backoff or more retries, you must edit each withRetry() call individually (no config).",
+          "Timezone ambiguity: 'this Friday' could mean in N days. Prompt rules say 'upcoming Friday'. If today IS Friday, does 'Friday' mean today or next week? Prompt is silent. Test edge cases with actual Groq calls.",
+          "Phone number in amount field: if user says 'my phone is 9876543210', money agent may parse it as amount=9876543210. Prompt says 'integer in smallest unit' but doesn't prevent noise. Router's low confidence for such inputs is your only guard."
+        ],
+        "newDomainSteps": [
+          "1. ADD INTENT TO ENUM: Edit src/lib/agents/schemas/router-response.ts, line 3. Add new intent string to INTENTS array. Example: INTENTS = [..., 'log_learning'] as const.",
+          "2. UPDATE ROUTER RULES: Edit src/lib/agents/prompts/router.ts. Add new intent description to the Intents list (lines 1-9), add 3-4 example utterances showing when router should choose this intent (lines 15-42), consider tie-breaker rules if overlaps exist (lines 44-48).",
+          "3. CREATE OP SCHEMA: Create src/lib/op-schemas/[domain].ts. Define Zod schema, e.g., export const LearningPayloadSchema = z.object({title: z.string(), topic: z.string().nullable(), ...}). Export type LearningPayload = z.infer<typeof LearningPayloadSchema>. Match field names to DB schema.",
+          "4. REGISTER OP SCHEMA: Edit src/lib/op-schemas/index.ts. Import new schema (line 2: import { LearningPayloadSchema } from './learning'). Add to exports (line 9). Add case to getPayloadSchemaForKind() switch (line 20-25): case 'learning': return LearningPayloadSchema.",
+          "5. ADD ENTITY KIND TO TYPES: Verify src/types/ops.ts line 3 ENTITY_KINDS array includes your domain name ('learning' is already there as placeholder). If not, add it.",
+          "6. CREATE AGENT RESPONSE SCHEMA: Create src/lib/agents/schemas/[domain]-agent-response.ts. Define Zod schema for what LLM will extract, e.g., export const LearningAgentResponseSchema = z.object({title: z.string(), topic: z.string().nullable(), confidence?: z.number()}).strict(). Export type LearningAgentResponse = z.infer<typeof LearningAgentResponseSchema>. Do NOT include 'kind' or 'source' fields here (added by route).",
+          "7. CREATE SYSTEM PROMPT BUILDER: Create src/lib/agents/prompts/[domain]-agent.ts. Export function buildLearningAgentSystemPrompt(args: {nowIso: string, userTz: string, ...}) return string. Prompt must: (a) explain the task, (b) list the JSON shape EXACTLY matching schema, (c) define extraction rules with field-by-field cues, (d) end with examples showing input→output JSON, (e) say 'Return ONLY this JSON object (no prose, no markdown)'. Use template from existing prompts (task-agent.ts, money-agent.ts).",
+          "8. CREATE AGENT FUNCTION: Create src/lib/agents/[domain]-agent.ts. Export async function parseLearningEntry(args: {client: Groq, text: string, nowIso?: string, userTz?: string, ...other context?}) → LearningAgentResponse. Inside: (a) call buildLearningAgentSystemPrompt(context) to get system prompt, (b) call withRetry(() => callGroqJSON<unknown>({client, model: 'openai/gpt-oss-120b', system, user: text, temperature: 0, maxTokens: 256}), {attempts: 3, baseMs: 500}), (c) parse result with schema.safeParse(raw), (d) throw if !parsed.success with full error message + raw. Return parsed.data.",
+          "9. ADD CONDITIONAL TO /API/AGENT: Edit src/app/api/agent/route.ts. Add condition after query_money check (line 109): if (router.intent === 'log_learning') { const payload = await parseLearningEntry({client, text: ..., ...}); return NextResponse.json({..., intent: 'log_learning', payload: {..., kind: 'learning', source: 'manual', ...}});} Define exactly what fields go into the payload object (must match LearningPayloadSchema).",
+          "10. ADD CONDITIONAL TO /API/VOICE: Edit src/app/api/voice/route.ts. Same pattern as /api/agent: add else if (router.intent === 'log_learning') {...} inside the streaming controller.start() try block (around line 97-127). Emit same SSE events: {step:'payload', intent:'log_learning', payload, transcript}.",
+          "11. UPDATE TYPES (IF LOGGING ONLY): Edit src/components/confirmation-chip.tsx line 17-19 (ChipDraft type). Add new union branch: | (LearningPayload & {kind: 'learning'}). Import LearningPayload from @/lib/op-schemas/learning.",
+          "12. CREATE CONFIRMATION UI (IF LOGGING ONLY): Create src/components/confirmation-chip-learning.tsx. Export component that receives draft: LearningPayload & {kind: 'learning'}, onConfirm callback. Render fields matching your schema + allow edits. Call onConfirm(updatedDraft, {enabled, period, intervalCount}) on submit. Add component case in ConfirmationChip() switch (line 30-34).",
+          "13. TEST END-TO-END: (a) Call POST /api/agent with {text: 'log a learning about React', categories: []}. Verify response has correct intent + payload fields. (b) If voice: record audio, POST /api/voice as multipart, consume SSE stream. (c) Insert test op into op_log with kind:'learning', verify DB sync, verify UI displays correctly.",
+          "14. ADD DB MIGRATION (IF NOT QUERY-ONLY): Create migrations/000X_[domain].sql. Define table with columns matching LearningPayload fields (id, user_id, title, topic, field_hlcs, deleted_at, created_at, updated_at, indexes). Add indexes on (user_id, deleted_at) for queries.",
+          "15. UPDATE DB INIT: Edit src/lib/db.ts (if hand-built Dexie) or run migration. Create Dexie table: db.table('learnings').mapToClass(class {id!:string; user_id!: string; ...}). Verify schema_version matches op_log version."
+        ]
+      },
+      {
+        "dimension": "ui",
+        "keyFiles": [
+          {
+            "path": "src/app/app/page.tsx",
+            "role": "Shell: conditionally renders tab content (money/tasks) and wires all components via activeTab state"
+          },
+          {
+            "path": "src/hooks/use-tab-state.ts",
+            "role": "Manages active Tab via URL search params (?tab=tasks); type Tab = 'money' | 'tasks'"
+          },
+          {
+            "path": "src/components/tab-bar.tsx",
+            "role": "Navigation (fixed desktop nav + floating mobile dock); loops TABS array to render buttons"
+          },
+          {
+            "path": "src/components/money-card.tsx",
+            "role": "Desktop sticky sidebar card: monthly spend, delta vs previous, top 3 categories, sparkline"
+          },
+          {
+            "path": "src/components/money-list.tsx",
+            "role": "Main list: MoneyEntryRow items with long-press delete, FX conversion, receipt viewer"
+          },
+          {
+            "path": "src/components/task-list.tsx",
+            "role": "Main list: TaskRow items with toggle-complete, due/overdue state, priority badge"
+          },
+          {
+            "path": "src/components/task-filter.tsx",
+            "role": "Filter tabs (open/completed/all); conditionally shown above TaskList"
+          },
+          {
+            "path": "src/components/task-summary.tsx",
+            "role": "Desktop sticky sidebar: overdue/today/upcoming/no-date counts for open tasks"
+          },
+          {
+            "path": "src/components/confirmation-chip.tsx",
+            "role": "Modal for editing draft (ChipDraft discriminator); tap fields to edit amount/description/category/due"
+          },
+          {
+            "path": "src/hooks/use-tasks.ts",
+            "role": "useLiveQuery hook; filters by userId+filter (open/completed/all); sorts by due_at/completed_at"
+          },
+          {
+            "path": "src/hooks/use-money-entries.ts",
+            "role": "useLiveQuery hook; filters by userId; optional PeriodRange via [user_id+occurred_at] compound key"
+          },
+          {
+            "path": "src/hooks/use-categories.ts",
+            "role": "useLiveQuery hook; fetches CategoryRow[] filtered by userId"
+          },
+          {
+            "path": "src/hooks/use-user-prefs.ts",
+            "role": "useLiveQuery hook; fetches user preferences (primary_currency, tz, etc.)"
+          },
+          {
+            "path": "src/lib/dexie.ts",
+            "role": "Dexie database: Row type definitions + PulseDb class with versioned schemas"
+          },
+          {
+            "path": "src/app/globals.css",
+            "role": "Glass design utilities: .glass, .glass-soft, .glass-accent, color palette (accent-2 cyan, destructive red)"
+          },
+          {
+            "path": "src/lib/op-schemas/money.ts",
+            "role": "MoneyPayload type; import SUPPORTED_CURRENCIES"
+          },
+          {
+            "path": "src/lib/op-schemas/task.ts",
+            "role": "TaskPayload type with title, due_at, priority, completed_at, source, raw_input"
+          }
+        ],
+        "patterns": [
+          "Tab type is a discriminated union (type Tab = 'money' | 'tasks'); add new domain as new Tab variant",
+          "VALID_TABS array in use-tab-state.ts must be kept in sync with Tab type; defaults to 'money'",
+          "Tab state persisted to URL via URLSearchParams; setTab deletes param if default, else sets it",
+          "Each domain needs: 1) Card (desktop sidebar), 2) List (main content), 3) optional Filter, 4) optional Summary",
+          "Card/List/Filter/Summary all accept userId prop and use useLiveQuery hooks for reactive data",
+          "Glass design: use .glass (full blur+gradient) for main containers, .glass-soft (light) for items",
+          "Tab buttons in tab-bar.tsx styled with gradient bg when active: 'bg-[linear-gradient(150deg,rgb(111_123_255/.35),rgb(52_230_255/.22))]'",
+          "Components render conditionally in app/page.tsx: '{activeTab === 'money' && <MoneyCard/>} {activeTab === 'tasks' && <TaskList/>}'",
+          "All domain entities must define Row type in dexie.ts with fields: id, user_id, deleted_at, created_at, updated_at, field_hlcs",
+          "Dexie tables must use compound keys for user+date filtering: '[user_id+occurred_at]' or '[user_id+due_at]'",
+          "useLiveQuery queries always filter by user_id and return [] if no userId; never throw",
+          "ChipDraft is discriminated union: '(PayloadType & { kind: 'domainName'; })'; handled in confirmEntry()",
+          "confirmEntry() calls generateOp() with entity_kind, entity_id, op_type ('create'/'update'/'delete'), payload, user_id",
+          "After generateOp, call applyLocalOp() then pushPullOnce({ userId }) for sync",
+          "Mobile layout: floating fixed dock at bottom-4 with icon+label; Desktop: fixed top nav with sidebar",
+          "Long-press on list items (500ms via useRef setTimeout) opens context menu for delete/edit actions",
+          "Overdue/warning states use conditional CSS: 'text-warning' for overdue tasks, 'text-destructive' for negative money"
+        ],
+        "gotchas": [
+          "Tab MUST be added to VALID_TABS array in use-tab-state.ts or URL params won't validate; invalid tab defaults to 'money'",
+          "useTabState() uses useSearchParams, making AppPageInner a CSR component; wrap in Suspense + LockGate in page export",
+          "Dexie version() must increment: add new table + compound keys in a new version block, don't modify existing versions",
+          "useLiveQuery deps array must be stable; derived objects like Map(categories) should be wrapped in useMemo to avoid infinite loops",
+          "Glass utilities defined in globals.css with @utility; not standard Tailwind classes, require custom CSS import",
+          "MoneyCard computes 'currentPeriodRange' and 'previousPeriodRange' locally; no dedicated hook, logic duplicated",
+          "TaskBadgeCount only counts overdue+open tasks; badge only shown on mobile tab-bar when count > 0",
+          "confirmEntry() switches tab on successful create: 'if (activeTab !== 'money') setTab('money')' — ensure this is desired UX",
+          "Long-press timer must be cleared on onPointerUp/Leave or it fires again; useRef to avoid closure bugs",
+          "FxRates fetched globally in MoneyCard/List but conversion only applied if rates exist; missing rates silently excluded",
+          "CategoryPicker is separate component; CategoryRow has 'kind' (spend/income), must match direction when picking",
+          "RecurringRuleRow is separate entity; money entries can link via 'recurring_rule_id' but rules aren't shown in money-list UI",
+          "Undo stack in money-list is UI-only (state + fixed positioned toast); not persisted to Dexie, only in-memory",
+          "Desktop sidebar (aside) is position: sticky top-6; mobile hides sidebar entirely, shows summary in modal on demand",
+          "accent-2 is cyan (#34e6ff); used for active states, drop shadows, glow effects; primary is indigo (#6f7bff)",
+          "TabBar fixed position clips content flow; app/page.tsx adds pb-24 (mobile) or pb-6 (desktop) to account for nav height"
+        ],
+        "newDomainSteps": [
+          "1. Update type Tab in src/hooks/use-tab-state.ts: change 'type Tab = \"money\" | \"tasks\"' to include new domain, e.g., '| \"notes\"'",
+          "2. Update VALID_TABS array in same file to include new domain as string literal",
+          "3. Create Row type in src/lib/dexie.ts with required fields: id, user_id, deleted_at, created_at, updated_at, field_hlcs (all strings except id UUID)",
+          "4. Add table property to PulseDb class: 'notes!: EntityTable<NoteRow, 'id>'",
+          "5. Create new version() block in PulseDb.constructor() with incremented version number and stores definition, e.g., 'this.version(5).stores({ notes: 'id, user_id, [user_id+created_at]' })'",
+          "6. Create src/hooks/use-notes.ts with useLiveQuery hook, filter by userId, return [] if no userId",
+          "7. Define export type for filter (e.g., 'type NoteFilter = \"active\" | \"archived\" | \"all\"') and sorting logic",
+          "8. Create src/components/note-card.tsx: class 'glass rounded-2xl p-4'; accept userId prop; use useNotes hook; render summary stats",
+          "9. Create src/components/note-list.tsx: list items with 'glass-soft rounded-2xl p-3'; long-press for delete; use useLiveQuery data",
+          "10. Create src/components/note-filter.tsx (optional): render tab buttons for filter state; use cn() from @/lib/utils for conditional glass-accent styling",
+          "11. Create src/components/note-summary.tsx (optional): desktop-only sidebar stats; render in aside when activeTab === 'notes'",
+          "12. Update src/app/app/page.tsx: import new components at top; add conditional render block: '{activeTab === \"notes\" && (<div className=\"flex flex-col gap-3\"><NoteFilter/><NoteList/></div>)}'",
+          "13. In aside (desktop sidebar): add '{activeTab === \"notes\" && <NoteSummary userId={user.id} />}'",
+          "14. Update TabBar TABS const in src/components/tab-bar.tsx: add '{ id: \"notes\", icon: SomeIconComponent, label: \"Notes\" }'",
+          "15. Create src/lib/op-schemas/note.ts: export type NotePayload with fields matching NoteRow (minus system fields)",
+          "16. Update ChipDraft type in src/components/confirmation-chip.tsx: add union variant '| (NotePayload & { kind: \"note\" })'",
+          "17. Create conditional render in ConfirmationChip: 'if (draft.kind === \"note\") return <ConfirmationChipNote/>'",
+          "18. Implement ConfirmationChipNote component (mirror ConfirmationChipTask pattern): editable fields, then onConfirm callback",
+          "19. In app/page.tsx confirmEntry(), add elif for 'final.kind === \"note\"': generateOp with entity_kind: 'note', call applyLocalOp, switch tab if needed",
+          "20. Add note drafts to agent parser or voice/text input handlers; set draft via setDraft(payload) in app/page.tsx parseText()"
+        ]
+      },
+      {
+        "dimension": "voice-confirm",
+        "keyFiles": [
+          {
+            "path": "src/components/voice-recorder.tsx",
+            "role": "User-facing audio capture UI; calls onParsed(payload, transcript) callback with parsed ChipDraft from /api/voice; falls back to voice-queue on offline"
+          },
+          {
+            "path": "src/components/confirmation-chip.tsx",
+            "role": "Edit-before-confirm UI rendering ChipDraft union (money | task); discriminates on draft.kind; calls onConfirm(final, recurring) after user edits"
+          },
+          {
+            "path": "src/lib/voice-sse.ts",
+            "role": "SSE stream parser for /api/voice endpoint; emits step events (transcribing, transcript, parsing, payload, error); returns VoiceFinalPayload{intent, payload, transcript}"
+          },
+          {
+            "path": "src/lib/voice-queue.ts",
+            "role": "Offline resilience: enqueueVoice(blob) stores failed audio; drainVoiceQueue() retries queued items with concurrency guard isDraining"
+          },
+          {
+            "path": "src/app/api/voice/route.ts",
+            "role": "Backend SSE handler: audio→groq-whisper→transcript→routeIntent()→domain-parser(money|task)→ChipDraft payload→SSE stream"
+          },
+          {
+            "path": "src/app/api/agent/route.ts",
+            "role": "Text input handler: identical routing logic to /api/voice but accepts JSON text instead of multipart audio"
+          },
+          {
+            "path": "src/lib/sync-client.ts",
+            "role": "Op generation: generateOp() creates Op with HLC timestamp; applyLocalOp() dispatches to entity_kind handlers (money, task, recurring, etc.)"
+          },
+          {
+            "path": "src/lib/op-log.ts",
+            "role": "Field-level LWW conflict resolution: applyOp() merges create/update/delete ops using HLC per-field timestamps"
+          },
+          {
+            "path": "src/lib/dexie.ts",
+            "role": "Client Dexie schema: EntityTable definitions for op_log, money_entries, tasks, recurring_rules, voice_queue, etc.; versioned stores with composite indexes"
+          },
+          {
+            "path": "src/app/app/page.tsx",
+            "role": "Orchestrator: wires VoiceRecorder.onParsed→setDraft→ConfirmationChip.onConfirm→confirmEntry→generateOp→applyLocalOp→pushPullOnce; handles drains on online event"
+          },
+          {
+            "path": "src/lib/agents/router.ts",
+            "role": "Intent classifier: routes input text to log_money | log_task | query_money | query_task | chat; uses groq-20b with RouterResponseSchema{intent, confidence}"
+          },
+          {
+            "path": "src/lib/agents/money-agent.ts",
+            "role": "Money domain parser: text+categories→groq-120b→MoneyAgentResponse{amount, currency, direction, category_name, description, occurred_at}"
+          },
+          {
+            "path": "src/lib/agents/task-agent.ts",
+            "role": "Task domain parser: text→groq-120b→TaskAgentResponse{title, due_at, priority}"
+          },
+          {
+            "path": "src/lib/op-schemas/money.ts",
+            "role": "MoneyPayload schema: defines validated structure for money op_log entries (source enum includes 'voice', 'manual', 'recurring', 'receipt')"
+          },
+          {
+            "path": "src/lib/op-schemas/task.ts",
+            "role": "TaskPayload schema: validates task op entries (source enum: 'voice' | 'manual')"
+          },
+          {
+            "path": "src/lib/op-schemas/recurring.ts",
+            "role": "RecurringPayload schema: validates recurring rule ops with period, interval_count, anchor_at, end_condition_kind logic"
+          },
+          {
+            "path": "src/types/ops.ts",
+            "role": "Op type definition: HLC timestamp, entity_kind (discriminated enum), op_type (create|update|delete), per-field tracking via field_hlcs"
+          }
+        ],
+        "patterns": [
+          "Voice/text input → routeIntent() classifier → domain-specific agent parser → ChipDraft payload union → ConfirmationChip UI → confirmEntry() → generateOp() → applyLocalOp() → op_log entry applied via entity_kind dispatch",
+          "ChipDraft = discriminated union with 'kind' field ('money' | 'task'); MoneyPayload extends with draftCategoryName?, receiptPreviewUrl?; all drafts carry source='voice'|'manual'|'receipt'",
+          "generateOp() input: {entity_kind, entity_id, op_type, payload, user_id}; output: Op with id (UUID), hlc (HLC timestamp), device_id, schema_version=1",
+          "applyLocalOp() switches on entity_kind to route to db[${entity_kind}_entries].put(); uses db.transaction() for atomicity; idempotent on duplicate op.id",
+          "Agent response schemas use Zod for validation; agent receives context: categories, userTz, defaultCurrency, nowIso; returns structured response matching CategoryName/CurrencyEnum/PriorityEnum",
+          "Money confirmation optionally creates recurring rule first (generateOp with entity_kind='recurring'); then creates money entry with recurring_rule_id",
+          "Field-level LWW: each field in EntityRow tracks field_hlcs[fieldName] = hlcString; applyUpdate() only mutates field if incoming op.hlc > existing field_hlcs[field]",
+          "Offline resilience: blob queued in db.voice_queue; drainVoiceQueue() on 'online' event with concurrency guard; processBlob passed as callback to avoid UI state loss",
+          "Receipt flow mirrors voice exactly: ReceiptButton→callReceiptApiStreaming()→/api/receipt SSE→ChipDraft with receiptPreviewUrl→ConfirmationChip rendered with receipt image preview",
+          "Router determines intent with 0.0-1.0 confidence score; log_* intents trigger ChipDraft creation; query_* intents return QueryPlan{kind, ...}; other intents return null payload",
+          "Category matching: app passes categories[]={id, name, kind} to agent; money-agent returns category_name; app.tsx finds matching id before creating op",
+          "Recurring rule anchor_at = occurred_at; next_due_at computed via nextDueFromAnchor(anchor_at, period, interval_count) to handle day-of-month clamping (e.g., Jan 31 +1mo = Feb 28)",
+          "Permission model: voice-recorder needs getUserMedia({audio:{channelCount:1, sampleRate:16000, echoCancellation, noiseSuppression}}); stops stream on unmount",
+          "VoiceRecorder state machine: idle→recording→transcribing→transcript→parsing→idle/error; ConfirmationChip disables VoiceRecorder when draft !== null",
+          "SSE event format: 'data: {step, ...}\n\n'; parser handles incomplete buffers and multiple events per chunk; stops on done or EOF"
+        ],
+        "gotchas": [
+          "isDraining guard in voice-queue.ts is in-process only — cross-tab concurrent drains can still double-process same blob (Phase 2 concern); marked with __resetDrainGuardForTests() for test isolation",
+          "Receipt drain (app/page.tsx line 123) intentionally discards payload to avoid surfacing a chip over active user edit; the receipt image is preserved in R2 regardless",
+          "Category matching uses category_name string from agent response, must match user's category.name exactly; if no match, category_id = null (app stores it, no validation error)",
+          "URL.createObjectURL(file) for receiptPreviewUrl only valid until revoked; component must revoke on unmount or rerender to avoid memory leak (not shown in receipt-button.tsx)",
+          "Query intents (query_money, query_task, chat) return payload: null; app routes to QueryAnswerCard, not ConfirmationChip; no op_log entry created",
+          "ChipDraft money carries optional receipt_key after receipt upload completes; confirmation includes receipt_key in money op payload but ConfirmationChip doesn't expose edit UI for it",
+          "Task priority defaults to 'medium' in schema; if agent returns invalid priority string, Zod parse fails and agent throws 'invalid response' error (user sees fallback money draft)",
+          "Recurring.end_condition_kind='until' requires end_until ISO datetime; 'count' requires end_count integer; schema refinement enforces this; other end_condition_kind values allow nulls but will fail server-side",
+          "HLC comparison in field-level LWW: compareHlc(new_hlc, existing_hlc) > 0 means new_hlc wins; same logical timestamp (same device within clock tick) keeps existing (FIFO on ties); different devices use device_id suffix tiebreaker",
+          "Voice-recorder disabled when draft !== null, parsing, or queryPlan !== null; user cannot start new recording until ConfirmationChip resolves or is canceled",
+          "Agent response error handling: if Groq API fails or returns invalid JSON, error is caught and sent as SSE {step:'error', message}; voice-recorder falls back to enqueueVoice(blob)",
+          "Payload schema version hardcoded to 1 in generateOp; server-side sync validates against getPayloadSchemaForKind(entity_kind); mismatch rejects op",
+          "Timezone (userTz) used in date parsing for due_at in task agent; now ISO timestamp passed as nowIso; agent prompt may use these to resolve relative dates like 'tomorrow' or 'next Monday'",
+          "draftCategoryName on money ChipDraft is legacy field (Phase 1 remnant); not used in current confirm flow; app extracts category_name from agent response and matches to id",
+          "Sync transaction in applyLocalOp() touches [op_log, widgets, money_entries, recurring_rules, categories, tasks, insights]; new entity_kind domains added Phase 2+ must extend this list",
+          "Receipt blob stored as Blob in receipt_queue table; browser will serialize/deserialize via IndexedDB structured clone — large images (>5MB) may hit quota or perf issues"
+        ],
+        "newDomainSteps": [
+          "1. Add new entity_kind to ENTITY_KINDS tuple in src/types/ops.ts (e.g., 'learning' or 'note')",
+          "2. Create domain-specific Dexie row type in src/lib/dexie.ts (e.g., LearningRow with user_id, created_at, updated_at, field_hlcs, deleted_at, [domain-specific fields]); add table and version store",
+          "3. Create op-schema in src/lib/op-schemas/{domain}.ts with Zod schema (e.g., LearningPayloadSchema exported as LearningPayload type); include source enum if user-inputtable",
+          "4. Register schema in src/lib/op-schemas/index.ts getPayloadSchemaForKind() switch statement: case '{domain}': return {Domain}PayloadSchema",
+          "5. Add case in src/lib/sync-client.ts applyLocalOp() switch to dispatch to db[{domain}_entries].put(next); extend db.transaction() store array",
+          "6. Create agent response schema in src/lib/agents/schemas/{domain}-agent-response.ts with Zod (e.g., LearningAgentResponseSchema); match domain's required fields",
+          "7. Create domain parser in src/lib/agents/{domain}-agent.ts: export async function parse{Domain}Entry({client, text, context}): Promise<{Domain}AgentResponse>; call callGroqJSON with domain-specific system prompt",
+          "8. Create system prompt in src/lib/agents/prompts/{domain}.ts: export function build{Domain}AgentSystemPrompt({context}): string; describe parsing rules for domain",
+          "9. Update src/lib/agents/router.ts INTENTS: add 'log_{domain}' intent; train router to recognize domain input patterns",
+          "10. Add router branch in src/app/api/voice/route.ts and src/app/api/agent/route.ts: else if (router.intent === 'log_{domain}') { const payload = await parse{Domain}Entry(...); send({step:'payload', intent:'log_{domain}', payload:{kind:'{domain}', ...}}); }",
+          "11. Create ChipDraft discriminator: update src/components/confirmation-chip.tsx ChipDraft union type to include domain variant (e.g., ({DomainPayload} & {kind:'{domain}'})); add new ConfirmationChip{Domain} component or extend existing render",
+          "12. Add domain case in src/app/app/page.tsx confirmEntry(): if (final.kind === '{domain}') { const op = await generateOp({entity_kind:'{domain}', entity_id: UUID, op_type:'create', payload:{...final}, user_id}); await applyLocalOp(op); }",
+          "13. Wire ReceiptButton or create new {Domain}InputButton with onParsed=(payload, preview?) callback; add to app/page.tsx input header alongside VoiceRecorder; set draft state on parse",
+          "14. Create optional UI views in app/app/page.tsx for displaying {domain} entries (e.g., {Domain}List, {Domain}Card); add tab bar entry if multi-tab layout",
+          "15. (Optional) Add drain queue for offline resilience: create src/lib/{domain}-queue.ts mirroring voice-queue.ts pattern if domain input is async (receipts, images); call drain on 'online' event in app/page.tsx",
+          "16. Test: verify generateOp + applyLocalOp workflow end-to-end; confirm op_log stores entry and db[{domain}_entries] reflects persisted row with correct field_hlcs; validate HLC ordering on concurrent ops"
+        ]
+      },
+      {
+        "dimension": "Testing: Vitest + fake-indexeddb + mocked Groq for domain-driven LWW sync",
+        "keyFiles": [
+          {
+            "path": "vitest.config.ts",
+            "role": "Root test config; environment=node, fake-indexeddb setup, @ alias to src/"
+          },
+          {
+            "path": "tests/setup.ts",
+            "role": "Test entry point; imports fake-indexeddb/auto for Node-based Dexie tests"
+          },
+          {
+            "path": "src/lib/op-schemas/index.ts",
+            "role": "Domain schema registry; getPayloadSchemaForKind(kind) dispatches to Zod schemas by entity_kind"
+          },
+          {
+            "path": "src/lib/op-schemas/task.ts",
+            "role": "Example domain payload schema; Zod object with title/due_at/priority/source enum"
+          },
+          {
+            "path": "src/lib/op-schemas/money.ts",
+            "role": "Example domain payload schema; amount (nonnegative int), currency (enum SUPPORTED_CURRENCIES), direction enum"
+          },
+          {
+            "path": "tests/op-schemas-task.test.ts",
+            "role": "Domain schema test template; safeParse tests for create/update, .partial() for updates"
+          },
+          {
+            "path": "tests/agents/money-agent.test.ts",
+            "role": "Agent test pattern; mocked Groq via vi.fn(), fixture-driven parametrization over CASES array"
+          },
+          {
+            "path": "tests/fixtures/money-agent-cases.ts",
+            "role": "Agent test fixtures; Case type with {id, text, bucket, expect, expectNull} for parametrized test loops"
+          },
+          {
+            "path": "tests/sync-server.test.ts",
+            "role": "Sync op merge logic; tests dedup by id, HLC ordering, filtering by last_synced_hlc"
+          },
+          {
+            "path": "tests/sync-client.test.ts",
+            "role": "Client-side sync ops; generateOp + applyLocalOp materialize ops to Dexie entities, HLC monotonicity"
+          },
+          {
+            "path": "tests/dexie.test.ts",
+            "role": "Dexie store materialization; phase-versioned schema tests, compound indices [user_id+occurred_at], resetDb()"
+          },
+          {
+            "path": "tests/api/agent-route.test.ts",
+            "role": "API route pattern; vi.mock auth/Cloudflare/agents, test 401/400/200 with mocked downstream calls"
+          }
+        ],
+        "patterns": [
+          "Domain schema test: Create src/lib/op-schemas/[domain].ts exporting [Domain]PayloadSchema = z.object({...fields}); create tests/op-schemas-[domain].test.ts with safeParse success/failure cases, .partial() for updates",
+          "Agent test fixture: Create tests/fixtures/[domain]-agent-cases.ts exporting Case[] with {id, text, bucket, expect} typed to AgentResponse; loop over CASES in describe suite, mock Groq via vi.fn().mockResolvedValue({choices: [{message: {content: JSON.stringify(response)}}]})",
+          "Agent test pattern: forEach case => mock Groq response => call agent function => loop over c.expect properties and assert equality. Use makeMockResponseForCase() helper to merge case.expect with defaults",
+          "Sync materialization: applyLocalOp() reads op.entity_kind/op.payload and materializes to correct Dexie table (db.[entity_kind]_rows); write tests in sync-client.test.ts under 'applyLocalOp — Phase X entity kinds' describe block",
+          "Dexie schema versioning: Each phase bump uses this.version(N).stores({...}); existing stores migrate forward. Add tests in dexie.test.ts under 'Dexie vX: [entity_kind] — Phase Y' describe",
+          "Compound index for range queries: Use [user_id+field] pattern; test .where('[user_id+field]').between([u1, val1], [u1, val2]).toArray() in dexie.test.ts",
+          "API route tests: Mock @/lib/auth, @opennextjs/cloudflare, downstream agents (routeIntent, parseMoneyEntry, etc). Test status codes 401/400/200, validate response structure",
+          "Op schema registry: Add new domain to getPayloadSchemaForKind switch statement in src/lib/op-schemas/index.ts; export both schema and type",
+          "Test fixture buckets: Organize test cases by bucket (happy, currency, amount, direction, priority, date, failure, etc). Each bucket tests a specific concern; 3-10 cases per bucket is typical",
+          "Mocked Groq structure: {chat: {completions: {create: vi.fn().mockResolvedValue({choices: [{message: {content: JSON.stringify(json)}}]})}}} — mock only the LLM call path"
+        ],
+        "gotchas": [
+          "fake-indexeddb must be imported in tests/setup.ts before Dexie tests run; Vitest does not auto-polyfill IndexedDB in Node",
+          "resetDb() clears ALL Dexie tables; call beforeEach to avoid test pollution between domain tests",
+          "Mocked Groq is only mocked for the test; tests do NOT actually call the LLM (test is deterministic, uses fixture responses). withRetry() still works because client is mocked",
+          "applyLocalOp() expects entity_kind to match a known table name (money => money_entries, task => tasks); unmapped kinds silently skip materialization; verify table names in dexie.ts",
+          "HLC strings must be lexicographically comparable ('0000000000000001-000000-d1' < '0000000000000002-000000-d1'); generateOp() monotonically increases; test this via multiple calls",
+          "Op payload schemas use Zod enums, not string unions; invalid enum values fail safeParse with detailed error. Money currency must be one of SUPPORTED_CURRENCIES, not arbitrary ISO 4217",
+          "Agent response schemas are strict; parseMoneyEntry() throws if Groq returns invalid JSON shape. Always define a schema for agent LLM outputs before testing",
+          "Fixture cases use bucket field for test organization, not Vitest grouping; all CASES are iterated in one test loop. Use descriptive case IDs (h-01, c-02, d-03, etc.) for clarity",
+          "Op.id must be globally unique; tests often hardcode id like 'op_uuid-1', but production generateOp() creates unique IDs via crypto.randomUUID()",
+          "field_hlcs tracks per-field HLC for LWW conflict resolution; tests must set {field_name: hlc_string} accurately. Omitting a field means it has no HLC (null coalesce to 'never synced')",
+          "updatePayloadSchema.partial() allows testing partial updates (e.g., only completed_at). Full create must include required fields; partial update can omit non-required fields",
+          "vi.mock() at top-level module scope; mocks persist for all tests in that file unless vi.restoreAllMocks() called. Use beforeEach(() => vi.restoreAllMocks()) for isolated mocking"
+        ],
+        "newDomainSteps": [
+          "1. Add new entity_kind to ENTITY_KINDS const in src/types/ops.ts and define Op type generics (already done for 'learning', 'note', 'project', 'budget' — verify your domain name here)",
+          "2. Create src/lib/op-schemas/[domain].ts exporting [Domain]PayloadSchema = z.object({field1: z.type1(), field2: z.type2(), ...}) and type [Domain]Payload = z.infer<typeof [Domain]PayloadSchema>",
+          "3. Add schema to src/lib/op-schemas/index.ts: import, export type, add case to getPayloadSchemaForKind switch (case '[domain]': return [Domain]PayloadSchema)",
+          "4. Create tests/op-schemas-[domain].test.ts with describe('[Domain]PayloadSchema') => it() suites for: minimal valid payload, partial update via .partial(), rejection of invalid enums/constraints, defaults",
+          "5. Define Dexie store type src/lib/dexie.ts: export type [Domain]Row = {id, user_id, field1, ..., field_hlcs: Record<string, string>, deleted_at, created_at, updated_at}; add to PulseDb class",
+          "6. Bump Dexie schema version in src/lib/dexie.ts (this.version(N).stores({..., [domain]_entries: 'id, user_id, ...indices'})). Test in tests/dexie.test.ts under new phase describe",
+          "7. Add materialization logic in src/lib/sync-client.ts applyLocalOp(): case 'create' for entity_kind => const row = {..., field_hlcs: {fieldName: op.hlc}, ...}; await db.[domain]_entries.put(row). Verify table name matches",
+          "8. Test materialization in tests/sync-client.test.ts under 'applyLocalOp — Phase X entity kinds': await applyLocalOp({entity_kind: '[domain]', op_type: 'create', payload: {...}, ...}); const row = await db.[domain]_entries.get(id); expect(row.field).toBe(...)",
+          "9. Create tests/dexie.test.ts test: round-trip row via db.[domain]_entries.put/get, test compound index via .where('[user_id+field]').between([...]).toArray() if applicable",
+          "10. If domain has Groq agent: create src/lib/agents/[domain]-agent.ts with parse[Domain]Entry() function accepting {client, text, ...}; export agent response schema from src/lib/agents/schemas/[domain]-agent-response.ts",
+          "11. Create tests/fixtures/[domain]-agent-cases.ts with Case[] array, buckets for test categories (happy, edge cases, failures); at least 20-30 diverse cases covering positive and negative inputs",
+          "12. Create tests/agents/[domain]-agent.test.ts: vi.fn().mockResolvedValue() for Groq, forEach CASES => makeMockResponseForCase => call parse[Domain]Entry({client: mockGroq, text: c.text, ...}) => assert c.expect fields",
+          "13. If domain has API route: create tests/api/[domain]-route.test.ts with vi.mock() for auth/Cloudflare/downstream agents; test 401 (no session), 400 (invalid body), 200 (valid); assert response shape",
+          "14. If domain stores in D1: create Kysely types in src/types/db.ts (add to DB interface); define insertion logic in src/lib/ops-to-d1.ts; test in tests/api/sync-route.test.ts or tests/sync-integration.test.ts",
+          "15. Run pnpm test to verify all new tests pass; pnpm test:coverage to check line coverage for new domain logic (aim for >80% coverage in op-schemas + agent logic)"
+        ]
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Map"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Synthesize"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "map:data-dexie",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a69a8f7124dd8f6ad",
+      "model": "claude-haiku-4-5-20251001",
+      "state": "done",
+      "startedAt": 1784304319328,
+      "queuedAt": 1784304319277,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "data-dexie",
+      "promptPreview": "You are mapping ONE dimension of the Pulse codebase (repo root C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse) so a brand-new feature \"domain\" (like Learning or Notes) can be added following EXISTING patterns. Pulse is a local-first PWA: Next 16 + React 19 + Dexie v4 (client = source of truth) + Better Auth + Cloudflare Workers/D1 + a custom HLC/op-log per-field-LWW sync engine + Groq ag…",
+      "lastProgressAt": 1784304450364,
+      "tokens": 41773,
+      "toolCalls": 29,
+      "durationMs": 131036,
+      "resultPreview": "{\"dimension\":\"data-dexie\",\"keyFiles\":[{\"path\":\"C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/dexie.ts\",\"role\":\"Client IndexedDB schema definition. Exports Row types (TaskRow, MoneyEntryRow, CategoryRow, RecurringRuleRow, WidgetRow, InsightRow, FxRateRow) + db instance. Uses .version() chaining for migrations. Currently at version 4.\"},{\"path\":\"C:/Users/SDMrSheikAhamed/Documents/…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "map:sync-oplog",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a0c54997455b48dcb",
+      "model": "claude-haiku-4-5-20251001",
+      "state": "done",
+      "startedAt": 1784304319330,
+      "queuedAt": 1784304319278,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "sync-oplog: Hybrid Logical Clock + per-field LWW + server m…",
+      "promptPreview": "You are mapping ONE dimension of the Pulse codebase (repo root C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse) so a brand-new feature \"domain\" (like Learning or Notes) can be added following EXISTING patterns. Pulse is a local-first PWA: Next 16 + React 19 + Dexie v4 (client = source of truth) + Better Auth + Cloudflare Workers/D1 + a custom HLC/op-log per-field-LWW sync engine + Groq ag…",
+      "lastProgressAt": 1784304439359,
+      "tokens": 42668,
+      "toolCalls": 30,
+      "durationMs": 120005,
+      "resultPreview": "{\"dimension\":\"sync-oplog: Hybrid Logical Clock + per-field LWW + server materialization via op-log\",\"keyFiles\":[{\"path\":\"C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/types/ops.ts\",\"role\":\"Central type definitions: ENTITY_KINDS array, Op schema, EntityRow type; entity_kind is a Zod enum sourced from this const.\"},{\"path\":\"C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "map:agents",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "ad6046a40ac555bb3",
+      "model": "claude-haiku-4-5-20251001",
+      "state": "done",
+      "startedAt": 1784304439397,
+      "queuedAt": 1784304319278,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Agents (Groq LLM Pipeline for Intent Routing & Extraction)",
+      "promptPreview": "You are mapping ONE dimension of the Pulse codebase (repo root C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse) so a brand-new feature \"domain\" (like Learning or Notes) can be added following EXISTING patterns. Pulse is a local-first PWA: Next 16 + React 19 + Dexie v4 (client = source of truth) + Better Auth + Cloudflare Workers/D1 + a custom HLC/op-log per-field-LWW sync engine + Groq ag…",
+      "lastProgressAt": 1784304638769,
+      "tokens": 45616,
+      "toolCalls": 42,
+      "durationMs": 199371,
+      "resultPreview": "{\"dimension\":\"Agents (Groq LLM Pipeline for Intent Routing & Extraction)\",\"keyFiles\":[{\"path\":\"src/lib/agents/llm-client.ts\",\"role\":\"Core LLM client: exports makeGroqClient(apiKey), callGroqJSON<T>() with json_object response_format, withRetry() exponential backoff wrapper; defines GroqModel union = 'openai/gpt-oss-20b' | 'openai/gpt-oss-120b' | 'whisper-large-v3-turbo'\"},{\"path\":\"src/lib/agents/r…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "map:ui",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "abb3844b563308a55",
+      "model": "claude-haiku-4-5-20251001",
+      "state": "done",
+      "startedAt": 1784304450367,
+      "queuedAt": 1784304319278,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "ui",
+      "promptPreview": "You are mapping ONE dimension of the Pulse codebase (repo root C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse) so a brand-new feature \"domain\" (like Learning or Notes) can be added following EXISTING patterns. Pulse is a local-first PWA: Next 16 + React 19 + Dexie v4 (client = source of truth) + Better Auth + Cloudflare Workers/D1 + a custom HLC/op-log per-field-LWW sync engine + Groq ag…",
+      "lastProgressAt": 1784304546705,
+      "tokens": 50019,
+      "toolCalls": 26,
+      "durationMs": 96338,
+      "resultPreview": "{\"dimension\":\"ui\",\"keyFiles\":[{\"path\":\"src/app/app/page.tsx\",\"role\":\"Shell: conditionally renders tab content (money/tasks) and wires all components via activeTab state\"},{\"path\":\"src/hooks/use-tab-state.ts\",\"role\":\"Manages active Tab via URL search params (?tab=tasks); type Tab = 'money' | 'tasks'\"},{\"path\":\"src/components/tab-bar.tsx\",\"role\":\"Navigation (fixed desktop nav + floating mobile dock)…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "map:voice-confirm",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "adda1f66070080f11",
+      "model": "claude-haiku-4-5-20251001",
+      "state": "done",
+      "startedAt": 1784304546716,
+      "queuedAt": 1784304319278,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "voice-confirm",
+      "promptPreview": "You are mapping ONE dimension of the Pulse codebase (repo root C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse) so a brand-new feature \"domain\" (like Learning or Notes) can be added following EXISTING patterns. Pulse is a local-first PWA: Next 16 + React 19 + Dexie v4 (client = source of truth) + Better Auth + Cloudflare Workers/D1 + a custom HLC/op-log per-field-LWW sync engine + Groq ag…",
+      "lastProgressAt": 1784304725169,
+      "tokens": 52884,
+      "toolCalls": 41,
+      "durationMs": 178452,
+      "resultPreview": "{\"dimension\":\"voice-confirm\",\"keyFiles\":[{\"path\":\"src/components/voice-recorder.tsx\",\"role\":\"User-facing audio capture UI; calls onParsed(payload, transcript) callback with parsed ChipDraft from /api/voice; falls back to voice-queue on offline\"},{\"path\":\"src/components/confirmation-chip.tsx\",\"role\":\"Edit-before-confirm UI rendering ChipDraft union (money | task); discriminates on draft.kind; calls…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "map:testing",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "ab09449debf1c2ea6",
+      "model": "claude-haiku-4-5-20251001",
+      "state": "done",
+      "startedAt": 1784304638773,
+      "queuedAt": 1784304319280,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Testing: Vitest + fake-indexeddb + mocked Groq for domain-d…",
+      "promptPreview": "You are mapping ONE dimension of the Pulse codebase (repo root C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse) so a brand-new feature \"domain\" (like Learning or Notes) can be added following EXISTING patterns. Pulse is a local-first PWA: Next 16 + React 19 + Dexie v4 (client = source of truth) + Better Auth + Cloudflare Workers/D1 + a custom HLC/op-log per-field-LWW sync engine + Groq ag…",
+      "lastProgressAt": 1784304815514,
+      "tokens": 52477,
+      "toolCalls": 33,
+      "durationMs": 176741,
+      "resultPreview": "{\"dimension\":\"Testing: Vitest + fake-indexeddb + mocked Groq for domain-driven LWW sync\",\"keyFiles\":[{\"path\":\"vitest.config.ts\",\"role\":\"Root test config; environment=node, fake-indexeddb setup, @ alias to src/\"},{\"path\":\"tests/setup.ts\",\"role\":\"Test entry point; imports fake-indexeddb/auto for Node-based Dexie tests\"},{\"path\":\"src/lib/op-schemas/index.ts\",\"role\":\"Domain schema registry; getPayload…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "synthesize:blueprint",
+      "phaseIndex": 2,
+      "phaseTitle": "Synthesize",
+      "agentId": "ab13d7af39b7c71e8",
+      "model": "claude-haiku-4-5-20251001",
+      "state": "done",
+      "startedAt": 1784304815528,
+      "queuedAt": 1784304815526,
+      "attempt": 1,
+      "promptPreview": "You are the architect for Pulse. Below are 6 dimension-maps describing how Pulse builds a feature domain (from reading the real code):\n\n[\n  {\n    \"dimension\": \"data-dexie\",\n    \"keyFiles\": [\n      {\n        \"path\": \"C:/Users/SDMrSheikAhamed/Documents/Claude/Projects/Pulse/src/lib/dexie.ts\",\n        \"role\": \"Client IndexedDB schema definition. Exports Row types (TaskRow, MoneyEntryRow, CategoryRow,…",
+      "lastProgressAt": 1784304921779,
+      "tokens": 41110,
+      "toolCalls": 0,
+      "durationMs": 106251,
+      "resultPreview": "# Pulse New-Domain Blueprint\n\n## Executive Summary\n\nAdding a new domain (entity_kind) to Pulse requires coordinated changes across **8 logical layers** and **35+ files**, all following the Money/Task LWW sync pattern. This blueprint provides the ordered recipe, exact symbols, and divergence points for two concrete examples (Learning, Notes).\n\n---\n\n## Part 1: Generic Recipe (Order of Execution)\n\n##…"
+    }
+  ],
+  "totalTokens": 326547,
+  "totalToolCalls": 201
+}
