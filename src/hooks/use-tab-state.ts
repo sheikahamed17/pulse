@@ -3,9 +3,9 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback } from 'react'
 
-export type Tab = 'money' | 'tasks'
+export type Tab = 'money' | 'tasks' | 'learning'
 
-const VALID_TABS: readonly Tab[] = ['money', 'tasks']
+const VALID_TABS: readonly Tab[] = ['money', 'tasks', 'learning']
 
 export function useTabState(): [Tab, (t: Tab) => void] {
   const router = useRouter()

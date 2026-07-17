@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckSquare, Wallet } from 'lucide-react'
+import { BookOpen, CheckSquare, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Tab } from '@/hooks/use-tab-state'
 
@@ -13,6 +13,7 @@ type Props = {
 const TABS: { id: Tab; icon: React.ComponentType<{ className?: string }>; label: string }[] = [
   { id: 'money', icon: Wallet, label: 'Money' },
   { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
+  { id: 'learning', icon: BookOpen, label: 'Learn' },
 ]
 
 export function TabBar({ active, onChange, taskBadgeCount }: Props) {

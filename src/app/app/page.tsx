@@ -21,6 +21,9 @@ import { TabBar } from '@/components/tab-bar'
 import { TaskList } from '@/components/task-list'
 import { TaskFilter } from '@/components/task-filter'
 import { TaskSummary } from '@/components/task-summary'
+import { LearningList } from '@/components/learning-list'
+import { LearningTagFilter } from '@/components/learning-tag-filter'
+import { LearningSummary } from '@/components/learning-summary'
 import { useTabState } from '@/hooks/use-tab-state'
 import { useCategories } from '@/hooks/use-categories'
 import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
@@ -62,6 +65,7 @@ function AppPageInner() {
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
+  const [selectedLearningTag, setSelectedLearningTag] = useState<string | null>(null)
   const { status: pushStatus, subscribe: pushSubscribe } = usePushSubscription()
   const [showPushNudge, setShowPushNudge] = useState(false)
 
@@ -419,6 +423,12 @@ function AppPageInner() {
               <TaskList userId={user.id} filter={taskFilter} />
             </div>
           )}
+          {activeTab === 'learning' && (
+            <div className="flex flex-col gap-3">
+              <LearningTagFilter userId={user.id} selectedTag={selectedLearningTag} onChange={setSelectedLearningTag} />
+              <LearningList userId={user.id} selectedTag={selectedLearningTag} />
+            </div>
+          )}
         </div>
 
         {/* Desktop-only sticky sidebar (right column) */}
@@ -426,6 +436,7 @@ function AppPageInner() {
           <div className="sticky top-6 flex flex-col gap-4">
             {activeTab === 'money' && <MoneyCard userId={user.id} />}
             {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
+            {activeTab === 'learning' && <LearningSummary userId={user.id} />}
           </div>
         </aside>
       </main>
