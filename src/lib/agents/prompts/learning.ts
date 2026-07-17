@@ -4,7 +4,7 @@ export function buildLearningAgentSystemPrompt(): string {
 Rules:
 1. Return ONLY this JSON object (no prose, no markdown):
    {
-     "text": <concise first-person learning statement, 1–200 chars>,
+     "text": <concise first-person learning statement>,
      "tags": <array of 1–4 short tags (e.g., ["Rust", "concurrency"]), each tag ≤40 chars>,
      "attribution": <source of the learning — "Rust book", "talk by Jane", "stackoverflow", etc.; null if no source named>
    }

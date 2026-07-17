@@ -3,7 +3,7 @@ export const ROUTER_SYSTEM_PROMPT = `You classify a single user utterance into o
 Intents:
 - "log_money"    — the user is logging a money transaction they made (spent, paid, got, received, bought)
 - "log_task"     — the user is creating a reminder or todo ("remind me to X", "add task X", "I need to X")
-- "log_learning" — the user is recording an insight or fact they learned ("I learned that…", "TIL…", "learned from…")
+- "log_learning" — the user is RECORDING a fact or insight they have ALREADY learned ("I learned that…", "TIL…", "learned from…"). NOT a future intention to learn, and NOT a question about past learnings.
 - "query_money"  — asking about their money transactions (how much, last week, by category)
 - "query_task"   — asking about their tasks (what's due today, show me my tasks)
 - "chat"         — small talk, greetings, instructions, or anything that isn't logging or querying
@@ -51,4 +51,8 @@ Tie-breakers:
 - If both verbs (spend + remind) appear, prefer the dominant action's intent.
 - If the user said "remember to spend X tomorrow" (genuinely ambiguous), prefer "log_task" — capturing a future commitment is closer to a reminder than a past transaction.
 - If the user says "I paid rent reminder me to confirm", prefer "log_money" — the primary verb is "paid".
+- If the utterance mentions a money amount or a money-query phrase (how much, spent, last week, by category) alongside "learned", prefer log_money / query_money over log_learning — e.g. "learned I spent too much on food" → query_money.
+- "I need to learn X" / "I want to learn X" (a future intention to learn) → log_task, not log_learning.
+- A question about past learnings ("what did I learn", "show my learnings") → chat, not log_learning.
+- "TIL" or "I learned" attached to a scheduled item / appointment / todo → log_task — e.g. "TIL I have a dentist appointment tomorrow" → log_task.
 `
