@@ -56,6 +56,7 @@ function resetMockDb() {
     money_entries: [],
     recurring_rules: [],
     tasks: [],
+    learning_entries: [],
     insights: [],
   }
 }
@@ -417,6 +418,95 @@ describe('/api/sync — Phase 3 insight materialization', () => {
       expect(rows).toHaveLength(1)
       expect(rows[0].summary).toBe('Great week!')
       expect(rows[0].period).toBe('weekly')
+    })
+  })
+})
+
+describe('/api/sync — Learning domain', () => {
+  it('persists a learning entry and includes it in the next pull', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const op = {
+        id: 'op-learning-1',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'learning',
+        entity_id: 'learning-1',
+        op_type: 'create' as const,
+        payload: {
+          text: 'The borrow checker prevents data races',
+          tags: ['Rust', 'concurrency'],
+          attribution: 'Rust book',
+          occurred_at: '2026-07-08T10:00:00.000Z',
+          source: 'voice',
+        },
+        schema_version: 1,
+      }
+      const push = await callSync({ device_id: 'd1', new_ops: [op] })
+      expect(push.applied_ack).toEqual(['op-learning-1'])
+
+      const pull = await callSync({ device_id: 'd2', new_ops: [] })
+      expect(pull.new_ops_from_server).toHaveLength(1)
+      expect(pull.new_ops_from_server[0].entity_kind).toBe('learning')
+
+      // Server-side row materialized
+      const rows = await testDb.selectFrom('learning_entries').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].text).toBe('The borrow checker prevents data races')
+      expect(rows[0].attribution).toBe('Rust book')
+      expect(rows[0].source).toBe('voice')
+
+      // tags JSON round-trips correctly
+      const tags = JSON.parse(rows[0].tags as string)
+      expect(tags).toEqual(['Rust', 'concurrency'])
+    })
+  })
+
+  it('whole-array tags LWW: second op with newer HLC replaces entire tags array', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      // Initial create
+      const op1 = {
+        id: 'op-learning-2a',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'learning',
+        entity_id: 'learning-2',
+        op_type: 'create' as const,
+        payload: {
+          text: 'Learning about TypeScript',
+          tags: ['TypeScript', 'JavaScript'],
+          attribution: null,
+          occurred_at: '2026-07-08T11:00:00.000Z',
+          source: 'manual',
+        },
+        schema_version: 1,
+      }
+      await callSync({ device_id: 'd1', new_ops: [op1] })
+
+      // Second op with newer HLC updates only tags
+      const op2 = {
+        id: 'op-learning-2b',
+        hlc: '0000000000000002-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'learning',
+        entity_id: 'learning-2',
+        op_type: 'update' as const,
+        payload: {
+          tags: ['TypeScript', 'Web Development', 'Frontend'],
+        },
+        schema_version: 1,
+      }
+      await callSync({ device_id: 'd1', new_ops: [op2] })
+
+      // Verify whole-array LWW: tags are completely replaced
+      const rows = await testDb.selectFrom('learning_entries').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      const tags = JSON.parse(rows[0].tags as string)
+      expect(tags).toEqual(['TypeScript', 'Web Development', 'Frontend'])
+      // Verify other fields are unchanged
+      expect(rows[0].text).toBe('Learning about TypeScript')
     })
   })
 })

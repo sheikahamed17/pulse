@@ -7,6 +7,7 @@ import {
   RECURRING_FIELDS,
   CATEGORY_FIELDS,
   TASK_FIELDS,
+  LEARNING_FIELDS,
   INSIGHT_FIELDS,
 } from '@/lib/entity-fields'
 
@@ -26,6 +27,8 @@ export async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
       return materializeRow_LWW(db, op, userId, 'categories', CATEGORY_FIELDS)
     case 'task':
       return materializeRow_LWW(db, op, userId, 'tasks', TASK_FIELDS)
+    case 'learning':
+      return materializeRow_LWW(db, op, userId, 'learning_entries', LEARNING_FIELDS)
     case 'insight':
       return materializeRow_LWW(db, op, userId, 'insights', INSIGHT_FIELDS)
     default:
@@ -37,7 +40,7 @@ async function materializeRow_LWW(
   db: Kysely<DB>,
   op: Op,
   userId: string,
-  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'insights',
+  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'learning_entries' | 'insights',
   fields: readonly string[],
 ) {
   const existing = await db
@@ -74,7 +77,14 @@ async function materializeRow_LWW(
   // (merged[f] === null, not undefined). This also matches per-field LWW —
   // an op that never touched a field must not clobber it.
   for (const f of fields) {
-    if (merged[f] !== undefined) row[f] = merged[f]
+    if (merged[f] !== undefined) {
+      // For learning_entries, tags are stored as JSON strings in the DB
+      if (tableName === 'learning_entries' && f === 'tags') {
+        row[f] = JSON.stringify(merged[f])
+      } else {
+        row[f] = merged[f]
+      }
+    }
   }
 
   const updates: Record<string, unknown> = {
@@ -83,7 +93,14 @@ async function materializeRow_LWW(
     updated_at: row.updated_at,
   }
   for (const f of fields) {
-    if (merged[f] !== undefined) updates[f] = merged[f]
+    if (merged[f] !== undefined) {
+      // For learning_entries, tags are stored as JSON strings in the DB
+      if (tableName === 'learning_entries' && f === 'tags') {
+        updates[f] = JSON.stringify(merged[f])
+      } else {
+        updates[f] = merged[f]
+      }
+    }
   }
 
   await db

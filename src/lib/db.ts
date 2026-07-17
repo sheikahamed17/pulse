@@ -154,6 +154,20 @@ export interface TaskTable {
   updated_at: string
 }
 
+export interface LearningEntryTable {
+  id: string
+  user_id: string
+  text: string
+  tags: string                  // JSON array
+  attribution: string | null
+  source: 'voice' | 'manual'
+  occurred_at: string
+  field_hlcs: string
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface FxRateTable {
   date: string                                   // 'YYYY-MM-DD'
   base: string                                   // always 'EUR' from ECB
@@ -214,6 +228,7 @@ export interface DB {
   recurring_rules: RecurringRuleTable
   money_entries: MoneyEntryTable
   tasks: TaskTable
+  learning_entries: LearningEntryTable
   fx_rates: FxRateTable
   insights: InsightTable
   push_subscriptions: PushSubscriptionTable

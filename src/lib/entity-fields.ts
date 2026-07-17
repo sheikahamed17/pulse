@@ -19,6 +19,10 @@ export const TASK_FIELDS = [
   'source', 'raw_input',
 ] as const
 
+export const LEARNING_FIELDS = [
+  'text', 'tags', 'attribution', 'source', 'occurred_at',
+] as const
+
 export const INSIGHT_FIELDS = [
   'period', 'starts_at', 'ends_at', 'summary', 'metrics',
 ] as const
