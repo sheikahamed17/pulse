@@ -54,10 +54,11 @@ export function LearningList({ userId, selectedTag }: Props) {
       {filtered.map(e => (
         <li
           key={e.id}
-          className="glass-soft rounded-2xl relative flex flex-col gap-2 p-3"
+          className="glass-soft rounded-2xl relative flex flex-col gap-2 p-3 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
           onPointerDown={() => longPress.onPointerDown(e)}
           onPointerUp={longPress.onPointerUp}
           onPointerLeave={longPress.onPointerLeave}
+          tabIndex={0}
         >
           <p className="text-sm">{e.text}</p>
           {e.tags.length > 0 && (
@@ -92,6 +93,7 @@ export function LearningList({ userId, selectedTag }: Props) {
             <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
               <button
                 type="button"
+                aria-label={`Delete learning: ${e.text.slice(0, 30)}${e.text.length > 30 ? '…' : ''}`}
                 className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                 onClick={() => deleteLearning(e)}
               >

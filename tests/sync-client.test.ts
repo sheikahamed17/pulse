@@ -336,3 +336,131 @@ describe('applyLocalOp: insight', () => {
     expect(before).toBe(after)
   })
 })
+
+describe('applyLocalOp — learning entity', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('materializes a learning_entries row from a learning create op', async () => {
+    await applyLocalOp({
+      id: 'op-l1',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'learning', entity_id: 'l1',
+      op_type: 'create',
+      payload: {
+        text: 'TypeScript generics are powerful',
+        tags: ['ts', 'generics'],
+        attribution: 'Sheik',
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+      },
+      schema_version: 1,
+    })
+    const row = await db.learning_entries.get('l1')
+    expect(row?.text).toBe('TypeScript generics are powerful')
+    expect(row?.tags).toEqual(['ts', 'generics'])
+    expect(row?.attribution).toBe('Sheik')
+    expect(row?.source).toBe('manual')
+    expect(row?.deleted_at).toBeNull()
+  })
+
+  it('stores tags as a native array, not stringified', async () => {
+    await applyLocalOp({
+      id: 'op-l-array-test',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'learning', entity_id: 'l-array',
+      op_type: 'create',
+      payload: {
+        text: 'Array test',
+        tags: ['one', 'two', 'three'],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'voice',
+      },
+      schema_version: 1,
+    })
+    const row = await db.learning_entries.get('l-array')
+    expect(Array.isArray(row?.tags)).toBe(true)
+    expect(row?.tags).toEqual(['one', 'two', 'three'])
+  })
+
+  it('updates a learning entry via update op (LWW merge)', async () => {
+    await applyLocalOp({
+      id: 'op-l-create',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'learning', entity_id: 'l-update',
+      op_type: 'create',
+      payload: {
+        text: 'Original text',
+        tags: ['old'],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+      },
+      schema_version: 1,
+    })
+    await applyLocalOp({
+      id: 'op-l-update',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'learning', entity_id: 'l-update',
+      op_type: 'update',
+      payload: {
+        tags: ['new', 'updated'],
+      },
+      schema_version: 1,
+    })
+    const row = await db.learning_entries.get('l-update')
+    expect(row?.text).toBe('Original text')
+    expect(row?.tags).toEqual(['new', 'updated'])
+  })
+
+  it('tombstones via delete op (sets deleted_at)', async () => {
+    await applyLocalOp({
+      id: 'op-l-create-del',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'learning', entity_id: 'l-delete',
+      op_type: 'create',
+      payload: {
+        text: 'Will be deleted',
+        tags: [],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+      },
+      schema_version: 1,
+    })
+    await applyLocalOp({
+      id: 'op-l-delete',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'learning', entity_id: 'l-delete',
+      op_type: 'delete',
+      payload: {},
+      schema_version: 1,
+    })
+    const row = await db.learning_entries.get('l-delete')
+    expect(row?.deleted_at).not.toBeNull()
+  })
+
+  it('is idempotent on duplicate learning op.id', async () => {
+    const op = {
+      id: 'op-l-dup',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'learning' as const, entity_id: 'l-dup',
+      op_type: 'create' as const,
+      payload: {
+        text: 'idempotent test',
+        tags: [],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual' as const,
+      },
+      schema_version: 1,
+    }
+    await applyLocalOp(op)
+    await applyLocalOp(op)
+    expect(await db.op_log.count()).toBe(1)
+    expect(await db.learning_entries.count()).toBe(1)
+  })
+})

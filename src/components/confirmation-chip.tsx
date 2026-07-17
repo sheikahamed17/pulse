@@ -389,7 +389,7 @@ function ConfirmationChipLearning({
               type="button"
               onClick={() => addTag(newTag)}
               aria-label="Add tag"
-              className="text-xs px-2 py-0.5 rounded-md border bg-muted hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+              className="min-h-[44px] flex items-center justify-center px-2 rounded-md border bg-muted hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none text-xs"
             >
               +
             </button>
@@ -414,7 +414,7 @@ function ConfirmationChipLearning({
           type="button"
           onClick={() => setEditingAttribution(true)}
           aria-label="Edit source or attribution"
-          className="mb-3 block w-full text-left rounded-md border bg-muted px-2 py-0.5 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+          className="mb-3 block w-full min-h-[44px] flex items-center text-left rounded-md border bg-muted px-2 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
         >
           {d.attribution || '+ source / attribution'}
         </button>
