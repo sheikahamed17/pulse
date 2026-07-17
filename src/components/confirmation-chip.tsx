@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CategoryPicker } from '@/components/category-picker'
@@ -12,11 +13,13 @@ import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 import type { TaskPayload } from '@/lib/op-schemas/task'
+import type { LearningPayload } from '@/lib/op-schemas/learning'
 import type { CategoryRow } from '@/lib/dexie'
 
 export type ChipDraft =
   | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string })
   | (TaskPayload & { kind: 'task' })
+  | (LearningPayload & { kind: 'learning' })
 
 type Props = {
   userId: string
@@ -29,6 +32,9 @@ type Props = {
 export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCancel }: Props) {
   if (draft.kind === 'task') {
     return <ConfirmationChipTask draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+  }
+  if (draft.kind === 'learning') {
+    return <ConfirmationChipLearning draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
   }
   return <ConfirmationChipMoney userId={userId} draft={draft} categoryById={categoryById} onConfirm={onConfirm} onCancel={onCancel} />
 }
@@ -277,6 +283,142 @@ function ConfirmationChipTask({
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.title.trim()}>
           Confirm task
+        </Button>
+      </div>
+
+      <p className="mt-1 text-center text-[10px] text-muted-foreground">tap any field to edit</p>
+    </div>
+  )
+}
+
+function ConfirmationChipLearning({
+  draft,
+  onConfirm,
+  onCancel,
+}: {
+  draft: LearningPayload & { kind: 'learning' }
+  onConfirm: Props['onConfirm']
+  onCancel: () => void
+}) {
+  const [d, setD] = useState<LearningPayload & { kind: 'learning' }>(draft)
+  const [editingText, setEditingText] = useState(false)
+  const [editingAttribution, setEditingAttribution] = useState(false)
+  const [newTag, setNewTag] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function handleConfirm() {
+    setBusy(true)
+    try {
+      await onConfirm(d, { enabled: false, period: 'monthly', intervalCount: 1 })
+    }
+    finally { setBusy(false) }
+  }
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim()
+    if (trimmed && !d.tags.includes(trimmed) && d.tags.length < 12) {
+      setD(s => ({ ...s, tags: [...s.tags, trimmed] }))
+      setNewTag('')
+    }
+  }
+
+  function removeTag(tag: string) {
+    setD(s => ({ ...s, tags: s.tags.filter(t => t !== tag) }))
+  }
+
+  return (
+    <div className="glass rounded-2xl p-5">
+      <div className="mb-3 flex items-center justify-between text-xs">
+        <span className="font-semibold uppercase tracking-wide text-cyan-500">
+          📚 Learn
+        </span>
+      </div>
+
+      {editingText ? (
+        <textarea
+          autoFocus
+          defaultValue={d.text}
+          onBlur={(e) => {
+            const v = e.currentTarget.value.trim()
+            if (v) setD(s => ({ ...s, text: v }))
+            setEditingText(false)
+          }}
+          className="mb-3 w-full rounded-md border bg-background p-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none resize-none"
+          rows={3}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingText(true)}
+          className="mb-3 block w-full whitespace-pre-wrap text-left font-mono text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+        >
+          {d.text}
+        </button>
+      )}
+
+      <div className="mb-3 flex flex-wrap gap-1.5 items-start">
+        {d.tags.map((tag) => (
+          <div key={tag} className="flex items-center gap-1 rounded-md border bg-muted px-2 py-0.5 text-xs">
+            <span>{tag}</span>
+            <button
+              type="button"
+              onClick={() => removeTag(tag)}
+              className="ml-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        {d.tags.length < 12 && (
+          <div className="flex items-center gap-1">
+            <Input
+              value={newTag}
+              onChange={e => setNewTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addTag(newTag)
+                }
+              }}
+              placeholder="add tag…"
+              className="h-7 text-xs max-w-[100px]"
+            />
+            <button
+              type="button"
+              onClick={() => addTag(newTag)}
+              className="text-xs px-2 py-0.5 rounded-md border bg-muted hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+            >
+              +
+            </button>
+          </div>
+        )}
+      </div>
+
+      {editingAttribution ? (
+        <Input
+          autoFocus
+          defaultValue={d.attribution ?? ''}
+          onBlur={(e) => {
+            setD(s => ({ ...s, attribution: e.currentTarget.value || null }))
+            setEditingAttribution(false)
+          }}
+          placeholder="source / where learned…"
+          className="mb-3 h-7 text-xs"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingAttribution(true)}
+          className="mb-3 block w-full text-left rounded-md border bg-muted px-2 py-0.5 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+        >
+          {d.attribution || '+ source / attribution'}
+        </button>
+      )}
+
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.text.trim()}>
+          Confirm learning
         </Button>
       </div>
 

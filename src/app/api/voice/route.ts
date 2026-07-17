@@ -8,6 +8,7 @@ import { groqWhisper } from '@/lib/agents/whisper'
 import { routeIntent } from '@/lib/agents/router'
 import { parseMoneyEntry } from '@/lib/agents/money-agent'
 import { parseTaskEntry } from '@/lib/agents/task-agent'
+import { parseLearning } from '@/lib/agents/learning-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,6 +114,24 @@ export async function POST(req: Request) {
               completed_at: null,
               source: 'voice',
               raw_input: transcript,
+            },
+          })
+        } else if (router.intent === 'log_learning') {
+          const payload = await parseLearning({
+            client: groq,
+            text: transcript,
+          })
+          send({
+            step: 'payload',
+            intent: 'log_learning',
+            transcript,
+            payload: {
+              kind: 'learning',
+              text: payload.text,
+              tags: payload.tags,
+              attribution: payload.attribution ?? null,
+              occurred_at: nowIso,
+              source: 'voice',
             },
           })
         } else {

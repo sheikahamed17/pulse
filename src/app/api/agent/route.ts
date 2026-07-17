@@ -9,6 +9,7 @@ import { routeIntent } from '@/lib/agents/router'
 import { parseMoneyEntry } from '@/lib/agents/money-agent'
 import { parseTaskEntry } from '@/lib/agents/task-agent'
 import { parseMoneyQuery } from '@/lib/agents/query-money-agent'
+import { parseLearning } from '@/lib/agents/learning-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,6 +103,26 @@ export async function POST(req: Request) {
           completed_at: null,
           source: 'manual',
           raw_input: parsed.data.text,
+        },
+      })
+    }
+
+    if (router.intent === 'log_learning') {
+      const payload = await parseLearning({
+        client: groq,
+        text: parsed.data.text,
+      })
+      return NextResponse.json({
+        transcript: parsed.data.text,
+        intent: 'log_learning',
+        confidence: router.confidence,
+        payload: {
+          kind: 'learning',
+          text: payload.text,
+          tags: payload.tags,
+          attribution: payload.attribution ?? null,
+          occurred_at: nowIso,
+          source: 'manual',
         },
       })
     }
