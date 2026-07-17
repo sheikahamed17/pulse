@@ -62,7 +62,7 @@ export function TabBar({ active, onChange, taskBadgeCount }: Props) {
               type="button"
               onClick={() => onChange(t.id)}
               aria-current={isActive ? 'page' : undefined}
-              className="flex-1 flex flex-col items-center gap-1 py-2 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded-lg"
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 px-2 min-h-[44px] transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded-lg"
             >
               <span className="relative">
                 <Icon

@@ -92,7 +92,7 @@ export function LearningList({ userId, selectedTag }: Props) {
             <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
               <button
                 type="button"
-                className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                 onClick={() => deleteLearning(e)}
               >
                 <Trash2 className="w-3 h-3" />
@@ -100,7 +100,7 @@ export function LearningList({ userId, selectedTag }: Props) {
               </button>
               <button
                 type="button"
-                className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                className="px-3 py-2 min-h-[44px] text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                 onClick={() => setMenuFor(null)}
               >
                 Cancel

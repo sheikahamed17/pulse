@@ -356,13 +356,14 @@ function ConfirmationChipLearning({
         </button>
       )}
 
-      <div className="mb-3 flex flex-wrap gap-1.5 items-start">
+      <div className="mb-3 flex flex-wrap gap-1.5 items-start" role="group" aria-label="Tags">
         {d.tags.map((tag) => (
           <div key={tag} className="flex items-center gap-1 rounded-md border bg-muted px-2 py-0.5 text-xs">
             <span>{tag}</span>
             <button
               type="button"
               onClick={() => removeTag(tag)}
+              aria-label={`Remove tag "${tag}"`}
               className="ml-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
             >
               <X className="w-3 h-3" />
@@ -381,11 +382,13 @@ function ConfirmationChipLearning({
                 }
               }}
               placeholder="add tag…"
+              aria-label="Add new tag"
               className="h-7 text-xs max-w-[100px]"
             />
             <button
               type="button"
               onClick={() => addTag(newTag)}
+              aria-label="Add tag"
               className="text-xs px-2 py-0.5 rounded-md border bg-muted hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
             >
               +
@@ -403,12 +406,14 @@ function ConfirmationChipLearning({
             setEditingAttribution(false)
           }}
           placeholder="source / where learned…"
+          aria-label="Where you learned it"
           className="mb-3 h-7 text-xs"
         />
       ) : (
         <button
           type="button"
           onClick={() => setEditingAttribution(true)}
+          aria-label="Edit source or attribution"
           className="mb-3 block w-full text-left rounded-md border bg-muted px-2 py-0.5 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
         >
           {d.attribution || '+ source / attribution'}
