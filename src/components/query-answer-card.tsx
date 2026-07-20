@@ -9,17 +9,11 @@ import { useCategories } from '@/hooks/use-categories'
 import { convertViaRates } from '@/lib/fx'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
-
-export type QueryPlan = {
-  kind: 'query_money'
-  direction: 'out' | 'in'
-  category_name: string | null
-  period: { from: string; to: string; label: string }
-}
+import type { QueryMoneyPlan } from '@/lib/query-plans'
 
 type Props = {
   userId: string
-  plan: QueryPlan
+  plan: QueryMoneyPlan
   onDismiss: () => void
 }
 

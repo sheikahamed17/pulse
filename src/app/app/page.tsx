@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AuroraBackground } from '@/components/aurora-background'
 import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip'
-import { QueryAnswerCard, type QueryPlan } from '@/components/query-answer-card'
+import { QueryAnswerCard } from '@/components/query-answer-card'
+import type { QueryPlan } from '@/lib/query-plans'
 import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { DigestCard } from '@/components/digest-card'
@@ -402,7 +403,7 @@ function AppPageInner() {
             />
           )}
 
-          {queryPlan && (
+          {queryPlan && queryPlan.kind === 'query_money' && (
             <QueryAnswerCard
               userId={user.id}
               plan={queryPlan}
