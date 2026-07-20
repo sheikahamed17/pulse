@@ -49,7 +49,7 @@ export function NotesTagFilter({ userId, selectedTag, onChange }: Props) {
         <button
           type="button"
           onClick={() => onChange(null)}
-          className="text-xs text-muted-foreground hover:text-foreground transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded px-2 py-1"
+          className="min-h-[44px] text-xs text-muted-foreground hover:text-foreground transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded px-2 py-1"
         >
           Clear
         </button>

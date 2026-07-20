@@ -473,7 +473,7 @@ function AppPageInner() {
                 value={notesSearchInputValue}
                 onChange={e => setNotesSearchInputValue(e.target.value)}
                 placeholder="Search notes…"
-                className="bg-white/5 border border-white/10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 focus-visible:ring-offset-0"
+                className="min-h-[44px] bg-white/5 border border-white/10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 focus-visible:ring-offset-0"
               />
               <NotesTagFilter userId={user.id} selectedTag={selectedNotesTag} onChange={setSelectedNotesTag} />
               <NotesList

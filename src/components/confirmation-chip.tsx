@@ -497,7 +497,7 @@ function ConfirmationChipNote({
         <button
           type="button"
           onClick={() => setEditingBody(true)}
-          className="mb-3 block w-full whitespace-pre-wrap text-left font-mono text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+          className="mb-3 block w-full min-h-[44px] whitespace-pre-wrap text-left font-mono text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded flex items-center"
           aria-label="Edit note body"
         >
           {d.body}
