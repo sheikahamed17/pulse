@@ -12,7 +12,12 @@ import { Input } from '@/components/ui/input'
 import { AuroraBackground } from '@/components/aurora-background'
 import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip'
 import { QueryAnswerCard } from '@/components/query-answer-card'
+import { QueryListAnswer } from '@/components/query-list-answer'
 import type { QueryPlan } from '@/lib/query-plans'
+import { filterTasksForQuery } from '@/lib/query-task-exec'
+import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { formatLocalDateTime } from '@/lib/format'
+import { Circle, CheckCircle2 } from 'lucide-react'
 import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { DigestCard } from '@/components/digest-card'
@@ -57,6 +62,65 @@ function nextDueFromAnchor(anchorIso: string, period: 'daily'|'weekly'|'monthly'
     end_count: null,
     is_active: 1,
   })
+}
+
+function QueryTaskListAnswer({ userId, plan, onDismiss }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_task' }>; onDismiss: () => void }) {
+  const allTasks = useTasks(userId, 'all')
+  const nowIso = new Date().toISOString()
+  const filtered = filterTasksForQuery(allTasks, plan, nowIso)
+  const { prefs } = useUserPrefs()
+
+  const title = plan.status === 'open' ? 'Open tasks' :
+    plan.status === 'overdue' ? 'Overdue tasks' :
+    plan.status === 'done' ? 'Completed tasks' :
+    'All tasks'
+
+  return (
+    <QueryListAnswer
+      title={title}
+      count={filtered.length}
+      onDismiss={onDismiss}
+    >
+      <ul className="flex flex-col gap-2">
+        {filtered.map(t => {
+          const isCompleted = !!t.completed_at
+          const isOverdue = !isCompleted && t.due_at && t.due_at < nowIso
+          return (
+            <li
+              key={t.id}
+              className="glass-soft rounded-2xl relative flex items-start justify-between gap-3 p-3"
+            >
+              <div className="flex flex-1 items-start gap-2 text-left">
+                {isCompleted ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-2" />
+                ) : (
+                  <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                )}
+                <div className="flex flex-col">
+                  <span className={isCompleted ? 'text-muted-foreground line-through' : ''}>
+                    {t.title}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {t.priority !== 'medium' && (
+                      <span className={`mr-2 ${t.priority === 'high' ? 'text-destructive' : ''}`}>
+                        {t.priority}
+                      </span>
+                    )}
+                    {t.due_at && (
+                      <span className={`font-mono tabular-nums ${isOverdue ? 'text-warning' : ''}`}>
+                        due {formatLocalDateTime(t.due_at, prefs.tz)}
+                        {isOverdue && ' · overdue'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </QueryListAnswer>
+  )
 }
 
 function AppPageInner() {
@@ -405,6 +469,14 @@ function AppPageInner() {
 
           {queryPlan && queryPlan.kind === 'query_money' && (
             <QueryAnswerCard
+              userId={user.id}
+              plan={queryPlan}
+              onDismiss={() => setQueryPlan(null)}
+            />
+          )}
+
+          {queryPlan && queryPlan.kind === 'query_task' && (
+            <QueryTaskListAnswer
               userId={user.id}
               plan={queryPlan}
               onDismiss={() => setQueryPlan(null)}

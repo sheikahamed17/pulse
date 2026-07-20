@@ -9,6 +9,7 @@ import { routeIntent } from '@/lib/agents/router'
 import { parseMoneyEntry } from '@/lib/agents/money-agent'
 import { parseTaskEntry } from '@/lib/agents/task-agent'
 import { parseMoneyQuery } from '@/lib/agents/query-money-agent'
+import { parseTaskQuery } from '@/lib/agents/query-task-agent'
 import { parseLearning } from '@/lib/agents/learning-agent'
 import { parseNote } from '@/lib/agents/note-agent'
 
@@ -171,7 +172,25 @@ export async function POST(req: Request) {
       })
     }
 
-    // query_task is Phase 3 — same fall-through.
+    if (router.intent === 'query_task') {
+      const plan = await parseTaskQuery({
+        client: groq,
+        text: parsed.data.text,
+        nowIso,
+        userTz: prefs.tz,
+      })
+      return NextResponse.json({
+        transcript: parsed.data.text,
+        intent: 'query_task',
+        confidence: router.confidence,
+        payload: {
+          kind: 'query_task',
+          status: plan.status,
+          period: plan.period,
+        },
+      })
+    }
+
     return NextResponse.json({
       transcript: parsed.data.text,
       intent: router.intent,
