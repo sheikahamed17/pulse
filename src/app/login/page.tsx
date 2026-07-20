@@ -47,7 +47,7 @@ export default function LoginPage() {
   return (
     <>
       <AuroraBackground />
-      <main className="flex min-h-screen items-center justify-center p-4">
+      <main className="flex min-h-[calc(100dvh_-_env(safe-area-inset-top))] items-center justify-center p-4">
         <Card className="w-full max-w-sm">
           <CardHeader className="items-center gap-2">
             <PulseLogo className="size-12" />

@@ -295,7 +295,7 @@ function AppPageInner() {
   return (
     <>
       <AuroraBackground />
-      <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 pb-24 md:pb-6 md:grid-cols-[1fr_320px]">
+      <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:pb-6 md:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           <header className="flex items-center justify-between">
             <div className="flex items-center gap-2">

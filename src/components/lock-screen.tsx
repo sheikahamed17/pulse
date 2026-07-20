@@ -23,7 +23,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   return (
     <>
       <AuroraBackground />
-      <main className="flex min-h-screen items-center justify-center p-4">
+      <main className="flex min-h-[calc(100dvh_-_env(safe-area-inset-top))] items-center justify-center p-4">
         <form onSubmit={submit} className="glass flex w-full max-w-xs flex-col items-center gap-4 rounded-2xl p-6">
           <Lock className="size-8 text-accent-2" aria-hidden />
           <h1 className="text-lg font-semibold">Enter your PIN</h1>

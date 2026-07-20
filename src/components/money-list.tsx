@@ -167,7 +167,7 @@ export function MoneyList({ userId }: Props) {
         })}
       </ul>
 
-      <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-2">
+      <div className="fixed bottom-[calc(1.5rem_+_env(safe-area-inset-bottom))] left-1/2 z-50 flex -translate-x-1/2 flex-col gap-2">
         {undo.entries.map(u => (
           <div key={u.id} className="flex items-center gap-3 rounded-md border bg-background px-3 py-1.5 text-xs shadow">
             <span>{u.label}</span>

@@ -21,7 +21,7 @@ export function TabBar({ active, onChange, taskBadgeCount }: Props) {
     <>
       {/* Desktop: segmented glass control at top */}
       <nav
-        className="hidden md:flex fixed top-0 left-0 right-0 z-40 gap-1 p-2 border-b glass"
+        className="hidden md:flex fixed top-0 left-0 right-0 z-40 gap-1 px-2 pb-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] border-b glass"
         aria-label="Primary"
       >
         {TABS.map(t => {
@@ -49,7 +49,7 @@ export function TabBar({ active, onChange, taskBadgeCount }: Props) {
 
       {/* Mobile: floating glass dock at bottom */}
       <nav
-        className="md:hidden fixed bottom-4 left-4 right-4 z-40 flex gap-2 p-3 rounded-2xl glass"
+        className="md:hidden fixed bottom-[calc(1rem_+_env(safe-area-inset-bottom))] left-4 right-4 z-40 flex gap-2 p-3 rounded-2xl glass"
         aria-label="Primary"
       >
         {TABS.map(t => {
