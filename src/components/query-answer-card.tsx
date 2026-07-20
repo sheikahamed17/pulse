@@ -9,8 +9,14 @@ import { useCategories } from '@/hooks/use-categories'
 import { convertViaRates } from '@/lib/fx'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
-import { MoneyList } from '@/components/money-list'
+import {
+  computeMoneyBreakdown,
+  computeMoneyDelta,
+  computeMoneySeries,
+} from '@/lib/query-money-exec'
 import type { QueryMoneyPlan } from '@/lib/query-plans'
+import type { MoneyEntryRow, CategoryRow, FxRateRow } from '@/lib/dexie'
+import type { UserPrefs } from '@/hooks/use-user-prefs'
 
 type Props = {
   userId: string
@@ -39,12 +45,12 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
     return match?.id ?? null
   }, [plan.category_name, plan.direction, categories])
 
-  // Helper function to convert entry amount to primary currency
-  const toPrimary = useCallback((amount: number, currency: string, occurredAt: string): number => {
-    if (currency === prefs.primary_currency) {
-      return amount
+  // Convert entry amount to primary currency (per-entry FX)
+  const toPrimary = useCallback((entry: MoneyEntryRow): number => {
+    if (entry.currency === prefs.primary_currency) {
+      return entry.amount
     }
-    const conv = convertViaRates(amount, currency, prefs.primary_currency, occurredAt, rates)
+    const conv = convertViaRates(entry.amount, entry.currency, prefs.primary_currency, entry.occurred_at, rates)
     return conv ? conv.amount : 0
   }, [prefs.primary_currency, rates])
 
@@ -81,7 +87,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
     })
   }, [entries, plan.period, plan.direction, targetCategoryId])
 
-  // Compute all mode data upfront
+  // Compute all mode data upfront using exec fns
   const modeData = useMemo(() => {
     // Total mode
     let totalAmount = 0
@@ -91,95 +97,35 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
     for (const e of filteredEntries) {
       totalCount++
       seenCurrencies.add(e.currency)
-      totalAmount += toPrimary(e.amount, e.currency, e.occurred_at)
+      totalAmount += toPrimary(e)
     }
 
-    // Breakdown mode
-    const totals = new Map<string | null, number>()
-    for (const e of filteredEntries) {
-      const key = e.category_id ?? null
-      totals.set(key, (totals.get(key) ?? 0) + toPrimary(e.amount, e.currency, e.occurred_at))
-    }
+    // Breakdown mode: call exec fn
+    const breakdown = computeMoneyBreakdown(
+      filteredEntries,
+      { direction: plan.direction, categoryNameOf },
+      toPrimary,
+    )
 
-    const breakdown = Array.from(totals.entries())
-      .map(([categoryId, amount]) => ({
-        categoryName: categoryNameOf(categoryId),
-        amount,
-      }))
-      .sort((a, b) => b.amount - a.amount)
+    // Delta mode: call exec fn
+    const { current: currentDelta, previous: previousDelta, deltaPct } = computeMoneyDelta(
+      filteredEntries,
+      previousEntries,
+      plan.direction,
+      toPrimary,
+    )
 
-    // Delta mode
-    let currentDelta = 0
-    let previousDelta = 0
-
-    for (const e of filteredEntries) {
-      currentDelta += toPrimary(e.amount, e.currency, e.occurred_at)
-    }
-
-    for (const e of previousEntries) {
-      previousDelta += toPrimary(e.amount, e.currency, e.occurred_at)
-    }
-
-    const deltaPct = previousDelta === 0 ? null : ((currentDelta - previousDelta) / previousDelta) * 100
-
-    // Series mode
-    const bucket = plan.bucket ?? 'day'
-    const buckets = new Map<string, number>()
-
-    if (bucket === 'day') {
-      const fromDate = new Date(plan.period.from)
-      const toDate = new Date(plan.period.to)
-      const current = new Date(fromDate)
-      while (current < toDate) {
-        const label = current.toISOString().split('T')[0]
-        buckets.set(label, 0)
-        current.setUTCDate(current.getUTCDate() + 1)
-      }
-    } else if (bucket === 'week') {
-      const fromDate = new Date(plan.period.from)
-      const toDate = new Date(plan.period.to)
-      const current = new Date(fromDate)
-      const day = current.getUTCDay() || 7
-      current.setUTCDate(current.getUTCDate() - (day - 1))
-
-      while (current < toDate) {
-        const label = current.toISOString().split('T')[0]
-        buckets.set(label, 0)
-        current.setUTCDate(current.getUTCDate() + 7)
-      }
-    } else if (bucket === 'month') {
-      const fromDate = new Date(plan.period.from)
-      const toDate = new Date(plan.period.to)
-      const current = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), 1))
-      while (current < toDate) {
-        const label = current.toISOString().split('T')[0].slice(0, 7)
-        buckets.set(label, 0)
-        current.setUTCMonth(current.getUTCMonth() + 1)
-      }
-    }
-
-    for (const e of filteredEntries) {
-      const entryDate = new Date(e.occurred_at)
-      let bucketKey: string
-
-      if (bucket === 'day') {
-        bucketKey = entryDate.toISOString().split('T')[0]
-      } else if (bucket === 'week') {
-        const day = entryDate.getUTCDay() || 7
-        const monday = new Date(entryDate)
-        monday.setUTCDate(monday.getUTCDate() - (day - 1))
-        bucketKey = monday.toISOString().split('T')[0]
-      } else {
-        bucketKey = entryDate.toISOString().split('T')[0].slice(0, 7)
-      }
-
-      if (buckets.has(bucketKey)) {
-        buckets.set(bucketKey, (buckets.get(bucketKey) ?? 0) + toPrimary(e.amount, e.currency, e.occurred_at))
-      }
-    }
-
-    const series = Array.from(buckets.entries())
-      .map(([label, amount]) => ({ label, amount }))
+    // Series mode: call exec fn
+    const series = computeMoneySeries(
+      filteredEntries,
+      {
+        from: plan.period.from,
+        to: plan.period.to,
+        bucket: plan.bucket ?? 'day',
+        direction: plan.direction,
+      },
+      toPrimary,
+    )
 
     return {
       total: { amount: totalAmount, count: totalCount, multiCurrency: seenCurrencies.size > 1 },
@@ -239,7 +185,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
 
         {showEntries && (
           <div className="mt-4 pt-4 border-t border-white/10">
-            <MoneyList userId={userId} />
+            <FilteredMoneyList entries={filteredEntries} categories={categories} prefs={prefs} rates={rates} />
           </div>
         )}
       </div>
@@ -288,7 +234,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
 
         {showEntries && (
           <div className="mt-4 pt-4 border-t border-white/10">
-            <MoneyList userId={userId} />
+            <FilteredMoneyList entries={filteredEntries} categories={categories} prefs={prefs} rates={rates} />
           </div>
         )}
       </div>
@@ -334,7 +280,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
 
         {showEntries && (
           <div className="mt-4 pt-4 border-t border-white/10">
-            <MoneyList userId={userId} />
+            <FilteredMoneyList entries={filteredEntries} categories={categories} prefs={prefs} rates={rates} />
           </div>
         )}
       </div>
@@ -367,7 +313,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
 
         {showEntries && (
           <div className="mt-4 pt-4 border-t border-white/10">
-            <MoneyList userId={userId} />
+            <FilteredMoneyList entries={filteredEntries} categories={categories} prefs={prefs} rates={rates} />
           </div>
         )}
       </div>
@@ -375,6 +321,86 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
   }
 
   return null
+}
+
+function FilteredMoneyList({
+  entries,
+  categories,
+  prefs,
+  rates,
+}: {
+  entries: MoneyEntryRow[]
+  categories: CategoryRow[]
+  prefs: UserPrefs
+  rates: FxRateRow[]
+}) {
+  const categoryById = useMemo(
+    () => new Map(categories.map(c => [c.id, c])),
+    [categories],
+  )
+  const [expandedFx, setExpandedFx] = useState<string | null>(null)
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {entries.length === 0 ? (
+        <li className="p-4 text-sm text-muted-foreground">No entries in this query.</li>
+      ) : (
+        entries.map(e => {
+          const cat = e.category_id ? categoryById.get(e.category_id) : undefined
+          return (
+            <li
+              key={e.id}
+              className="glass-soft relative flex items-start justify-between gap-3 rounded-2xl p-3 text-sm"
+            >
+              <div className="flex flex-col flex-1 min-w-0">
+                {cat && (
+                  <div className="mb-1.5 inline-flex w-fit items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs">
+                    <span>{cat.icon ?? ''}</span>
+                    <span className="text-muted-foreground">{cat.name}</span>
+                  </div>
+                )}
+                <div className="text-sm font-medium text-foreground">
+                  {e.description ? e.description : (cat ? cat.name : 'Uncategorized')}
+                </div>
+                {e.description && cat && (
+                  <span className="text-xs text-muted-foreground">{cat.name}</span>
+                )}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {e.currency !== prefs.primary_currency && (
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted-foreground hover:text-accent-2 transition text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+                      onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
+                    >
+                      {expandedFx === e.id ? (() => {
+                        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+                        return conv
+                          ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
+                          : 'No FX rate yet for this date'
+                      })() : '≈ convert'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-2">
+                <span className={`font-mono tabular-nums text-sm font-medium whitespace-nowrap ${
+                  e.direction === 'out' ? 'text-destructive' : 'text-income'
+                }`}>
+                  {formatAmount(e)}
+                </span>
+              </div>
+            </li>
+          )
+        })
+      )}
+    </ul>
+  )
+}
+
+function formatAmount(e: MoneyEntryRow): string {
+  const major = (e.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  return `${e.direction === 'out' ? '-' : '+'}${currencySymbol(e.currency)}${major}`
 }
 
 function Sparkline({ points, width = 80, height = 48 }: { points: number[], width?: number, height?: number }) {

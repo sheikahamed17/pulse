@@ -25,7 +25,7 @@ function mockCategoryNameOf(categoryId: string | null): string | null {
   return mockCategories.get(categoryId)?.name ?? null
 }
 
-const toPrimary = (amount: number) => amount // Already in primary currency
+const toPrimary = (entry: MoneyEntryRow) => entry.amount // Already in primary currency
 
 describe('computeMoneyBreakdown', () => {
   it('returns empty array for no entries', () => {

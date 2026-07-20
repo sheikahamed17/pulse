@@ -13,11 +13,12 @@ export type BreakdownResult = {
 /**
  * Compute breakdown by category for money entries.
  * Returns sorted list (descending by amount) of category totals.
+ * toPrimary receives the whole entry and returns its amount converted to primary currency.
  */
 export function computeMoneyBreakdown(
   entries: MoneyEntryRow[],
   options: BreakdownOptions,
-  toPrimary: (amount: number) => number,
+  toPrimary: (entry: MoneyEntryRow) => number,
 ): BreakdownResult[] {
   const { direction, categoryNameOf } = options
 
@@ -26,7 +27,7 @@ export function computeMoneyBreakdown(
   for (const e of entries) {
     if (e.direction !== direction) continue
     const key = e.category_id ?? null
-    const amount = toPrimary(e.amount)
+    const amount = toPrimary(e)
     totals.set(key, (totals.get(key) ?? 0) + amount)
   }
 
@@ -47,25 +48,26 @@ export type DeltaResult = {
 /**
  * Compute delta between current and previous period.
  * Returns current, previous, and deltaPct (null if previous is 0).
+ * toPrimary receives the whole entry and returns its amount converted to primary currency.
  */
 export function computeMoneyDelta(
   currentEntries: MoneyEntryRow[],
   previousEntries: MoneyEntryRow[],
   direction: 'out' | 'in',
-  toPrimary: (amount: number) => number,
+  toPrimary: (entry: MoneyEntryRow) => number,
 ): DeltaResult {
   let current = 0
   let previous = 0
 
   for (const e of currentEntries) {
     if (e.direction === direction) {
-      current += toPrimary(e.amount)
+      current += toPrimary(e)
     }
   }
 
   for (const e of previousEntries) {
     if (e.direction === direction) {
-      previous += toPrimary(e.amount)
+      previous += toPrimary(e)
     }
   }
 
@@ -89,11 +91,12 @@ export type SeriesResult = {
 /**
  * Compute time-series breakdown bucketed by day/week/month.
  * Returns array of { label, amount } sorted chronologically.
+ * toPrimary receives the whole entry and returns its amount converted to primary currency.
  */
 export function computeMoneySeries(
   entries: MoneyEntryRow[],
   options: SeriesOptions,
-  toPrimary: (amount: number) => number,
+  toPrimary: (entry: MoneyEntryRow) => number,
 ): SeriesResult[] {
   const { from, to, bucket, direction } = options
 
@@ -154,7 +157,7 @@ export function computeMoneySeries(
       bucketKey = entryDate.toISOString().split('T')[0].slice(0, 7)
     }
 
-    const amount = toPrimary(e.amount)
+    const amount = toPrimary(e)
     buckets.set(bucketKey, (buckets.get(bucketKey) ?? 0) + amount)
   }
 
