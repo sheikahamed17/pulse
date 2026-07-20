@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Settings } from 'lucide-react'
@@ -24,6 +24,8 @@ import { TaskSummary } from '@/components/task-summary'
 import { LearningList } from '@/components/learning-list'
 import { LearningTagFilter } from '@/components/learning-tag-filter'
 import { LearningSummary } from '@/components/learning-summary'
+import { NotesList } from '@/components/notes-list'
+import { NotesTagFilter } from '@/components/notes-tag-filter'
 import { useTabState } from '@/hooks/use-tab-state'
 import { useCategories } from '@/hooks/use-categories'
 import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
@@ -66,8 +68,23 @@ function AppPageInner() {
   const [activeTab, setTab] = useTabState()
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
   const [selectedLearningTag, setSelectedLearningTag] = useState<string | null>(null)
+  const [selectedNotesTag, setSelectedNotesTag] = useState<string | null>(null)
+  const [notesSearchQuery, setNotesSearchQuery] = useState('')
+  const [notesSearchInputValue, setNotesSearchInputValue] = useState('')
+  const notesSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { status: pushStatus, subscribe: pushSubscribe } = usePushSubscription()
   const [showPushNudge, setShowPushNudge] = useState(false)
+
+  // Debounce notes search input (~150ms)
+  useEffect(() => {
+    if (notesSearchDebounceRef.current) clearTimeout(notesSearchDebounceRef.current)
+    notesSearchDebounceRef.current = setTimeout(() => {
+      setNotesSearchQuery(notesSearchInputValue)
+    }, 150)
+    return () => {
+      if (notesSearchDebounceRef.current) clearTimeout(notesSearchDebounceRef.current)
+    }
+  }, [notesSearchInputValue])
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -447,6 +464,22 @@ function AppPageInner() {
             <div className="flex flex-col gap-3">
               <LearningTagFilter userId={user.id} selectedTag={selectedLearningTag} onChange={setSelectedLearningTag} />
               <LearningList userId={user.id} selectedTag={selectedLearningTag} />
+            </div>
+          )}
+          {activeTab === 'notes' && (
+            <div className="flex flex-col gap-3">
+              <Input
+                value={notesSearchInputValue}
+                onChange={e => setNotesSearchInputValue(e.target.value)}
+                placeholder="Search notes…"
+                className="bg-white/5 border border-white/10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 focus-visible:ring-offset-0"
+              />
+              <NotesTagFilter userId={user.id} selectedTag={selectedNotesTag} onChange={setSelectedNotesTag} />
+              <NotesList
+                userId={user.id}
+                selectedTag={selectedNotesTag}
+                searchQuery={notesSearchQuery}
+              />
             </div>
           )}
         </div>
