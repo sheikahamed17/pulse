@@ -1,0 +1,165 @@
+import type { MoneyEntryRow } from '@/lib/dexie'
+
+export type BreakdownOptions = {
+  direction: 'out' | 'in'
+  categoryNameOf: (categoryId: string | null) => string | null
+}
+
+export type BreakdownResult = {
+  categoryName: string | null
+  amount: number
+}
+
+/**
+ * Compute breakdown by category for money entries.
+ * Returns sorted list (descending by amount) of category totals.
+ */
+export function computeMoneyBreakdown(
+  entries: MoneyEntryRow[],
+  options: BreakdownOptions,
+  toPrimary: (amount: number) => number,
+): BreakdownResult[] {
+  const { direction, categoryNameOf } = options
+
+  const totals = new Map<string | null, number>()
+
+  for (const e of entries) {
+    if (e.direction !== direction) continue
+    const key = e.category_id ?? null
+    const amount = toPrimary(e.amount)
+    totals.set(key, (totals.get(key) ?? 0) + amount)
+  }
+
+  return Array.from(totals.entries())
+    .map(([categoryId, amount]) => ({
+      categoryName: categoryNameOf(categoryId),
+      amount,
+    }))
+    .sort((a, b) => b.amount - a.amount)
+}
+
+export type DeltaResult = {
+  current: number
+  previous: number
+  deltaPct: number | null
+}
+
+/**
+ * Compute delta between current and previous period.
+ * Returns current, previous, and deltaPct (null if previous is 0).
+ */
+export function computeMoneyDelta(
+  currentEntries: MoneyEntryRow[],
+  previousEntries: MoneyEntryRow[],
+  direction: 'out' | 'in',
+  toPrimary: (amount: number) => number,
+): DeltaResult {
+  let current = 0
+  let previous = 0
+
+  for (const e of currentEntries) {
+    if (e.direction === direction) {
+      current += toPrimary(e.amount)
+    }
+  }
+
+  for (const e of previousEntries) {
+    if (e.direction === direction) {
+      previous += toPrimary(e.amount)
+    }
+  }
+
+  const deltaPct = previous === 0 ? null : ((current - previous) / previous) * 100
+
+  return { current, previous, deltaPct }
+}
+
+export type SeriesOptions = {
+  from: string
+  to: string
+  bucket: 'day' | 'week' | 'month'
+  direction: 'out' | 'in'
+}
+
+export type SeriesResult = {
+  label: string
+  amount: number
+}
+
+/**
+ * Compute time-series breakdown bucketed by day/week/month.
+ * Returns array of { label, amount } sorted chronologically.
+ */
+export function computeMoneySeries(
+  entries: MoneyEntryRow[],
+  options: SeriesOptions,
+  toPrimary: (amount: number) => number,
+): SeriesResult[] {
+  const { from, to, bucket, direction } = options
+
+  const fromDate = new Date(from)
+  const toDate = new Date(to)
+
+  // Build buckets
+  const buckets = new Map<string, number>()
+
+  if (bucket === 'day') {
+    // Daily buckets from fromDate to toDate
+    const current = new Date(fromDate)
+    while (current < toDate) {
+      const label = current.toISOString().split('T')[0]
+      buckets.set(label, 0)
+      current.setUTCDate(current.getUTCDate() + 1)
+    }
+  } else if (bucket === 'week') {
+    // Weekly buckets (Monday-based, ISO weeks)
+    const current = new Date(fromDate)
+    // Align to Monday
+    const day = current.getUTCDay() || 7
+    current.setUTCDate(current.getUTCDate() - (day - 1))
+
+    while (current < toDate) {
+      const label = current.toISOString().split('T')[0]
+      buckets.set(label, 0)
+      current.setUTCDate(current.getUTCDate() + 7)
+    }
+  } else if (bucket === 'month') {
+    // Monthly buckets
+    const current = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), 1))
+    while (current < toDate) {
+      const label = current.toISOString().split('T')[0].slice(0, 7)
+      buckets.set(label, 0)
+      current.setUTCMonth(current.getUTCMonth() + 1)
+    }
+  }
+
+  // Aggregate entries into buckets
+  for (const e of entries) {
+    if (e.direction !== direction) continue
+
+    const entryDate = new Date(e.occurred_at)
+    if (entryDate < fromDate || entryDate >= toDate) continue
+
+    let bucketKey: string
+    if (bucket === 'day') {
+      bucketKey = entryDate.toISOString().split('T')[0]
+    } else if (bucket === 'week') {
+      // Align to Monday
+      const day = entryDate.getUTCDay() || 7
+      const monday = new Date(entryDate)
+      monday.setUTCDate(monday.getUTCDate() - (day - 1))
+      bucketKey = monday.toISOString().split('T')[0]
+    } else {
+      // month
+      bucketKey = entryDate.toISOString().split('T')[0].slice(0, 7)
+    }
+
+    const amount = toPrimary(e.amount)
+    buckets.set(bucketKey, (buckets.get(bucketKey) ?? 0) + amount)
+  }
+
+  // Convert to result array and sort chronologically
+  return Array.from(buckets.entries())
+    .map(([label, amount]) => ({ label, amount }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}

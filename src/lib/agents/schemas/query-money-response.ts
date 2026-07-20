@@ -3,6 +3,8 @@ import { z } from 'zod'
 export const QueryMoneyResponseSchema = z.object({
   direction: z.enum(['out', 'in']).default('out'),
   category_name: z.string().min(1).nullable(),
+  mode: z.enum(['total', 'breakdown', 'delta', 'series']).default('total'),
+  bucket: z.enum(['day', 'week', 'month']).optional(),
   period: z.object({
     from:  z.string().datetime(),
     to:    z.string().datetime(),

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
@@ -9,6 +9,7 @@ import { useCategories } from '@/hooks/use-categories'
 import { convertViaRates } from '@/lib/fx'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
+import { MoneyList } from '@/components/money-list'
 import type { QueryMoneyPlan } from '@/lib/query-plans'
 
 type Props = {
@@ -24,6 +25,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
   const entries = useMoneyEntries(userId, { from: plan.period.from, to: plan.period.to })
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
   const categories = useCategories(userId)
+  const [showEntries, setShowEntries] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(onDismiss, AUTO_DISMISS_MS)
@@ -37,75 +39,372 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
     return match?.id ?? null
   }, [plan.category_name, plan.direction, categories])
 
-  const { total, count, conversionDate, multiCurrency } = useMemo(() => {
-    let total = 0
-    let count = 0
-    let multi = false
-    let conversionDate: string | null = null
+  // Helper function to convert entry amount to primary currency
+  const toPrimary = useCallback((amount: number, currency: string, occurredAt: string): number => {
+    if (currency === prefs.primary_currency) {
+      return amount
+    }
+    const conv = convertViaRates(amount, currency, prefs.primary_currency, occurredAt, rates)
+    return conv ? conv.amount : 0
+  }, [prefs.primary_currency, rates])
+
+  // Category name lookup function
+  const categoryNameOf = useCallback((categoryId: string | null): string | null => {
+    if (!categoryId) return null
+    return categories.find(c => c.id === categoryId)?.name ?? null
+  }, [categories])
+
+  // Filter entries by direction and category
+  const filteredEntries = useMemo(() => {
+    return entries.filter(e => {
+      if (e.direction !== plan.direction) return false
+      if (targetCategoryId && e.category_id !== targetCategoryId) return false
+      return true
+    })
+  }, [entries, plan.direction, targetCategoryId])
+
+  // Get previous period entries for delta mode
+  const previousEntries = useMemo(() => {
+    // Calculate period length
+    const periodFrom = new Date(plan.period.from)
+    const periodTo = new Date(plan.period.to)
+    const periodLengthMs = periodTo.getTime() - periodFrom.getTime()
+
+    // Calculate previous period
+    const prevFrom = new Date(periodFrom.getTime() - periodLengthMs)
+    const prevTo = periodFrom
+
+    return entries.filter(e => {
+      const entryDate = new Date(e.occurred_at)
+      return entryDate >= prevFrom && entryDate < prevTo && e.direction === plan.direction &&
+        (!targetCategoryId || e.category_id === targetCategoryId)
+    })
+  }, [entries, plan.period, plan.direction, targetCategoryId])
+
+  // Compute all mode data upfront
+  const modeData = useMemo(() => {
+    // Total mode
+    let totalAmount = 0
+    let totalCount = 0
     const seenCurrencies = new Set<string>()
-    for (const e of entries) {
-      if (e.direction !== plan.direction) continue
-      if (targetCategoryId && e.category_id !== targetCategoryId) continue
-      count++
+
+    for (const e of filteredEntries) {
+      totalCount++
       seenCurrencies.add(e.currency)
-      if (e.currency === prefs.primary_currency) {
-        total += e.amount
-      } else {
-        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
-        if (conv) {
-          total += conv.amount
-          if (!conversionDate || conv.rateDate < conversionDate) conversionDate = conv.rateDate
-        }
+      totalAmount += toPrimary(e.amount, e.currency, e.occurred_at)
+    }
+
+    // Breakdown mode
+    const totals = new Map<string | null, number>()
+    for (const e of filteredEntries) {
+      const key = e.category_id ?? null
+      totals.set(key, (totals.get(key) ?? 0) + toPrimary(e.amount, e.currency, e.occurred_at))
+    }
+
+    const breakdown = Array.from(totals.entries())
+      .map(([categoryId, amount]) => ({
+        categoryName: categoryNameOf(categoryId),
+        amount,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+
+    // Delta mode
+    let currentDelta = 0
+    let previousDelta = 0
+
+    for (const e of filteredEntries) {
+      currentDelta += toPrimary(e.amount, e.currency, e.occurred_at)
+    }
+
+    for (const e of previousEntries) {
+      previousDelta += toPrimary(e.amount, e.currency, e.occurred_at)
+    }
+
+    const deltaPct = previousDelta === 0 ? null : ((currentDelta - previousDelta) / previousDelta) * 100
+
+    // Series mode
+    const bucket = plan.bucket ?? 'day'
+    const buckets = new Map<string, number>()
+
+    if (bucket === 'day') {
+      const fromDate = new Date(plan.period.from)
+      const toDate = new Date(plan.period.to)
+      const current = new Date(fromDate)
+      while (current < toDate) {
+        const label = current.toISOString().split('T')[0]
+        buckets.set(label, 0)
+        current.setUTCDate(current.getUTCDate() + 1)
+      }
+    } else if (bucket === 'week') {
+      const fromDate = new Date(plan.period.from)
+      const toDate = new Date(plan.period.to)
+      const current = new Date(fromDate)
+      const day = current.getUTCDay() || 7
+      current.setUTCDate(current.getUTCDate() - (day - 1))
+
+      while (current < toDate) {
+        const label = current.toISOString().split('T')[0]
+        buckets.set(label, 0)
+        current.setUTCDate(current.getUTCDate() + 7)
+      }
+    } else if (bucket === 'month') {
+      const fromDate = new Date(plan.period.from)
+      const toDate = new Date(plan.period.to)
+      const current = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), 1))
+      while (current < toDate) {
+        const label = current.toISOString().split('T')[0].slice(0, 7)
+        buckets.set(label, 0)
+        current.setUTCMonth(current.getUTCMonth() + 1)
       }
     }
-    if (seenCurrencies.size > 1) multi = true
-    return { total, count, conversionDate, multiCurrency: multi }
-  }, [entries, plan.direction, targetCategoryId, prefs.primary_currency, rates])
+
+    for (const e of filteredEntries) {
+      const entryDate = new Date(e.occurred_at)
+      let bucketKey: string
+
+      if (bucket === 'day') {
+        bucketKey = entryDate.toISOString().split('T')[0]
+      } else if (bucket === 'week') {
+        const day = entryDate.getUTCDay() || 7
+        const monday = new Date(entryDate)
+        monday.setUTCDate(monday.getUTCDate() - (day - 1))
+        bucketKey = monday.toISOString().split('T')[0]
+      } else {
+        bucketKey = entryDate.toISOString().split('T')[0].slice(0, 7)
+      }
+
+      if (buckets.has(bucketKey)) {
+        buckets.set(bucketKey, (buckets.get(bucketKey) ?? 0) + toPrimary(e.amount, e.currency, e.occurred_at))
+      }
+    }
+
+    const series = Array.from(buckets.entries())
+      .map(([label, amount]) => ({ label, amount }))
+
+    return {
+      total: { amount: totalAmount, count: totalCount, multiCurrency: seenCurrencies.size > 1 },
+      breakdown,
+      delta: { current: currentDelta, previous: previousDelta, deltaPct },
+      series,
+    }
+  }, [filteredEntries, previousEntries, plan, toPrimary, categoryNameOf])
+
+  // Mode-specific rendering
+  const headerText = useMemo(() => {
+    const directionText = plan.direction === 'out' ? '💸 Spent' : '💰 Earned'
+    const categoryText = plan.category_name ? ` in ${plan.category_name}` : ''
+    const periodText = plan.period.label
+    const modeText = plan.mode !== 'total' ? ` (${plan.mode})` : ''
+    return `${directionText}${categoryText}${modeText} · ${periodText}`
+  }, [plan])
 
   const divisor = prefs.primary_currency === 'JPY' ? 1 : 100
-  const major = (total / divisor).toLocaleString(undefined, { maximumFractionDigits: prefs.primary_currency === 'JPY' ? 0 : 2 })
+
+  if (plan.mode === 'total') {
+    const { amount, count, multiCurrency } = modeData.total
+    const major = (amount / divisor).toLocaleString(undefined, { maximumFractionDigits: prefs.primary_currency === 'JPY' ? 0 : 2 })
+
+    return (
+      <div className="glass rounded-2xl p-5">
+        <div className="mb-2 flex items-center justify-between text-xs">
+          <span className="font-semibold uppercase tracking-wide text-accent-2">{headerText}</span>
+        </div>
+
+        <div className="mb-2 text-4xl font-semibold font-mono tabular-nums text-accent-2">
+          {currencySymbol(prefs.primary_currency)}{major}
+        </div>
+
+        <p className="mb-3 text-xs text-muted-foreground">
+          Based on {count} {count === 1 ? 'entry' : 'entries'}
+        </p>
+
+        {plan.category_name && !targetCategoryId && (
+          <p className="mb-3 text-[10px] text-destructive">
+            Category &quot;{plan.category_name}&quot; not found — showing all categories instead.
+          </p>
+        )}
+
+        {multiCurrency && rates.length > 0 && (
+          <p className="mb-3 text-[10px] text-muted-foreground">
+            *Converted from multiple currencies via ECB {rates[0]?.date}
+          </p>
+        )}
+
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+            {showEntries ? 'Hide entries' : 'Show entries'}
+          </Button>
+        </div>
+
+        {showEntries && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <MoneyList userId={userId} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (plan.mode === 'breakdown') {
+    const { breakdown } = modeData
+    const max = Math.max(1, ...breakdown.map(b => b.amount))
+
+    return (
+      <div className="glass rounded-2xl p-5">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent-2">{headerText}</div>
+
+        {breakdown.length === 0 ? (
+          <p className="mb-3 text-xs text-muted-foreground">No entries found.</p>
+        ) : (
+          <ul className="mb-3 flex flex-col gap-2">
+            {breakdown.map((item, idx) => {
+              const amount = (item.amount / divisor).toLocaleString(undefined, { maximumFractionDigits: prefs.primary_currency === 'JPY' ? 0 : 2 })
+              const barWidth = (item.amount / max) * 100
+              return (
+                <li key={idx} className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">{item.categoryName ?? 'Uncategorized'}</span>
+                    <span className="font-mono tabular-nums">{currencySymbol(prefs.primary_currency)}{amount}</span>
+                  </div>
+                  <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="absolute inset-y-0 left-0 bg-accent-2"
+                      style={{ width: `${barWidth}%` }}
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+            {showEntries ? 'Hide entries' : 'Show entries'}
+          </Button>
+        </div>
+
+        {showEntries && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <MoneyList userId={userId} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (plan.mode === 'delta') {
+    const { current, previous, deltaPct } = modeData.delta
+    const currentMajor = (current / divisor).toLocaleString(undefined, { maximumFractionDigits: prefs.primary_currency === 'JPY' ? 0 : 2 })
+    const previousMajor = (previous / divisor).toLocaleString(undefined, { maximumFractionDigits: prefs.primary_currency === 'JPY' ? 0 : 2 })
+
+    return (
+      <div className="glass rounded-2xl p-5">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-accent-2">{headerText}</div>
+
+        <div className="mb-4 flex items-baseline justify-between gap-2">
+          <div>
+            <p className="text-[10px] text-muted-foreground mb-1">Current period</p>
+            <div className="text-3xl font-semibold font-mono tabular-nums text-accent-2">
+              {currencySymbol(prefs.primary_currency)}{currentMajor}
+            </div>
+          </div>
+          {deltaPct !== null && (
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground mb-1">Change</p>
+              <div className={`text-2xl font-semibold font-mono tabular-nums ${deltaPct > 0 ? 'text-destructive' : 'text-emerald-500'}`}>
+                {deltaPct > 0 ? '↑' : '↓'}{Math.abs(deltaPct).toFixed(1)}%
+              </div>
+            </div>
+          )}
+        </div>
+
+        <p className="mb-3 text-[10px] text-muted-foreground">
+          vs previous period: {currencySymbol(prefs.primary_currency)}{previousMajor}
+        </p>
+
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+            {showEntries ? 'Hide entries' : 'Show entries'}
+          </Button>
+        </div>
+
+        {showEntries && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <MoneyList userId={userId} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (plan.mode === 'series') {
+    const { series } = modeData
+
+    return (
+      <div className="glass rounded-2xl p-5">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-accent-2">{headerText}</div>
+
+        {series.length > 0 && (
+          <div className="mb-4">
+            <Sparkline points={series.map(d => d.amount)} width={100} height={48} />
+          </div>
+        )}
+
+        <p className="mb-3 text-[10px] text-muted-foreground">
+          {series.filter(d => d.amount > 0).length} buckets with activity
+        </p>
+
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+            {showEntries ? 'Hide entries' : 'Show entries'}
+          </Button>
+        </div>
+
+        {showEntries && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <MoneyList userId={userId} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return null
+}
+
+function Sparkline({ points, width = 80, height = 48 }: { points: number[], width?: number, height?: number }) {
+  if (points.length < 2) return null
+
+  const max = Math.max(...points, 1)
+  const min = 0
+  const range = max - min
+
+  const padding = 4
+  const chartWidth = width - 2 * padding
+  const chartHeight = height - 2 * padding
+
+  const xs = points.map((_, i) => padding + (i / (points.length - 1)) * chartWidth)
+  const ys = points.map(p => padding + chartHeight - (((p - min) / range) * chartHeight))
+
+  const pathPoints = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
+  const areaPath = `M${padding},${height - padding} ${pathPoints} L${width - padding},${height - padding}`
 
   return (
-    <div className="glass rounded-2xl p-5">
-      <div className="mb-2 flex items-center justify-between text-xs">
-        <span className="font-semibold uppercase tracking-wide text-accent-2">
-          {plan.direction === 'out' ? '💸 Spent' : '💰 Earned'}
-          {plan.category_name && ` in ${plan.category_name}`}
-          {' · '}
-          {plan.period.label}
-        </span>
-      </div>
-
-      <div className="mb-2 text-4xl font-semibold font-mono tabular-nums text-accent-2">
-        {currencySymbol(prefs.primary_currency)}{major}
-      </div>
-
-      <p className="mb-3 text-xs text-muted-foreground">
-        Based on {count} {count === 1 ? 'entry' : 'entries'}
-      </p>
-
-      {plan.category_name && !targetCategoryId && (
-        <p className="mb-3 text-[10px] text-destructive">
-          Category &quot;{plan.category_name}&quot; not found — showing all categories instead.
-        </p>
-      )}
-
-      {multiCurrency && conversionDate && (
-        <p className="mb-3 text-[10px] text-muted-foreground">
-          *Converted from multiple currencies via ECB {conversionDate}
-        </p>
-      )}
-
-      <div className="flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
-        <Button
-          className="flex-[2]"
-          disabled
-          title="List queries land in Phase 3"
-        >
-          Show entries
-        </Button>
-      </div>
-    </div>
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="w-full">
+      <defs>
+        <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style={{ stopColor: 'rgb(52 230 255)', stopOpacity: 0.3 }} />
+          <stop offset="100%" style={{ stopColor: 'rgb(52 230 255)', stopOpacity: 0.05 }} />
+        </linearGradient>
+      </defs>
+      <polyline points={pathPoints} fill="none" stroke="rgb(52 230 255)" strokeWidth="1.5" />
+      <path d={areaPath} fill="url(#sparkGradient)" />
+      <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="2.5" fill="rgb(52 230 255)" />
+    </svg>
   )
 }

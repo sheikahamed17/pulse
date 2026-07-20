@@ -164,6 +164,8 @@ export async function POST(req: Request) {
           kind: 'query_money',
           direction: plan.direction,
           category_name: plan.category_name,
+          mode: plan.mode,
+          bucket: plan.bucket,
           period: plan.period,
         },
       })
