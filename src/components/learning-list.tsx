@@ -58,6 +58,12 @@ export function LearningList({ userId, selectedTag }: Props) {
           onPointerDown={() => longPress.onPointerDown(e)}
           onPointerUp={longPress.onPointerUp}
           onPointerLeave={longPress.onPointerLeave}
+          onKeyDown={(keyEvent) => {
+            if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+              if (keyEvent.key === ' ') keyEvent.preventDefault()
+              setMenuFor(e.id)
+            }
+          }}
           tabIndex={0}
         >
           <p className="text-sm">{e.text}</p>

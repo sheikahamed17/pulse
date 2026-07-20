@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
@@ -132,22 +133,32 @@ export function MoneyList({ userId }: Props) {
                 }`}>
                   {formatAmount(e)}
                 </span>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => deleteEntry(e)}>Delete</Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="min-h-[44px] px-2 text-xs"
+                  aria-label={`Delete entry: ${e.description || formatAmount(e)}`}
+                  onClick={() => deleteEntry(e)}
+                >
+                  Delete
+                </Button>
               </div>
 
               {menuFor === e.id && (
                 <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
                   <button
                     type="button"
-                    className="px-3 py-1.5 text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                    aria-label={`Delete entry: ${e.description || formatAmount(e)}`}
+                    className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                     onClick={() => { deleteEntry(e); setMenuFor(null) }}
                   >
+                    <Trash2 className="w-3 h-3" />
                     Delete
                   </button>
                   {e.recurring_rule_id && (
                     <button
                       type="button"
-                      className="px-3 py-1.5 text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                      className="px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                       onClick={() => { router.push('/settings/recurring'); setMenuFor(null) }}
                     >
                       Edit recurring rule
@@ -155,7 +166,7 @@ export function MoneyList({ userId }: Props) {
                   )}
                   <button
                     type="button"
-                    className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                    className="px-3 py-2 min-h-[44px] text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                     onClick={() => setMenuFor(null)}
                   >
                     Cancel

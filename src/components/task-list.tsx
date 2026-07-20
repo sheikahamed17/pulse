@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Circle, CheckCircle2 } from 'lucide-react'
+import { Circle, CheckCircle2, Trash2 } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { formatLocalDateTime } from '@/lib/format'
@@ -65,10 +65,18 @@ export function TaskList({ userId, filter }: Props) {
         return (
           <li
             key={t.id}
-            className="glass-soft rounded-2xl relative flex items-start justify-between gap-3 p-3"
+            className="glass-soft rounded-2xl relative flex items-start justify-between gap-3 p-3 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
             onPointerDown={() => longPress.onPointerDown(t)}
             onPointerUp={longPress.onPointerUp}
             onPointerLeave={longPress.onPointerLeave}
+            onKeyDown={(keyEvent) => {
+              if (keyEvent.target !== keyEvent.currentTarget) return
+              if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+                if (keyEvent.key === ' ') keyEvent.preventDefault()
+                setMenuFor(t.id)
+              }
+            }}
+            tabIndex={0}
           >
             <button
               type="button"
@@ -105,14 +113,16 @@ export function TaskList({ userId, filter }: Props) {
               <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
                 <button
                   type="button"
-                  className="px-3 py-1.5 text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                  aria-label={`Delete task: ${t.title.slice(0, 30)}${t.title.length > 30 ? '…' : ''}`}
+                  className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                   onClick={() => deleteTask(t)}
                 >
+                  <Trash2 className="w-3 h-3" />
                   Delete
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                  className="px-3 py-2 min-h-[44px] text-xs text-muted-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                   onClick={() => setMenuFor(null)}
                 >
                   Cancel
