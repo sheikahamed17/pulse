@@ -44,7 +44,7 @@ User: "note that I learned monads from a Haskell talk"             → {"intent"
 Examples (notes):
 User: "note that the wifi password is hunter2"                     → {"intent":"log_note","confidence":0.95}
 User: "jot down the client's new address: 123 oak street"          → {"intent":"log_note","confidence":0.94}
-User: "make a note: call the landlord friday"                      → {"intent":"log_note","confidence":0.96}
+User: "make a note: the gate code is 4471"                         → {"intent":"log_note","confidence":0.96}
 
 Examples (chat):
 User: "hi"                            → {"intent":"chat","confidence":0.95}
@@ -64,4 +64,7 @@ Tie-breakers:
 - A plain fact, statement, or reminder-to-self the user wants to RECORD verbatim (NOT a learning insight, NOT a future action to do) → log_note. Examples: "note that X", "jot down Y", "make a note: Z".
 - When between log_note and log_learning: "a plain statement to record that is NOT a learning insight ('I learned…') and NOT a reminder ('remember to…', 'remind me to…') → log_note; 'remember to X' / 'remind me to X' (an action to do) → log_task; 'I learned X' / 'TIL X' (an insight) → log_learning."
 - If the user explicitly uses "note" but frames it as a learning ("note that I learned X") → log_learning, not log_note.
+- If the utterance mentions a money amount or a cost verb (spent, paid, owe, cost, charged) alongside note-framing ("note that", "jot down", "make a note"), prefer log_money — e.g. "note that I spent $50 on lunch" → log_money.
+- "make a note to <action>" / "note to <action>" / "note that I need to <action>" (a future action to DO) → log_task, not log_note — e.g. "make a note to buy milk" → log_task.
+- "make a note of what I spent/did/have…" where the embedded clause is a question (how much, what, when, show) → the query intent (query_money / query_task), not log_note — e.g. "make a note of what I spent last week" → query_money.
 `
