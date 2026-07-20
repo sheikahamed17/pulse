@@ -15,7 +15,9 @@ import { QueryAnswerCard } from '@/components/query-answer-card'
 import { QueryListAnswer } from '@/components/query-list-answer'
 import type { QueryPlan } from '@/lib/query-plans'
 import { filterTasksForQuery } from '@/lib/query-task-exec'
+import { filterLearningsForQuery } from '@/lib/query-learning-exec'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { useLearnings } from '@/hooks/use-learnings'
 import { formatLocalDateTime } from '@/lib/format'
 import { Circle, CheckCircle2 } from 'lucide-react'
 import { MoneyCard } from '@/components/money-card'
@@ -118,6 +120,59 @@ function QueryTaskListAnswer({ userId, plan, onDismiss }: { userId: string; plan
             </li>
           )
         })}
+      </ul>
+    </QueryListAnswer>
+  )
+}
+
+function QueryLearningListAnswer({ userId, plan, onDismiss }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_learning' }>; onDismiss: () => void }) {
+  const allLearnings = useLearnings(userId)
+  const filtered = filterLearningsForQuery(allLearnings, plan)
+  const { prefs } = useUserPrefs()
+
+  let title = 'Learnings'
+  if (plan.search) title = `Learnings about ${plan.search}`
+  if (plan.tags.length > 0) title = `Learnings tagged ${plan.tags.join(', ')}`
+  if (plan.search && plan.tags.length > 0) title = `Learnings about ${plan.search} tagged ${plan.tags.join(', ')}`
+  if (plan.period) title = `Learnings ${plan.period.label}`
+
+  return (
+    <QueryListAnswer
+      title={title}
+      count={filtered.length}
+      onDismiss={onDismiss}
+    >
+      <ul className="flex flex-col gap-2">
+        {filtered.map(l => (
+          <li
+            key={l.id}
+            className="glass-soft rounded-2xl relative flex flex-col gap-2 p-3"
+          >
+            <p className="text-sm">{l.text}</p>
+            {l.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {l.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white/10 text-muted-foreground border border-white/20"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
+              <div className="flex items-center gap-2">
+                {l.attribution && (
+                  <span className="truncate">— {l.attribution}</span>
+                )}
+              </div>
+              <span className="font-mono tabular-nums flex-shrink-0">
+                {formatLocalDateTime(l.occurred_at, prefs.tz)}
+              </span>
+            </div>
+          </li>
+        ))}
       </ul>
     </QueryListAnswer>
   )
@@ -477,6 +532,14 @@ function AppPageInner() {
 
           {queryPlan && queryPlan.kind === 'query_task' && (
             <QueryTaskListAnswer
+              userId={user.id}
+              plan={queryPlan}
+              onDismiss={() => setQueryPlan(null)}
+            />
+          )}
+
+          {queryPlan && queryPlan.kind === 'query_learning' && (
+            <QueryLearningListAnswer
               userId={user.id}
               plan={queryPlan}
               onDismiss={() => setQueryPlan(null)}
