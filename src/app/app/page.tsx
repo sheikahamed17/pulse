@@ -134,7 +134,7 @@ function QueryLearningListAnswer({ userId, plan, onDismiss }: { userId: string; 
   if (plan.search) title = `Learnings about ${plan.search}`
   if (plan.tags.length > 0) title = `Learnings tagged ${plan.tags.join(', ')}`
   if (plan.search && plan.tags.length > 0) title = `Learnings about ${plan.search} tagged ${plan.tags.join(', ')}`
-  if (plan.period) title = `Learnings ${plan.period.label}`
+  if (plan.period) title += ` ${plan.period.label}`
 
   return (
     <QueryListAnswer
