@@ -80,4 +80,7 @@ Tie-breakers:
 - If the utterance mentions a money amount or a cost verb (spent, paid, owe, cost, charged) alongside note-framing ("note that", "jot down", "make a note"), prefer log_money — e.g. "note that I spent $50 on lunch" → log_money.
 - "make a note to <action>" / "note to <action>" / "note that I need to <action>" (a future action to DO) → log_task, not log_note — e.g. "make a note to buy milk" → log_task.
 - "make a note of what I spent/did/have…" where the embedded clause is a question (how much, what, when, show) → the query intent (query_money / query_task), not log_note — e.g. "make a note of what I spent last week" → query_money.
+- A past-tense fact being RECORDED ("I found X", "found a bug", "discovered Y") → log_note or log_learning, NOT a search — e.g. "note that I found a bug" → log_note.
+- A colon-prefixed line ("note: …" / "todo: …"): an action verb (call, email, find, buy, review) → log_task; a stated fact → log_note. Never a query — e.g. "note: find the password" → log_task; "note: the wifi password is hunter2" → log_note.
+- "remind me <question>" ("remind me what I learned about X", "remind me what's due") → the matching query intent (query_learning / query_task / query_money), NOT log_task.
 `
