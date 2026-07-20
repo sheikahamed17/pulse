@@ -35,7 +35,7 @@ export function TabBar({ active, onChange, taskBadgeCount }: Props) {
               onClick={() => onChange(t.id)}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none',
+                'flex-1 flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] rounded-lg transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none',
                 isActive
                   ? 'bg-[linear-gradient(150deg,rgb(111_123_255/.35),rgb(52_230_255/.22))] border border-[rgb(120_190_255/.4)] text-foreground drop-shadow-[0_0_12px_rgb(52_230_255/.3)]'
                   : 'text-muted-foreground hover:text-foreground',

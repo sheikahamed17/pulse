@@ -469,6 +469,7 @@ function AppPageInner() {
           {activeTab === 'notes' && (
             <div className="flex flex-col gap-3">
               <Input
+                aria-label="Search notes"
                 value={notesSearchInputValue}
                 onChange={e => setNotesSearchInputValue(e.target.value)}
                 placeholder="Search notes…"
