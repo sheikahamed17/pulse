@@ -96,9 +96,9 @@ function QueryTaskListAnswer({ userId, plan, onDismiss }: { userId: string; plan
             >
               <div className="flex flex-1 items-start gap-2 text-left">
                 {isCompleted ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-2" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-2" aria-label="Task completed" />
                 ) : (
-                  <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" aria-label={isOverdue ? "Task overdue" : "Task pending"} />
                 )}
                 <div className="flex flex-col">
                   <span className={isCompleted ? 'text-muted-foreground line-through' : ''}>

@@ -177,8 +177,8 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
         )}
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
-          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+          <Button variant="outline" className="flex-1" onClick={onDismiss} aria-label="Dismiss money answer">Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)} aria-label={showEntries ? 'Hide entries for money answer' : 'Show entries for money answer'}>
             {showEntries ? 'Hide entries' : 'Show entries'}
           </Button>
         </div>
@@ -213,7 +213,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
                     <span className="font-medium">{item.categoryName ?? 'Uncategorized'}</span>
                     <span className="font-mono tabular-nums">{currencySymbol(prefs.primary_currency)}{amount}</span>
                   </div>
-                  <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div className="relative h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`${item.categoryName ?? 'Uncategorized'}: ${currencySymbol(prefs.primary_currency)}${amount}`} aria-valuenow={barWidth} aria-valuemin={0} aria-valuemax={100}>
                     <div
                       className="absolute inset-y-0 left-0 bg-accent-2"
                       style={{ width: `${barWidth}%` }}
@@ -226,8 +226,8 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
         )}
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
-          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+          <Button variant="outline" className="flex-1" onClick={onDismiss} aria-label="Dismiss breakdown answer">Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)} aria-label={showEntries ? 'Hide entries for breakdown answer' : 'Show entries for breakdown answer'}>
             {showEntries ? 'Hide entries' : 'Show entries'}
           </Button>
         </div>
@@ -272,8 +272,8 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
         </p>
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
-          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+          <Button variant="outline" className="flex-1" onClick={onDismiss} aria-label="Dismiss delta answer">Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)} aria-label={showEntries ? 'Hide entries for delta answer' : 'Show entries for delta answer'}>
             {showEntries ? 'Hide entries' : 'Show entries'}
           </Button>
         </div>
@@ -296,7 +296,7 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
 
         {series.length > 0 && (
           <div className="mb-4">
-            <Sparkline points={series.map(d => d.amount)} width={100} height={48} />
+            <Sparkline points={series.map(d => d.amount)} width={100} height={48} label={`Spending trend over ${series.length} periods`} />
           </div>
         )}
 
@@ -305,8 +305,8 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
         </p>
 
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onDismiss}>Dismiss</Button>
-          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)}>
+          <Button variant="outline" className="flex-1" onClick={onDismiss} aria-label="Dismiss series answer">Dismiss</Button>
+          <Button className="flex-[2]" onClick={() => setShowEntries(!showEntries)} aria-label={showEntries ? 'Hide entries for series answer' : 'Show entries for series answer'}>
             {showEntries ? 'Hide entries' : 'Show entries'}
           </Button>
         </div>
@@ -371,6 +371,7 @@ function FilteredMoneyList({
                       type="button"
                       className="text-[10px] text-muted-foreground hover:text-accent-2 transition text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
                       onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
+                      aria-label={expandedFx === e.id ? `Hide currency conversion for ${currencySymbol(e.currency)}${(e.amount / 100).toFixed(2)}` : `Show currency conversion for ${currencySymbol(e.currency)}${(e.amount / 100).toFixed(2)}`}
                     >
                       {expandedFx === e.id ? (() => {
                         const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
@@ -403,7 +404,7 @@ function formatAmount(e: MoneyEntryRow): string {
   return `${e.direction === 'out' ? '-' : '+'}${currencySymbol(e.currency)}${major}`
 }
 
-function Sparkline({ points, width = 80, height = 48 }: { points: number[], width?: number, height?: number }) {
+function Sparkline({ points, width = 80, height = 48, label }: { points: number[], width?: number, height?: number, label?: string }) {
   if (points.length < 2) return null
 
   const max = Math.max(...points, 1)
@@ -421,7 +422,7 @@ function Sparkline({ points, width = 80, height = 48 }: { points: number[], widt
   const areaPath = `M${padding},${height - padding} ${pathPoints} L${width - padding},${height - padding}`
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="w-full">
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="w-full" role="img" aria-label={label || 'Spending sparkline'}>
       <defs>
         <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" style={{ stopColor: 'rgb(52 230 255)', stopOpacity: 0.3 }} />
