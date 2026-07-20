@@ -132,6 +132,20 @@ export type LearningRow = {
   updated_at: string
 }
 
+export type NoteRow = {
+  id: string
+  user_id: string
+  title: string | null
+  body: string
+  tags: string[]
+  source: 'voice' | 'manual'
+  occurred_at: string
+  field_hlcs: Record<string, string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type FxRateRow = {
   date: string                  // 'YYYY-MM-DD'
   base: string                  // 'EUR' from ECB
@@ -152,6 +166,7 @@ class PulseDb extends Dexie {
   insights!: EntityTable<InsightRow, 'id'>
   receipt_queue!: EntityTable<ReceiptQueueItem, 'id'>
   learning_entries!: EntityTable<LearningRow, 'id'>
+  note_entries!: EntityTable<NoteRow, 'id'>
   fx_rates!: Table<FxRateRow>
 
   constructor() {
@@ -178,6 +193,9 @@ class PulseDb extends Dexie {
     this.version(5).stores({
       learning_entries: 'id, user_id, occurred_at, *tags',
     })
+    this.version(6).stores({
+      note_entries: 'id, user_id, occurred_at, *tags',
+    })
   }
 }
 
@@ -195,5 +213,6 @@ export async function resetDb() {
   await db.insights.clear()
   await db.receipt_queue.clear()
   await db.learning_entries.clear()
+  await db.note_entries.clear()
   await db.fx_rates.clear()
 }

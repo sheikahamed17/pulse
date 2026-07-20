@@ -464,3 +464,136 @@ describe('applyLocalOp — learning entity', () => {
     expect(await db.learning_entries.count()).toBe(1)
   })
 })
+
+describe('applyLocalOp — note entity', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('materializes a note_entries row from a note create op', async () => {
+    await applyLocalOp({
+      id: 'op-n1',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'note', entity_id: 'n1',
+      op_type: 'create',
+      payload: {
+        title: 'WiFi Setup',
+        body: 'WiFi password is hunter2',
+        tags: ['home', 'network'],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'voice',
+      },
+      schema_version: 1,
+    })
+    const row = await db.note_entries.get('n1')
+    expect(row?.title).toBe('WiFi Setup')
+    expect(row?.body).toBe('WiFi password is hunter2')
+    expect(row?.tags).toEqual(['home', 'network'])
+    expect(row?.source).toBe('voice')
+    expect(row?.deleted_at).toBeNull()
+  })
+
+  it('stores tags as a native array, not stringified', async () => {
+    await applyLocalOp({
+      id: 'op-n-array-test',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'note', entity_id: 'n-array',
+      op_type: 'create',
+      payload: {
+        title: null,
+        body: 'Array test note',
+        tags: ['tag1', 'tag2', 'tag3'],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+      },
+      schema_version: 1,
+    })
+    const row = await db.note_entries.get('n-array')
+    expect(Array.isArray(row?.tags)).toBe(true)
+    expect(row?.tags).toEqual(['tag1', 'tag2', 'tag3'])
+  })
+
+  it('updates a note entry via update op (LWW merge)', async () => {
+    await applyLocalOp({
+      id: 'op-n-create',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'note', entity_id: 'n-update',
+      op_type: 'create',
+      payload: {
+        title: 'Original title',
+        body: 'Original body text',
+        tags: ['old'],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+      },
+      schema_version: 1,
+    })
+    await applyLocalOp({
+      id: 'op-n-update',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'note', entity_id: 'n-update',
+      op_type: 'update',
+      payload: {
+        tags: ['new', 'updated'],
+      },
+      schema_version: 1,
+    })
+    const row = await db.note_entries.get('n-update')
+    expect(row?.title).toBe('Original title')
+    expect(row?.body).toBe('Original body text')
+    expect(row?.tags).toEqual(['new', 'updated'])
+  })
+
+  it('tombstones via delete op (sets deleted_at)', async () => {
+    await applyLocalOp({
+      id: 'op-n-create-del',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'note', entity_id: 'n-delete',
+      op_type: 'create',
+      payload: {
+        title: 'Will be deleted',
+        body: 'This note will be deleted',
+        tags: [],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+      },
+      schema_version: 1,
+    })
+    await applyLocalOp({
+      id: 'op-n-delete',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'note', entity_id: 'n-delete',
+      op_type: 'delete',
+      payload: {},
+      schema_version: 1,
+    })
+    const row = await db.note_entries.get('n-delete')
+    expect(row?.deleted_at).not.toBeNull()
+  })
+
+  it('is idempotent on duplicate note op.id', async () => {
+    const op = {
+      id: 'op-n-dup',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'note' as const, entity_id: 'n-dup',
+      op_type: 'create' as const,
+      payload: {
+        title: 'Idempotent note',
+        body: 'This is a test note',
+        tags: [],
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual' as const,
+      },
+      schema_version: 1,
+    }
+    await applyLocalOp(op)
+    await applyLocalOp(op)
+    expect(await db.op_log.count()).toBe(1)
+    expect(await db.note_entries.count()).toBe(1)
+  })
+})
