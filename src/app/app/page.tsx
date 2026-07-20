@@ -16,8 +16,10 @@ import { QueryListAnswer } from '@/components/query-list-answer'
 import type { QueryPlan } from '@/lib/query-plans'
 import { filterTasksForQuery } from '@/lib/query-task-exec'
 import { filterLearningsForQuery } from '@/lib/query-learning-exec'
+import { filterNotesForQuery } from '@/lib/query-notes-exec'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useLearnings } from '@/hooks/use-learnings'
+import { useNotes } from '@/hooks/use-notes'
 import { formatLocalDateTime } from '@/lib/format'
 import { Circle, CheckCircle2 } from 'lucide-react'
 import { MoneyCard } from '@/components/money-card'
@@ -169,6 +171,55 @@ function QueryLearningListAnswer({ userId, plan, onDismiss }: { userId: string; 
               </div>
               <span className="font-mono tabular-nums flex-shrink-0">
                 {formatLocalDateTime(l.occurred_at, prefs.tz)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </QueryListAnswer>
+  )
+}
+
+function QueryNotesListAnswer({ userId, plan, onDismiss }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_notes' }>; onDismiss: () => void }) {
+  const allNotes = useNotes(userId)
+  const filtered = filterNotesForQuery(allNotes, plan)
+  const { prefs } = useUserPrefs()
+
+  let title = 'Notes'
+  if (plan.search) title = `Notes about ${plan.search}`
+  if (plan.tags.length > 0) title = `Notes tagged ${plan.tags.join(', ')}`
+  if (plan.search && plan.tags.length > 0) title = `Notes about ${plan.search} tagged ${plan.tags.join(', ')}`
+  if (plan.period) title += ` ${plan.period.label}`
+
+  return (
+    <QueryListAnswer
+      title={title}
+      count={filtered.length}
+      onDismiss={onDismiss}
+    >
+      <ul className="flex flex-col gap-2">
+        {filtered.map(n => (
+          <li
+            key={n.id}
+            className="glass-soft rounded-2xl relative flex flex-col gap-2 p-3"
+          >
+            <p className="text-sm">{n.title || n.body}</p>
+            {n.title && <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>}
+            {n.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {n.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white/10 text-muted-foreground border border-white/20"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-end text-xs text-muted-foreground">
+              <span className="font-mono tabular-nums flex-shrink-0">
+                {formatLocalDateTime(n.occurred_at, prefs.tz)}
               </span>
             </div>
           </li>
@@ -540,6 +591,14 @@ function AppPageInner() {
 
           {queryPlan && queryPlan.kind === 'query_learning' && (
             <QueryLearningListAnswer
+              userId={user.id}
+              plan={queryPlan}
+              onDismiss={() => setQueryPlan(null)}
+            />
+          )}
+
+          {queryPlan && queryPlan.kind === 'query_notes' && (
+            <QueryNotesListAnswer
               userId={user.id}
               plan={queryPlan}
               onDismiss={() => setQueryPlan(null)}

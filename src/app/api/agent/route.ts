@@ -11,6 +11,7 @@ import { parseTaskEntry } from '@/lib/agents/task-agent'
 import { parseMoneyQuery } from '@/lib/agents/query-money-agent'
 import { parseTaskQuery } from '@/lib/agents/query-task-agent'
 import { parseLearningQuery } from '@/lib/agents/query-learning-agent'
+import { parseNotesQuery } from '@/lib/agents/query-notes-agent'
 import { parseLearning } from '@/lib/agents/learning-agent'
 import { parseNote } from '@/lib/agents/note-agent'
 
@@ -205,6 +206,26 @@ export async function POST(req: Request) {
         confidence: router.confidence,
         payload: {
           kind: 'query_learning',
+          search: plan.search,
+          tags: plan.tags,
+          period: plan.period,
+        },
+      })
+    }
+
+    if (router.intent === 'query_notes') {
+      const plan = await parseNotesQuery({
+        client: groq,
+        text: parsed.data.text,
+        nowIso,
+        userTz: prefs.tz,
+      })
+      return NextResponse.json({
+        transcript: parsed.data.text,
+        intent: 'query_notes',
+        confidence: router.confidence,
+        payload: {
+          kind: 'query_notes',
           search: plan.search,
           tags: plan.tags,
           period: plan.period,
