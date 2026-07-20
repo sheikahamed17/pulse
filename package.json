@@ -10,6 +10,7 @@
     "cf:build": "pnpm build && pnpm opennextjs-cloudflare build",
     "cf:preview": "pnpm cf:build && pnpm wrangler pages dev",
     "gen:icons": "node scripts/gen-icons.mjs",
+    "eval:router": "node scripts/eval-router.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
