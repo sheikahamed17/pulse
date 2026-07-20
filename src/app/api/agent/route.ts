@@ -10,6 +10,7 @@ import { parseMoneyEntry } from '@/lib/agents/money-agent'
 import { parseTaskEntry } from '@/lib/agents/task-agent'
 import { parseMoneyQuery } from '@/lib/agents/query-money-agent'
 import { parseLearning } from '@/lib/agents/learning-agent'
+import { parseNote } from '@/lib/agents/note-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,6 +122,26 @@ export async function POST(req: Request) {
           text: payload.text,
           tags: payload.tags,
           attribution: payload.attribution ?? null,
+          occurred_at: nowIso,
+          source: 'manual',
+        },
+      })
+    }
+
+    if (router.intent === 'log_note') {
+      const payload = await parseNote({
+        client: groq,
+        text: parsed.data.text,
+      })
+      return NextResponse.json({
+        transcript: parsed.data.text,
+        intent: 'log_note',
+        confidence: router.confidence,
+        payload: {
+          kind: 'note',
+          body: parsed.data.text,
+          title: payload.title ?? null,
+          tags: payload.tags,
           occurred_at: nowIso,
           source: 'manual',
         },

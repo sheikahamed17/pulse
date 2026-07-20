@@ -244,6 +244,26 @@ function AppPageInner() {
       return
     }
 
+    if (final.kind === 'note') {
+      const op = await generateOp({
+        entity_kind: 'note',
+        entity_id: crypto.randomUUID(),
+        op_type: 'create',
+        payload: {
+          body: final.body,
+          title: final.title ?? null,
+          tags: final.tags,
+          occurred_at: final.occurred_at,
+          source: final.source,
+        },
+        user_id: user.id,
+      })
+      await applyLocalOp(op)
+      setDraft(null)
+      pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
+      return
+    }
+
     // Money kind (Phase 1 logic, preserved verbatim)
     let ruleId: string | null = null
     if (recurring.enabled) {

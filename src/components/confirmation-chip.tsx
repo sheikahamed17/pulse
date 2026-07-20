@@ -14,12 +14,14 @@ import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 import type { TaskPayload } from '@/lib/op-schemas/task'
 import type { LearningPayload } from '@/lib/op-schemas/learning'
+import type { NotePayload } from '@/lib/op-schemas/note'
 import type { CategoryRow } from '@/lib/dexie'
 
 export type ChipDraft =
   | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string })
   | (TaskPayload & { kind: 'task' })
   | (LearningPayload & { kind: 'learning' })
+  | (NotePayload & { kind: 'note' })
 
 type Props = {
   userId: string
@@ -35,6 +37,9 @@ export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCan
   }
   if (draft.kind === 'learning') {
     return <ConfirmationChipLearning draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+  }
+  if (draft.kind === 'note') {
+    return <ConfirmationChipNote draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
   }
   return <ConfirmationChipMoney userId={userId} draft={draft} categoryById={categoryById} onConfirm={onConfirm} onCancel={onCancel} />
 }
@@ -424,6 +429,150 @@ function ConfirmationChipLearning({
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.text.trim()}>
           Confirm learning
+        </Button>
+      </div>
+
+      <p className="mt-1 text-center text-[10px] text-muted-foreground">tap any field to edit</p>
+    </div>
+  )
+}
+
+function ConfirmationChipNote({
+  draft,
+  onConfirm,
+  onCancel,
+}: {
+  draft: NotePayload & { kind: 'note' }
+  onConfirm: Props['onConfirm']
+  onCancel: () => void
+}) {
+  const [d, setD] = useState<NotePayload & { kind: 'note' }>(draft)
+  const [editingBody, setEditingBody] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [newTag, setNewTag] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function handleConfirm() {
+    setBusy(true)
+    try {
+      await onConfirm(d, { enabled: false, period: 'monthly', intervalCount: 1 })
+    }
+    finally { setBusy(false) }
+  }
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim()
+    if (trimmed && !d.tags.includes(trimmed) && d.tags.length < 12) {
+      setD(s => ({ ...s, tags: [...s.tags, trimmed] }))
+      setNewTag('')
+    }
+  }
+
+  function removeTag(tag: string) {
+    setD(s => ({ ...s, tags: s.tags.filter(t => t !== tag) }))
+  }
+
+  return (
+    <div className="glass rounded-2xl p-5">
+      <div className="mb-3 flex items-center justify-between text-xs">
+        <span className="font-semibold uppercase tracking-wide text-amber-500">
+          📝 Note
+        </span>
+      </div>
+
+      {editingBody ? (
+        <textarea
+          autoFocus
+          defaultValue={d.body}
+          onBlur={(e) => {
+            const v = e.currentTarget.value.trim()
+            if (v) setD(s => ({ ...s, body: v }))
+            setEditingBody(false)
+          }}
+          className="mb-3 w-full rounded-md border bg-background p-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none resize-none"
+          rows={3}
+          aria-label="Note body"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingBody(true)}
+          className="mb-3 block w-full whitespace-pre-wrap text-left font-mono text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+          aria-label="Edit note body"
+        >
+          {d.body}
+        </button>
+      )}
+
+      {editingTitle ? (
+        <Input
+          autoFocus
+          defaultValue={d.title ?? ''}
+          onBlur={(e) => {
+            const v = e.currentTarget.value.trim()
+            setD(s => ({ ...s, title: v || null }))
+            setEditingTitle(false)
+          }}
+          placeholder="title (optional)…"
+          aria-label="Note title"
+          className="mb-3 font-mono text-sm"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditingTitle(true)}
+          className="mb-3 block w-full min-h-[44px] flex items-center text-left rounded-md border bg-muted px-2 text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+          aria-label="Edit note title"
+        >
+          {d.title ? <span className="font-semibold">{d.title}</span> : <span className="text-muted-foreground">+ title (optional)</span>}
+        </button>
+      )}
+
+      <div className="mb-3 flex flex-wrap gap-1.5 items-start" role="group" aria-label="Tags">
+        {d.tags.map((tag) => (
+          <div key={tag} className="flex items-center gap-1 rounded-md border bg-muted px-2 py-0.5 text-xs">
+            <span>{tag}</span>
+            <button
+              type="button"
+              onClick={() => removeTag(tag)}
+              aria-label={`Remove tag "${tag}"`}
+              className="ml-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        {d.tags.length < 12 && (
+          <div className="flex items-center gap-1">
+            <Input
+              value={newTag}
+              onChange={e => setNewTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addTag(newTag)
+                }
+              }}
+              placeholder="add tag…"
+              aria-label="Add new tag"
+              className="h-7 text-xs max-w-[100px]"
+            />
+            <button
+              type="button"
+              onClick={() => addTag(newTag)}
+              aria-label="Add tag"
+              className="min-h-[44px] flex items-center justify-center px-2 rounded-md border bg-muted hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none text-xs"
+            >
+              +
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.body.trim()}>
+          Confirm note
         </Button>
       </div>
 

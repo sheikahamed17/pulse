@@ -9,6 +9,7 @@ import { routeIntent } from '@/lib/agents/router'
 import { parseMoneyEntry } from '@/lib/agents/money-agent'
 import { parseTaskEntry } from '@/lib/agents/task-agent'
 import { parseLearning } from '@/lib/agents/learning-agent'
+import { parseNote } from '@/lib/agents/note-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -130,6 +131,24 @@ export async function POST(req: Request) {
               text: payload.text,
               tags: payload.tags,
               attribution: payload.attribution ?? null,
+              occurred_at: nowIso,
+              source: 'voice',
+            },
+          })
+        } else if (router.intent === 'log_note') {
+          const payload = await parseNote({
+            client: groq,
+            text: transcript,
+          })
+          send({
+            step: 'payload',
+            intent: 'log_note',
+            transcript,
+            payload: {
+              kind: 'note',
+              body: transcript,
+              title: payload.title ?? null,
+              tags: payload.tags,
               occurred_at: nowIso,
               source: 'voice',
             },
