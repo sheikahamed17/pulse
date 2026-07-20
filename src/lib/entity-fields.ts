@@ -23,6 +23,10 @@ export const LEARNING_FIELDS = [
   'text', 'tags', 'attribution', 'source', 'occurred_at',
 ] as const
 
+export const NOTE_FIELDS = [
+  'title', 'body', 'tags', 'occurred_at', 'source',
+] as const
+
 export const INSIGHT_FIELDS = [
   'period', 'starts_at', 'ends_at', 'summary', 'metrics',
 ] as const

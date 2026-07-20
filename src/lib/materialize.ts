@@ -8,6 +8,7 @@ import {
   CATEGORY_FIELDS,
   TASK_FIELDS,
   LEARNING_FIELDS,
+  NOTE_FIELDS,
   INSIGHT_FIELDS,
 } from '@/lib/entity-fields'
 
@@ -29,6 +30,8 @@ export async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
       return materializeRow_LWW(db, op, userId, 'tasks', TASK_FIELDS)
     case 'learning':
       return materializeRow_LWW(db, op, userId, 'learning_entries', LEARNING_FIELDS)
+    case 'note':
+      return materializeRow_LWW(db, op, userId, 'note_entries', NOTE_FIELDS)
     case 'insight':
       return materializeRow_LWW(db, op, userId, 'insights', INSIGHT_FIELDS)
     default:
@@ -40,7 +43,7 @@ async function materializeRow_LWW(
   db: Kysely<DB>,
   op: Op,
   userId: string,
-  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'learning_entries' | 'insights',
+  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'learning_entries' | 'note_entries' | 'insights',
   fields: readonly string[],
 ) {
   const existing = await db
@@ -78,8 +81,8 @@ async function materializeRow_LWW(
   // an op that never touched a field must not clobber it.
   for (const f of fields) {
     if (merged[f] !== undefined) {
-      // For learning_entries, tags are stored as JSON strings in the DB
-      if (tableName === 'learning_entries' && f === 'tags') {
+      // For learning_entries and note_entries, tags are stored as JSON strings in the DB
+      if ((tableName === 'learning_entries' || tableName === 'note_entries') && f === 'tags') {
         row[f] = JSON.stringify(merged[f])
       } else {
         row[f] = merged[f]
@@ -94,8 +97,8 @@ async function materializeRow_LWW(
   }
   for (const f of fields) {
     if (merged[f] !== undefined) {
-      // For learning_entries, tags are stored as JSON strings in the DB
-      if (tableName === 'learning_entries' && f === 'tags') {
+      // For learning_entries and note_entries, tags are stored as JSON strings in the DB
+      if ((tableName === 'learning_entries' || tableName === 'note_entries') && f === 'tags') {
         updates[f] = JSON.stringify(merged[f])
       } else {
         updates[f] = merged[f]

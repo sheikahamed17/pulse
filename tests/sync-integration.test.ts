@@ -57,6 +57,7 @@ function resetMockDb() {
     recurring_rules: [],
     tasks: [],
     learning_entries: [],
+    note_entries: [],
     insights: [],
   }
 }
@@ -507,6 +508,96 @@ describe('/api/sync — Learning domain', () => {
       expect(tags).toEqual(['TypeScript', 'Web Development', 'Frontend'])
       // Verify other fields are unchanged
       expect(rows[0].text).toBe('Learning about TypeScript')
+    })
+  })
+})
+
+describe('/api/sync — Notes domain', () => {
+  it('persists a note entry and includes it in the next pull', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const op = {
+        id: 'op-note-1',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'note',
+        entity_id: 'note-1',
+        op_type: 'create' as const,
+        payload: {
+          title: 'Quick note',
+          body: 'The wifi password is hunter2',
+          tags: ['network', 'home'],
+          occurred_at: '2026-07-08T10:00:00.000Z',
+          source: 'voice',
+        },
+        schema_version: 1,
+      }
+      const push = await callSync({ device_id: 'd1', new_ops: [op] })
+      expect(push.applied_ack).toEqual(['op-note-1'])
+
+      const pull = await callSync({ device_id: 'd2', new_ops: [] })
+      expect(pull.new_ops_from_server).toHaveLength(1)
+      expect(pull.new_ops_from_server[0].entity_kind).toBe('note')
+
+      // Server-side row materialized
+      const rows = await testDb.selectFrom('note_entries').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].title).toBe('Quick note')
+      expect(rows[0].body).toBe('The wifi password is hunter2')
+      expect(rows[0].source).toBe('voice')
+
+      // tags JSON round-trips correctly
+      const tags = JSON.parse(rows[0].tags as string)
+      expect(tags).toEqual(['network', 'home'])
+    })
+  })
+
+  it('whole-array tags LWW: second op with newer HLC replaces entire tags array', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      // Initial create
+      const op1 = {
+        id: 'op-note-2a',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'note',
+        entity_id: 'note-2',
+        op_type: 'create' as const,
+        payload: {
+          title: 'Note about meetings',
+          body: 'Had a great standup meeting today',
+          tags: ['work', 'meeting'],
+          occurred_at: '2026-07-08T11:00:00.000Z',
+          source: 'manual',
+        },
+        schema_version: 1,
+      }
+      await callSync({ device_id: 'd1', new_ops: [op1] })
+
+      // Second op with newer HLC updates only tags
+      const op2 = {
+        id: 'op-note-2b',
+        hlc: '0000000000000002-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'note',
+        entity_id: 'note-2',
+        op_type: 'update' as const,
+        payload: {
+          tags: ['work', 'standup', 'productive'],
+        },
+        schema_version: 1,
+      }
+      await callSync({ device_id: 'd1', new_ops: [op2] })
+
+      // Verify whole-array LWW: tags are completely replaced
+      const rows = await testDb.selectFrom('note_entries').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      const tags = JSON.parse(rows[0].tags as string)
+      expect(tags).toEqual(['work', 'standup', 'productive'])
+      // Verify other fields are unchanged
+      expect(rows[0].body).toBe('Had a great standup meeting today')
+      expect(rows[0].title).toBe('Note about meetings')
     })
   })
 })
