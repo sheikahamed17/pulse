@@ -146,3 +146,68 @@ describe('routeIntent — Phase 3 (6 intents + learning regression)', () => {
     }
   })
 })
+
+describe('routeIntent — Phase 4 (7 intents + note + regression)', () => {
+  it('parses a log_note intent', async () => {
+    const client = mockGroqWithJSON({ intent: 'log_note', confidence: 0.95 })
+    const r = await routeIntent({ client: client as never, text: 'note that the wifi password is hunter2' })
+    expect(r.intent).toBe('log_note')
+  })
+
+  it('classifies another note example', async () => {
+    const client = mockGroqWithJSON({ intent: 'log_note', confidence: 0.94 })
+    const r = await routeIntent({ client: client as never, text: 'jot down the client\'s new address' })
+    expect(r.intent).toBe('log_note')
+  })
+
+  it('classifies note with make a note', async () => {
+    const client = mockGroqWithJSON({ intent: 'log_note', confidence: 0.96 })
+    const r = await routeIntent({ client: client as never, text: 'make a note: call the landlord friday' })
+    expect(r.intent).toBe('log_note')
+  })
+
+  it('regression: still classifies log_money correctly', async () => {
+    const client = mockGroqWithJSON({ intent: 'log_money', confidence: 0.95 })
+    const r = await routeIntent({ client: client as never, text: 'spent 80 on chai' })
+    expect(r.intent).toBe('log_money')
+  })
+
+  it('regression: still classifies log_task correctly', async () => {
+    const client = mockGroqWithJSON({ intent: 'log_task', confidence: 0.97 })
+    const r = await routeIntent({ client: client as never, text: 'remind me to call mom tomorrow at 3pm' })
+    expect(r.intent).toBe('log_task')
+  })
+
+  it('regression: still classifies log_learning correctly', async () => {
+    const client = mockGroqWithJSON({ intent: 'log_learning', confidence: 0.96 })
+    const r = await routeIntent({ client: client as never, text: 'I learned that the borrow checker prevents data races' })
+    expect(r.intent).toBe('log_learning')
+  })
+
+  it('regression: still classifies query_money correctly', async () => {
+    const client = mockGroqWithJSON({ intent: 'query_money', confidence: 0.93 })
+    const r = await routeIntent({ client: client as never, text: 'how much did I spend last week' })
+    expect(r.intent).toBe('query_money')
+  })
+
+  it('regression: still classifies query_task correctly', async () => {
+    const client = mockGroqWithJSON({ intent: 'query_task', confidence: 0.92 })
+    const r = await routeIntent({ client: client as never, text: 'what do I have due this week' })
+    expect(r.intent).toBe('query_task')
+  })
+
+  it('regression: still classifies chat correctly', async () => {
+    const client = mockGroqWithJSON({ intent: 'chat', confidence: 0.88 })
+    const r = await routeIntent({ client: client as never, text: 'thanks' })
+    expect(r.intent).toBe('chat')
+  })
+
+  it('all 7 intents reachable', async () => {
+    const intents = ['log_money', 'log_task', 'log_learning', 'log_note', 'query_money', 'query_task', 'chat'] as const
+    for (const intent of intents) {
+      const client = mockGroqWithJSON({ intent, confidence: 0.9 })
+      const r = await routeIntent({ client: client as never, text: 'test' })
+      expect(r.intent).toBe(intent)
+    }
+  })
+})

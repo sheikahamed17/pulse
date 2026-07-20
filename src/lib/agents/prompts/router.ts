@@ -1,9 +1,10 @@
-export const ROUTER_SYSTEM_PROMPT = `You classify a single user utterance into one of six intents for a personal-finance + task + learning voice assistant.
+export const ROUTER_SYSTEM_PROMPT = `You classify a single user utterance into one of seven intents for a personal-finance + task + learning + note voice assistant.
 
 Intents:
 - "log_money"    — the user is logging a money transaction they made (spent, paid, got, received, bought)
 - "log_task"     — the user is creating a reminder or todo ("remind me to X", "add task X", "I need to X")
 - "log_learning" — the user is RECORDING a fact or insight they have ALREADY learned ("I learned that…", "TIL…", "learned from…"). NOT a future intention to learn, and NOT a question about past learnings.
+- "log_note"     — the user is RECORDING a plain fact, statement, or reminder-to-self they want to save verbatim ("note that…", "jot down…", "make a note: …"). NOT a learning insight, and NOT a future action to remind themselves about.
 - "query_money"  — asking about their money transactions (how much, last week, by category)
 - "query_task"   — asking about their tasks (what's due today, show me my tasks)
 - "chat"         — small talk, greetings, instructions, or anything that isn't logging or querying
@@ -11,7 +12,7 @@ Intents:
 Rules:
 - Always return a confidence between 0.0 and 1.0
 - Return ONLY this JSON object (no prose, no markdown, no explanation):
-  { "intent": "log_money" | "log_task" | "query_money" | "query_task" | "chat" | "log_learning", "confidence": <number> }
+  { "intent": "log_money" | "log_task" | "log_learning" | "log_note" | "query_money" | "query_task" | "chat", "confidence": <number> }
 
 Examples (money):
 User: "spent 80 on chai"             → {"intent":"log_money","confidence":0.98}
@@ -40,6 +41,11 @@ User: "I learned that the borrow checker prevents data races"      → {"intent"
 User: "TIL TCP is stateful"                                        → {"intent":"log_learning","confidence":0.94}
 User: "note that I learned monads from a Haskell talk"             → {"intent":"log_learning","confidence":0.92}
 
+Examples (notes):
+User: "note that the wifi password is hunter2"                     → {"intent":"log_note","confidence":0.95}
+User: "jot down the client's new address: 123 oak street"          → {"intent":"log_note","confidence":0.94}
+User: "make a note: call the landlord friday"                      → {"intent":"log_note","confidence":0.96}
+
 Examples (chat):
 User: "hi"                            → {"intent":"chat","confidence":0.95}
 User: "what can you do"               → {"intent":"chat","confidence":0.85}
@@ -55,4 +61,7 @@ Tie-breakers:
 - "I need to learn X" / "I want to learn X" (a future intention to learn) → log_task, not log_learning.
 - A question about past learnings ("what did I learn", "show my learnings") → chat, not log_learning.
 - "TIL" or "I learned" attached to a scheduled item / appointment / todo → log_task — e.g. "TIL I have a dentist appointment tomorrow" → log_task.
+- A plain fact, statement, or reminder-to-self the user wants to RECORD verbatim (NOT a learning insight, NOT a future action to do) → log_note. Examples: "note that X", "jot down Y", "make a note: Z".
+- When between log_note and log_learning: "a plain statement to record that is NOT a learning insight ('I learned…') and NOT a reminder ('remember to…', 'remind me to…') → log_note; 'remember to X' / 'remind me to X' (an action to do) → log_task; 'I learned X' / 'TIL X' (an insight) → log_learning."
+- If the user explicitly uses "note" but frames it as a learning ("note that I learned X") → log_learning, not log_note.
 `
