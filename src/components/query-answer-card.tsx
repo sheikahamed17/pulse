@@ -13,6 +13,7 @@ import {
   computeMoneyBreakdown,
   computeMoneyDelta,
   computeMoneySeries,
+  deltaFetchRange,
 } from '@/lib/query-money-exec'
 import type { QueryMoneyPlan } from '@/lib/query-plans'
 import type { MoneyEntryRow, CategoryRow, FxRateRow } from '@/lib/dexie'
@@ -28,7 +29,10 @@ const AUTO_DISMISS_MS = 30_000
 
 export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
   const { prefs } = useUserPrefs()
-  const entries = useMoneyEntries(userId, { from: plan.period.from, to: plan.period.to })
+  const fetchRange = useMemo(() => {
+    return deltaFetchRange(plan.mode, plan.period)
+  }, [plan.mode, plan.period])
+  const entries = useMoneyEntries(userId, fetchRange)
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
   const categories = useCategories(userId)
   const [showEntries, setShowEntries] = useState(false)
@@ -60,14 +64,15 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
     return categories.find(c => c.id === categoryId)?.name ?? null
   }, [categories])
 
-  // Filter entries by direction and category
+  // Filter entries by direction, category, and current-period date bounds
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
+      if (e.occurred_at < plan.period.from || e.occurred_at >= plan.period.to) return false
       if (e.direction !== plan.direction) return false
       if (targetCategoryId && e.category_id !== targetCategoryId) return false
       return true
     })
-  }, [entries, plan.direction, targetCategoryId])
+  }, [entries, plan.period, plan.direction, targetCategoryId])
 
   // Get previous period entries for delta mode
   const previousEntries = useMemo(() => {

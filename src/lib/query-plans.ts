@@ -30,3 +30,12 @@ export type QueryNotesPlan = {
 }
 
 export type QueryPlan = QueryMoneyPlan | QueryTaskPlan | QueryLearningPlan | QueryNotesPlan
+
+export const QUERY_KINDS = ['query_money', 'query_task', 'query_learning', 'query_notes'] as const
+
+export function isQueryPlan(payload: unknown): payload is QueryPlan {
+  return (
+    typeof payload === 'object' && payload !== null &&
+    QUERY_KINDS.includes((payload as { kind?: unknown }).kind as (typeof QUERY_KINDS)[number])
+  )
+}

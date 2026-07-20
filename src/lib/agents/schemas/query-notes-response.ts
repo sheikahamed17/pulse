@@ -11,6 +11,6 @@ export const QueryNotesResponseSchema = z.object({
 }).refine(
   v => !v.period || v.period.from < v.period.to,
   { message: 'period.from must be < period.to' },
-).strict()
+)
 
 export type QueryNotesResponse = z.infer<typeof QueryNotesResponseSchema>

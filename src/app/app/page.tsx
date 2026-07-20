@@ -14,6 +14,7 @@ import { ConfirmationChip, type ChipDraft } from '@/components/confirmation-chip
 import { QueryAnswerCard } from '@/components/query-answer-card'
 import { QueryListAnswer } from '@/components/query-list-answer'
 import type { QueryPlan } from '@/lib/query-plans'
+import { isQueryPlan } from '@/lib/query-plans'
 import { filterTasksForQuery } from '@/lib/query-task-exec'
 import { filterLearningsForQuery } from '@/lib/query-learning-exec'
 import { filterNotesForQuery } from '@/lib/query-notes-exec'
@@ -353,8 +354,8 @@ function AppPageInner() {
         setText('')
         return
       }
-      if ((data.payload as QueryPlan).kind === 'query_money') {
-        setQueryPlan(data.payload as QueryPlan)
+      if (isQueryPlan(data.payload)) {
+        setQueryPlan(data.payload)
         setText('')
       } else {
         setDraft(data.payload as ChipDraft)

@@ -1,5 +1,28 @@
 import type { MoneyEntryRow } from '@/lib/dexie'
 
+export type FetchRange = { from: string; to: string }
+
+/**
+ * Compute the fetch range for delta mode to include both current and previous periods.
+ * For other modes, returns the current period only.
+ */
+export function deltaFetchRange(
+  mode: 'total' | 'breakdown' | 'delta' | 'series',
+  period: { from: string; to: string },
+): FetchRange {
+  if (mode !== 'delta') {
+    return { from: period.from, to: period.to }
+  }
+
+  // For delta mode, calculate the previous period length and extend the fetch
+  const from = new Date(period.from).getTime()
+  const to = new Date(period.to).getTime()
+  const len = to - from
+  const prevFrom = new Date(from - len).toISOString()
+
+  return { from: prevFrom, to: period.to }
+}
+
 export type BreakdownOptions = {
   direction: 'out' | 'in'
   categoryNameOf: (categoryId: string | null) => string | null
