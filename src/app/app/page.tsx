@@ -26,6 +26,7 @@ import { Circle, CheckCircle2 } from 'lucide-react'
 import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
 import { DigestCard } from '@/components/digest-card'
+import { BudgetSection } from '@/components/budget-section'
 import { VoiceRecorder } from '@/components/voice-recorder'
 import { ReceiptButton } from '@/components/receipt-button'
 import { TabBar } from '@/components/tab-bar'
@@ -644,6 +645,7 @@ function AppPageInner() {
           {activeTab === 'money' && (
             <div className="flex flex-col gap-3">
               <DigestCard userId={user.id} />
+              <BudgetSection userId={user.id} />
               <div className="md:hidden">
                 <MoneyCard userId={user.id} />
               </div>
