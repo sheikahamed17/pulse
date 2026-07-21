@@ -300,3 +300,22 @@ describe('routeIntent — Phase 5 (9 intents + query_learning + query_notes + re
     }
   })
 })
+
+describe('routeIntent — Phase 6 (10 intents + set_budget + regression)', () => {
+  it('parses a set_budget intent', async () => {
+    const client = mockGroqWithJSON({ intent: 'set_budget', confidence: 0.95 })
+    const r = await routeIntent({ client: client as never, text: 'set a budget for food 8000' })
+    expect(r.intent).toBe('set_budget')
+  })
+  it('regression: log_money still classifies', async () => {
+    const client = mockGroqWithJSON({ intent: 'log_money', confidence: 0.95 })
+    expect((await routeIntent({ client: client as never, text: 'spent 80 on chai' })).intent).toBe('log_money')
+  })
+  it('all 10 intents reachable', async () => {
+    const intents = ['log_money','log_task','log_learning','log_note','query_money','query_task','query_learning','query_notes','chat','set_budget'] as const
+    for (const intent of intents) {
+      const client = mockGroqWithJSON({ intent, confidence: 0.9 })
+      expect((await routeIntent({ client: client as never, text: 'x' })).intent).toBe(intent)
+    }
+  })
+})

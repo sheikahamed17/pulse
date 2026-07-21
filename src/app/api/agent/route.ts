@@ -14,6 +14,7 @@ import { parseLearningQuery } from '@/lib/agents/query-learning-agent'
 import { parseNotesQuery } from '@/lib/agents/query-notes-agent'
 import { parseLearning } from '@/lib/agents/learning-agent'
 import { parseNote } from '@/lib/agents/note-agent'
+import { parseBudget } from '@/lib/agents/budget-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -148,6 +149,26 @@ export async function POST(req: Request) {
           occurred_at: nowIso,
           source: 'manual',
         },
+      })
+    }
+
+    if (router.intent === 'set_budget') {
+      const parsedBudget = await parseBudget({
+        client: groq,
+        text: parsed.data.text,
+        categories: parsed.data.categories.map(c => ({ name: c.name, kind: c.kind })),
+        defaultCurrency: prefs.primary_currency,
+      })
+      const matchedCat = parsed.data.categories.find(
+        c => c.name === parsedBudget.category_name && c.kind === 'spend',
+      )
+      return NextResponse.json({
+        transcript: parsed.data.text,
+        intent: 'set_budget',
+        confidence: router.confidence,
+        payload: matchedCat
+          ? { kind: 'budget', category_id: matchedCat.id, category_name: matchedCat.name, amount: parsedBudget.amount, currency: parsedBudget.currency }
+          : null,   // no matching spend category → nothing to set
       })
     }
 

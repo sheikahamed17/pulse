@@ -22,6 +22,7 @@ export type ChipDraft =
   | (TaskPayload & { kind: 'task' })
   | (LearningPayload & { kind: 'learning' })
   | (NotePayload & { kind: 'note' })
+  | { kind: 'budget'; category_id: string; category_name: string; amount: number; currency: string }
 
 type Props = {
   userId: string
@@ -40,6 +41,9 @@ export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCan
   }
   if (draft.kind === 'note') {
     return <ConfirmationChipNote draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+  }
+  if (draft.kind === 'budget') {
+    return <ConfirmationChipBudget draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
   }
   return <ConfirmationChipMoney userId={userId} draft={draft} categoryById={categoryById} onConfirm={onConfirm} onCancel={onCancel} />
 }
@@ -577,6 +581,36 @@ function ConfirmationChipNote({
       </div>
 
       <p className="mt-1 text-center text-[10px] text-muted-foreground">tap any field to edit</p>
+    </div>
+  )
+}
+
+function ConfirmationChipBudget({ draft, onConfirm, onCancel }: {
+  draft: Extract<ChipDraft, { kind: 'budget' }>
+  onConfirm: Props['onConfirm']
+  onCancel: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const major = draft.amount / (draft.currency === 'JPY' ? 1 : 100)
+
+  async function handleConfirm() {
+    setBusy(true)
+    try {
+      await onConfirm(draft, { enabled: false, period: 'monthly', intervalCount: 1 })
+    }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <div className="glass-soft rounded-2xl p-3 flex items-center justify-between gap-3">
+      <span className="text-sm">
+        Budget · <span className="font-medium">{draft.category_name}</span> ·{' '}
+        <span className="font-mono tabular-nums">{currencySymbol(draft.currency)}{major.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>/mo
+      </span>
+      <span className="flex items-center gap-2">
+        <button type="button" aria-label="Confirm budget" className="min-h-[44px] px-3 text-xs rounded-lg bg-accent-2/20 text-accent-2 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none" onClick={handleConfirm} disabled={busy}>Set</button>
+        <button type="button" aria-label="Cancel" className="min-h-[44px] px-3 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded-lg" onClick={onCancel} disabled={busy}>Cancel</button>
+      </span>
     </div>
   )
 }

@@ -454,6 +454,21 @@ function AppPageInner() {
       return
     }
 
+    if (final.kind === 'budget') {
+      const existing = await db.budgets.get(final.category_id)
+      const op = await generateOp({
+        entity_kind: 'budget',
+        entity_id: final.category_id,
+        op_type: existing ? 'update' : 'create',
+        payload: { category_id: final.category_id, amount: final.amount, currency: final.currency },
+        user_id: user.id,
+      })
+      await applyLocalOp(op)
+      setDraft(null)
+      pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
+      return
+    }
+
     // Money kind (Phase 1 logic, preserved verbatim)
     let ruleId: string | null = null
     if (recurring.enabled) {

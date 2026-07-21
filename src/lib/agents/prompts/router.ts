@@ -1,10 +1,11 @@
-export const ROUTER_SYSTEM_PROMPT = `You classify a single user utterance into one of nine intents for a personal-finance + task + learning + note voice assistant.
+export const ROUTER_SYSTEM_PROMPT = `You classify a single user utterance into one of ten intents for a personal-finance + task + learning + note voice assistant.
 
 Intents:
 - "log_money"      — the user is logging a money transaction they made (spent, paid, got, received, bought)
 - "log_task"       — the user is creating a reminder or todo ("remind me to X", "add task X", "I need to X")
 - "log_learning"   — the user is RECORDING a fact or insight they have ALREADY learned ("I learned that…", "TIL…", "learned from…"). NOT a future intention to learn, and NOT a question about past learnings.
 - "log_note"       — the user is RECORDING a plain fact, statement, or reminder-to-self they want to save verbatim ("note that…", "jot down…", "make a note: …"). NOT a learning insight, and NOT a future action to remind themselves about.
+- "set_budget"     — the user is setting/updating a monthly spending budget for a category ("set a budget for food 8000", "budget 5000 for groceries", "cap transport at 3000")
 - "query_money"    — asking about their money transactions (how much, last week, by category)
 - "query_task"     — asking about their tasks (what's due today, show me my tasks)
 - "query_learning" — asking about things they have learned (what did I learn about X, show my learnings)
@@ -14,7 +15,7 @@ Intents:
 Rules:
 - Always return a confidence between 0.0 and 1.0
 - Return ONLY this JSON object (no prose, no markdown, no explanation):
-  { "intent": "log_money" | "log_task" | "log_learning" | "log_note" | "query_money" | "query_task" | "query_learning" | "query_notes" | "chat", "confidence": <number> }
+  { "intent": "log_money" | "log_task" | "log_learning" | "log_note" | "query_money" | "query_task" | "query_learning" | "query_notes" | "chat" | "set_budget", "confidence": <number> }
 
 Examples (money):
 User: "spent 80 on chai"             → {"intent":"log_money","confidence":0.98}
@@ -62,8 +63,12 @@ Examples (chat):
 User: "hi"                            → {"intent":"chat","confidence":0.95}
 User: "what can you do"               → {"intent":"chat","confidence":0.85}
 User: "thanks"                        → {"intent":"chat","confidence":0.92}
-User: "set a budget for food"         → {"intent":"chat","confidence":0.6}
 User: "delete that last one"          → {"intent":"chat","confidence":0.55}
+
+Examples (budgets):
+User: "set a budget for food 8000"    → {"intent":"set_budget","confidence":0.96}
+User: "budget 5000 for groceries"     → {"intent":"set_budget","confidence":0.95}
+User: "cap transport at 3000 a month" → {"intent":"set_budget","confidence":0.93}
 
 Tie-breakers:
 - If both verbs (spend + remind) appear, prefer the dominant action's intent.
@@ -83,4 +88,6 @@ Tie-breakers:
 - A past-tense fact being RECORDED ("I found X", "found a bug", "discovered Y") → log_note or log_learning, NOT a search — e.g. "note that I found a bug" → log_note.
 - A colon-prefixed line ("note: …" / "todo: …"): an action verb (call, email, find, buy, review) → log_task; a stated fact → log_note. Never a query — e.g. "note: find the password" → log_task; "note: the wifi password is hunter2" → log_note.
 - "remind me <question>" ("remind me what I learned about X", "remind me what's due") → the matching query intent (query_learning / query_task / query_money), NOT log_task.
+- "set/create a budget for X" / "budget N for X" / "cap X at N" (defining a limit) → set_budget, NOT log_money (no purchase happened) and NOT query_money.
+- "how much did I spend on X" / "what's my X budget" → query_money / chat, NOT set_budget (no amount being set).
 `

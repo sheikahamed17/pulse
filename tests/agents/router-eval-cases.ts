@@ -147,4 +147,15 @@ export const ROUTER_EVAL_CASES: EvalCase[] = [
   { utterance: 'thanks', expected: 'chat' },
   { utterance: 'what can you do', expected: 'chat' },
   { utterance: 'delete that last one', expected: 'chat' },
+
+  // ── set_budget ────────────────────────────────────────────────
+  { utterance: 'set a budget for food 8000', expected: 'set_budget' },
+  { utterance: 'cap transport at 3000', expected: 'set_budget' },
+  { utterance: 'budget 5000 for groceries', expected: 'set_budget' },
+  {
+    utterance: "what's my food budget",
+    expected: 'query_money',
+    acceptable: ['chat'],
+    note: 'rule: "what\'s my X budget" (query, not setting) → query_money or chat, not set_budget',
+  },
 ]
