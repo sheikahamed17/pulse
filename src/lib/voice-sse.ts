@@ -25,48 +25,69 @@ export type VoiceFinalPayload = {
 export async function callVoiceApiStreaming(
   blob: Blob,
   onEvent: (e: VoiceStreamEvent) => void,
+  opts: { idleTimeoutMs?: number } = {},
 ): Promise<VoiceFinalPayload | null> {
-  const fd = new FormData()
-  fd.append('audio', blob, filenameForMime(blob.type))
-
-  const res = await fetch('/api/voice', { method: 'POST', body: fd })
-  if (!res.ok || !res.body) {
-    return null
+  // Abort if the stream goes silent for too long. The server legitimately streams
+  // over several seconds (transcribe → route → parse → payload), so this is an
+  // INACTIVITY timeout — rearmed on every chunk — not an overall deadline. A hung
+  // backend (e.g. a Groq rate-limit stall) then recovers to idle instead of freezing
+  // the UI on "Transcribing…". Returning null routes the caller to its offline queue.
+  const idleMs = opts.idleTimeoutMs ?? 20000
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const arm = () => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => controller.abort(), idleMs)
   }
 
-  const reader = res.body.getReader()
-  const dec = new TextDecoder()
-  let buf = ''
-  let final: VoiceFinalPayload | null = null
+  try {
+    const fd = new FormData()
+    fd.append('audio', blob, filenameForMime(blob.type))
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buf += dec.decode(value, { stream: true })
+    arm()
+    const res = await fetch('/api/voice', { method: 'POST', body: fd, signal: controller.signal })
+    if (!res.ok || !res.body) return null
 
-    // SSE event boundary is \n\n. Process complete events; keep the partial trailing.
-    let nl: number
-    while ((nl = buf.indexOf('\n\n')) >= 0) {
-      const raw = buf.slice(0, nl)
-      buf = buf.slice(nl + 2)
-      // raw starts with "data: <json>"; strip the prefix
-      const data = raw.startsWith('data: ') ? raw.slice(6) : raw
-      if (!data.trim()) continue
-      try {
-        const event = JSON.parse(data) as VoiceStreamEvent
-        onEvent(event)
-        if (event.step === 'payload') {
-          final = {
-            intent: event.intent,
-            payload: event.payload,
-            transcript: event.transcript ?? '',
+    const reader = res.body.getReader()
+    const dec = new TextDecoder()
+    let buf = ''
+    let final: VoiceFinalPayload | null = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      arm() // server is actively streaming — reset the inactivity timer
+      buf += dec.decode(value, { stream: true })
+
+      // SSE event boundary is \n\n. Process complete events; keep the partial trailing.
+      let nl: number
+      while ((nl = buf.indexOf('\n\n')) >= 0) {
+        const raw = buf.slice(0, nl)
+        buf = buf.slice(nl + 2)
+        // raw starts with "data: <json>"; strip the prefix
+        const data = raw.startsWith('data: ') ? raw.slice(6) : raw
+        if (!data.trim()) continue
+        try {
+          const event = JSON.parse(data) as VoiceStreamEvent
+          onEvent(event)
+          if (event.step === 'payload') {
+            final = {
+              intent: event.intent,
+              payload: event.payload,
+              transcript: event.transcript ?? '',
+            }
           }
+        } catch (err) {
+          console.warn('voice-sse: failed to parse event', data, err)
         }
-      } catch (err) {
-        console.warn('voice-sse: failed to parse event', data, err)
       }
     }
-  }
 
-  return final
+    return final
+  } catch {
+    // network error or inactivity abort — caller enqueues + recovers to idle
+    return null
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
