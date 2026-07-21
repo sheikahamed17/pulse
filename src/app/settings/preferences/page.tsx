@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { usePushSubscription } from '@/hooks/use-push-subscription'
+import { isVoiceAnswersEnabled, setVoiceAnswersEnabled } from '@/lib/speak'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { IANA_TIMEZONES } from '@/lib/iana-timezones'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ export default function PreferencesPage() {
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [speakAnswers, setSpeakAnswers] = useState(true)
   const previousPrefsRef = useRef(prefs)
 
   useEffect(() => {
@@ -44,6 +46,12 @@ export default function PreferencesPage() {
     }
     previousPrefsRef.current = prefs
   }, [dirty, prefs])
+
+  // Initialize speakAnswers from localStorage (avoid SSR mismatch)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSpeakAnswers(isVoiceAnswersEnabled())
+  }, [])
 
   const filteredTzs = tzQuery
     ? IANA_TIMEZONES.filter(z => z.toLowerCase().includes(tzQuery.toLowerCase()))
@@ -166,6 +174,19 @@ export default function PreferencesPage() {
           {pushStatus === 'pending' && (
             <p className="text-xs text-muted-foreground">Loading…</p>
           )}
+        </section>
+
+        <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+          <h2 className="text-sm font-medium">Voice answers</h2>
+          <p className="text-xs text-muted-foreground">Read spoken query answers aloud after a voice question.</p>
+          <button
+            type="button"
+            aria-pressed={speakAnswers}
+            onClick={() => { const next = !speakAnswers; setSpeakAnswers(next); setVoiceAnswersEnabled(next) }}
+            className="glass rounded-lg px-3 py-2 min-h-[44px] text-sm font-medium hover:bg-white/15 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none w-fit"
+          >
+            {speakAnswers ? '🔊 Speaking enabled — tap to mute' : '🔇 Muted — tap to enable'}
+          </button>
         </section>
 
         <div className="flex flex-col gap-2">
