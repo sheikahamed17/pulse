@@ -52,6 +52,21 @@ vi.mock('@/lib/agents/task-agent', () => ({
     title: 'Call mom', due_at: '2026-06-19T15:00:00.000Z', priority: 'medium',
   }),
 }))
+vi.mock('@/lib/agents/query-money-agent', () => ({
+  parseMoneyQuery: vi.fn().mockResolvedValue({
+    direction: 'out', category_name: 'Food', mode: 'total',
+    bucket: 'category', period: { from: '2026-06-11T00:00:00.000Z', to: '2026-06-18T00:00:00.000Z', label: 'last week' },
+  }),
+}))
+vi.mock('@/lib/agents/query-task-agent', () => ({
+  parseTaskQuery: vi.fn().mockResolvedValue({ status: 'overdue', period: null }),
+}))
+vi.mock('@/lib/agents/query-learning-agent', () => ({
+  parseLearningQuery: vi.fn().mockResolvedValue({ search: 'test', tags: [], period: null }),
+}))
+vi.mock('@/lib/agents/query-notes-agent', () => ({
+  parseNotesQuery: vi.fn().mockResolvedValue({ search: 'test', tags: [], period: null }),
+}))
 
 const { POST } = await import('@/app/api/voice/route')
 
@@ -103,6 +118,27 @@ describe('/api/voice (SSE)', () => {
     const payload = (events.find(e => e.step === 'payload') as { payload: { kind: string; title: string } }).payload
     expect(payload.kind).toBe('task')
     expect(payload.title).toBe('Call mom')
+  })
+
+  it('emits a query_money plan payload for a money question', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_money', confidence: 0.93 })
+    const res = await POST(multipartReq(new Blob(['x'], { type: 'audio/webm' })))
+    const events = await consumeSSE(res)
+    expect(events.map(e => e.step)).toEqual(['transcribing', 'transcript', 'parsing', 'payload'])
+    const payload = (events[3] as { payload: { kind: string; mode: string } }).payload
+    expect(payload.kind).toBe('query_money')
+    expect(payload.mode).toBe('total')
+  })
+
+  it('emits a query_task plan payload for a task question', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_task', confidence: 0.9 })
+    const res = await POST(multipartReq(new Blob(['x'], { type: 'audio/webm' })))
+    const events = await consumeSSE(res)
+    const payload = (events[3] as { payload: { kind: string; status: string } }).payload
+    expect(payload.kind).toBe('query_task')
+    expect(payload.status).toBe('overdue')
   })
 
   it('returns 401 without session', async () => {

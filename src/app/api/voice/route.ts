@@ -10,6 +10,10 @@ import { parseMoneyEntry } from '@/lib/agents/money-agent'
 import { parseTaskEntry } from '@/lib/agents/task-agent'
 import { parseLearning } from '@/lib/agents/learning-agent'
 import { parseNote } from '@/lib/agents/note-agent'
+import { parseMoneyQuery } from '@/lib/agents/query-money-agent'
+import { parseTaskQuery } from '@/lib/agents/query-task-agent'
+import { parseLearningQuery } from '@/lib/agents/query-learning-agent'
+import { parseNotesQuery } from '@/lib/agents/query-notes-agent'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,14 +157,36 @@ export async function POST(req: Request) {
               source: 'voice',
             },
           })
-        } else {
-          // query_money / query_task / chat — no payload yet (query_money lands in 2.6)
-          send({
-            step: 'payload',
-            intent: router.intent,
-            transcript,
-            payload: null,
+        } else if (router.intent === 'query_money') {
+          const plan = await parseMoneyQuery({
+            client: groq,
+            text: transcript,
+            categories: cats.map(c => ({ name: c.name, kind: c.kind as 'spend' | 'income' })),
+            nowIso,
+            userTz: prefs.tz,
           })
+          send({ step: 'payload', intent: 'query_money', transcript, payload: {
+            kind: 'query_money', direction: plan.direction, category_name: plan.category_name,
+            mode: plan.mode, bucket: plan.bucket, period: plan.period,
+          } })
+        } else if (router.intent === 'query_task') {
+          const plan = await parseTaskQuery({ client: groq, text: transcript, nowIso, userTz: prefs.tz })
+          send({ step: 'payload', intent: 'query_task', transcript, payload: {
+            kind: 'query_task', status: plan.status, period: plan.period,
+          } })
+        } else if (router.intent === 'query_learning') {
+          const plan = await parseLearningQuery({ client: groq, text: transcript, nowIso, userTz: prefs.tz })
+          send({ step: 'payload', intent: 'query_learning', transcript, payload: {
+            kind: 'query_learning', search: plan.search, tags: plan.tags, period: plan.period,
+          } })
+        } else if (router.intent === 'query_notes') {
+          const plan = await parseNotesQuery({ client: groq, text: transcript, nowIso, userTz: prefs.tz })
+          send({ step: 'payload', intent: 'query_notes', transcript, payload: {
+            kind: 'query_notes', search: plan.search, tags: plan.tags, period: plan.period,
+          } })
+        } else {
+          // chat — no actionable payload
+          send({ step: 'payload', intent: router.intent, transcript, payload: null })
         }
       } catch (err) {
         send({ step: 'error', message: (err as Error).message })
