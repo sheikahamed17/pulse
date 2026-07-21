@@ -55,6 +55,7 @@ export async function POST(req: Request) {
 
     const progress = computeBudgetProgress(money, userBudgets as unknown as BudgetRow[], monthKey, tz, toPrimary)
 
+    const divisor = primary === 'JPY' ? 1 : 100
     for (const p of progress) {
       for (const threshold of THRESHOLDS) {
         if (p.pct < threshold) continue
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
           id: notifId,
           user_id: userId,
           title: `Budget alert: ${cat?.name ?? 'category'} at ${p.pct}%`,
-          body: `${(p.spent / 100).toFixed(0)} of ${(p.limit / 100).toFixed(0)} this month`,
+          body: `${(p.spent / divisor).toFixed(0)} of ${(p.limit / divisor).toFixed(0)} this month`,
           url: '/app?tab=money',
           created_at: now,
           read_at: null,

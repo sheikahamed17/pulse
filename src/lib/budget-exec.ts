@@ -2,8 +2,8 @@ import type { BudgetRow, MoneyEntryRow } from '@/lib/dexie'
 
 export type BudgetProgress = {
   categoryId: string
-  limit: number
-  spent: number
+  limit: number                     // in user's PRIMARY currency minor units (whole yen for JPY, cents for USD/INR/etc)
+  spent: number                     // in user's PRIMARY currency minor units (whole yen for JPY, cents for USD/INR/etc)
   pct: number                       // rounded, display only
   state: 'ok' | 'warn' | 'over'
 }

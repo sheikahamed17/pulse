@@ -87,4 +87,21 @@ describe('/api/cron/budgets', () => {
     const body = await res.json() as { alerts_created: number }
     expect(body.alerts_created).toBe(0)
   })
+  it('JPY-primary user gets whole-yen figures in notification (not 100x too small)', async () => {
+    // Set up JPY-primary user with JPY budget of 500000 and spending of 500000 (100%)
+    state.prefs = [{ user_id: 'u1', primary_currency: 'JPY', tz: 'Asia/Tokyo' }]
+    state.budgets = [{ id: 'cat-1', user_id: 'u1', category_id: 'cat-1', amount: 500000, currency: 'JPY', deleted_at: null }]
+    state.money = [{ id: 'm1', user_id: 'u1', category_id: 'cat-1', amount: 500000, currency: 'JPY', direction: 'out', occurred_at: new Date().toISOString(), deleted_at: null }]
+
+    const res = await POST(req())
+    const body = await res.json() as { alerts_created: number }
+    expect(body.alerts_created).toBe(2)   // 80% and 100% thresholds crossed
+
+    // Assert notification bodies contain whole-yen figures (500000, not 5000 which would be the incorrect 100x division)
+    const monthKey = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit',
+    }).format(new Date()).replace(/(\d{4})-(\d{2})/, '$1-$2')
+    const notif100 = state.notifs.find(n => n.id === `budget-cat-1-${monthKey}-100`)
+    expect(notif100?.body).toBe('500000 of 500000 this month')
+  })
 })
