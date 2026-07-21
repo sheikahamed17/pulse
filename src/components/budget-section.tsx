@@ -164,6 +164,7 @@ export function BudgetSection({ userId }: Props) {
             />
             <button
               type="button"
+              aria-label="Save budget"
               className="min-h-[44px] px-3 text-xs rounded-lg bg-accent-2/20 text-accent-2 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none disabled:opacity-40"
               disabled={!newCatId || !newAmount}
               onClick={submitNew}
