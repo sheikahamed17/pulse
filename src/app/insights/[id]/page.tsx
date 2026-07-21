@@ -26,7 +26,7 @@ export default function InsightDetailPage() {
     <>
       <AuroraBackground />
       <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
-        <Link href="/insights" className="text-sm text-muted-foreground hover:underline">← All insights</Link>
+        <Link href="/insights" className="text-sm text-muted-foreground hover:underline focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded">← All insights</Link>
         {insight ? <InsightCard insight={insight} variant="detail" /> : <p className="text-sm text-muted-foreground">Insight not found.</p>}
       </main>
     </>
