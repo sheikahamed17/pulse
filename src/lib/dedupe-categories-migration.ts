@@ -52,13 +52,27 @@ export async function runCategoryDedupeOnce({ userId }: { userId: string }): Pro
     if (canon) await apply('recurring', r.id, 'update', { category_id: canon })
   }
   // 4. Migrate budgets: entity_id === category_id, so re-create on the canonical id.
+  //    Several dupe budgets can map to ONE canonical category (a budget set on each
+  //    device's own "Rent" dupe). Two blind creates on the same id would let op-order
+  //    LWW pick an arbitrary amount and silently drop the other — and could clobber a
+  //    budget already set on the canonical id. Instead collapse deterministically:
+  //    highest amount wins (a budget is a spending cap — never silently lower it), and
+  //    fold any existing canonical-id budget into the max so a stale dupe can't stomp it.
   const budgets = (await db.budgets.where('user_id').equals(userId).toArray()).filter(b => !b.deleted_at)
+  const winner = new Map<string, { amount: number; currency: string }>()
+  const dupeBudgetIds: string[] = []
+  const canonNeedsCreate = new Set<string>()
   for (const b of budgets) {
     const canon = plan.remap[b.category_id]
-    if (canon) {
-      await apply('budget', b.id, 'delete', {})
-      await apply('budget', canon, 'create', { category_id: canon, amount: b.amount, currency: b.currency })
-    }
+    if (canon) { dupeBudgetIds.push(b.id); canonNeedsCreate.add(canon) }
+    const key = canon ?? b.category_id
+    const cur = winner.get(key)
+    if (!cur || b.amount > cur.amount) winner.set(key, { amount: b.amount, currency: b.currency })
+  }
+  for (const id of dupeBudgetIds) await apply('budget', id, 'delete', {})
+  for (const canon of canonNeedsCreate) {
+    const w = winner.get(canon)!
+    await apply('budget', canon, 'create', { category_id: canon, amount: w.amount, currency: w.currency })
   }
   // 5. Tombstone the duplicate categories.
   for (const id of plan.tombstones) {

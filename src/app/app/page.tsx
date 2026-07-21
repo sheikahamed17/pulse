@@ -282,7 +282,10 @@ function AppPageInner() {
   useEffect(() => {
     if (!user) return
     seedDefaultCategoriesIfEmpty({ userId: user.id })
-      .then(n => { if (n > 0) pushPullOnce({ userId: user.id }).catch(console.error) })
+      // Sync BEFORE dedupe: push a fresh seed and — crucially for already-seeded
+      // accounts (seeder returns 0) — pull the server's existing dupes so the
+      // migration sees the full set, not just what this device happened to cache.
+      .then(() => pushPullOnce({ userId: user.id }).catch(console.error))
       .then(() => runCategoryDedupeOnce({ userId: user.id }))
       .then(r => { if (r.ran && r.tombstoned > 0) pushPullOnce({ userId: user.id }).catch(console.error) })
       .catch(err => console.error('seed/dedupe', err))
