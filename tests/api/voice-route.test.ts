@@ -141,6 +141,26 @@ describe('/api/voice (SSE)', () => {
     expect(payload.status).toBe('overdue')
   })
 
+  it('emits a query_learning plan payload for a learning question', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_learning', confidence: 0.9 })
+    const res = await POST(multipartReq(new Blob(['x'], { type: 'audio/webm' })))
+    const events = await consumeSSE(res)
+    const payload = (events[3] as { payload: { kind: string; search: string } }).payload
+    expect(payload.kind).toBe('query_learning')
+    expect(payload.search).toBe('test')
+  })
+
+  it('emits a query_notes plan payload for a notes question', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_notes', confidence: 0.9 })
+    const res = await POST(multipartReq(new Blob(['x'], { type: 'audio/webm' })))
+    const events = await consumeSSE(res)
+    const payload = (events[3] as { payload: { kind: string; search: string } }).payload
+    expect(payload.kind).toBe('query_notes')
+    expect(payload.search).toBe('test')
+  })
+
   it('returns 401 without session', async () => {
     const { getSession } = await import('@/lib/auth')
     ;(getSession as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null)
