@@ -1,6 +1,7 @@
 import { db } from '@/lib/dexie'
 import { generateOp, applyLocalOp } from '@/lib/sync-client'
 import type { CategoryPayload } from '@/lib/op-schemas/category'
+import { categoryId } from '@/lib/category-dedupe'
 
 type SeedCategory = Omit<CategoryPayload, 'sort_order'>
 
@@ -30,7 +31,7 @@ export async function seedDefaultCategoriesIfEmpty({ userId }: { userId: string 
     const cat = DEFAULT_CATEGORIES[i]
     const op = await generateOp({
       entity_kind: 'category',
-      entity_id: crypto.randomUUID(),
+      entity_id: categoryId(userId, cat.name),   // deterministic → idempotent across devices (no dup sets)
       op_type: 'create',
       payload: { ...cat, sort_order: i },
       user_id: userId,

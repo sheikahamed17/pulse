@@ -41,6 +41,15 @@ describe('seedDefaultCategoriesIfEmpty', () => {
     expect(u2).toBe(14)
   })
 
+  it('uses deterministic ids (cat-{userId}-{slug}) so multi-device seeds converge, not duplicate', async () => {
+    await seedDefaultCategoriesIfEmpty({ userId: 'u1' })
+    expect((await db.categories.get('cat-u1-rent'))?.name).toBe('Rent')
+    expect((await db.categories.get('cat-u1-food'))?.name).toBe('Food')
+    // op_log entity_ids are deterministic too (a second device would produce identical ids → LWW dedupes)
+    const rentOp = (await db.op_log.where('entity_kind').equals('category').toArray()).find(o => o.entity_id === 'cat-u1-rent')
+    expect(rentOp).toBeTruthy()
+  })
+
   it('exports DEFAULT_CATEGORIES with the expected names + icons', () => {
     const names = DEFAULT_CATEGORIES.map(c => c.name)
     expect(names).toContain('Food')

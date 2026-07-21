@@ -46,6 +46,7 @@ import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
 import { usePushSubscription } from '@/hooks/use-push-subscription'
 import { db } from '@/lib/dexie'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
+import { runCategoryDedupeOnce } from '@/lib/dedupe-categories-migration'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { drainVoiceQueue } from '@/lib/voice-queue'
 import { callVoiceApiStreaming } from '@/lib/voice-sse'
@@ -282,7 +283,9 @@ function AppPageInner() {
     if (!user) return
     seedDefaultCategoriesIfEmpty({ userId: user.id })
       .then(n => { if (n > 0) pushPullOnce({ userId: user.id }).catch(console.error) })
-      .catch(err => console.error('seed', err))
+      .then(() => runCategoryDedupeOnce({ userId: user.id }))
+      .then(r => { if (r.ran && r.tombstoned > 0) pushPullOnce({ userId: user.id }).catch(console.error) })
+      .catch(err => console.error('seed/dedupe', err))
   }, [user])
 
   useEffect(() => {
