@@ -30,3 +30,7 @@ export const NOTE_FIELDS = [
 export const INSIGHT_FIELDS = [
   'period', 'starts_at', 'ends_at', 'summary', 'metrics',
 ] as const
+
+export const BUDGET_FIELDS = [
+  'category_id', 'amount', 'currency',
+] as const

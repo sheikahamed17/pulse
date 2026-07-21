@@ -597,3 +597,22 @@ describe('applyLocalOp — note entity', () => {
     expect(await db.note_entries.count()).toBe(1)
   })
 })
+
+describe('applyLocalOp — budget entity', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('applyLocalOp materializes a budget to Dexie (client step)', async () => {
+    const op = await generateOp({
+      entity_kind: 'budget', entity_id: 'cat-food',
+      op_type: 'create',
+      payload: { category_id: 'cat-food', amount: 800000, currency: 'INR' },
+      user_id: 'u1',
+    })
+    await applyLocalOp(op)
+    const row = await db.budgets.get('cat-food')
+    expect(row).toBeTruthy()
+    expect(row!.amount).toBe(800000)
+    expect(row!.category_id).toBe('cat-food')
+    expect(row!.currency).toBe('INR')
+  })
+})

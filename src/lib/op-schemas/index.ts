@@ -6,9 +6,10 @@ import { TaskPayloadSchema } from './task'
 import { InsightPayloadSchema } from './insight'
 import { LearningPayloadSchema } from './learning'
 import { NotePayloadSchema } from './note'
+import { BudgetPayloadSchema } from './budget'
 import type { ENTITY_KINDS } from '@/types/ops'
 
-export { MoneyPayloadSchema, RecurringPayloadSchema, CategoryPayloadSchema, TaskPayloadSchema, InsightPayloadSchema, LearningPayloadSchema, NotePayloadSchema }
+export { MoneyPayloadSchema, RecurringPayloadSchema, CategoryPayloadSchema, TaskPayloadSchema, InsightPayloadSchema, LearningPayloadSchema, NotePayloadSchema, BudgetPayloadSchema }
 export type { MoneyPayload } from './money'
 export type { RecurringPayload } from './recurring'
 export type { CategoryPayload } from './category'
@@ -16,6 +17,7 @@ export type { TaskPayload } from './task'
 export type { InsightPayload } from './insight'
 export type { LearningPayload } from './learning'
 export type { NotePayload } from './note'
+export type { BudgetPayload } from './budget'
 
 type Kind = typeof ENTITY_KINDS[number]
 
@@ -28,6 +30,7 @@ export function getPayloadSchemaForKind(kind: Kind): z.ZodTypeAny | null {
     case 'insight':  return InsightPayloadSchema
     case 'learning': return LearningPayloadSchema
     case 'note':     return NotePayloadSchema
+    case 'budget':   return BudgetPayloadSchema
     default:         return null
   }
 }
