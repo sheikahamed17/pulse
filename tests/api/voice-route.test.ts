@@ -97,6 +97,14 @@ describe('/api/voice (SSE)', () => {
     return new Request('http://x/api/voice', { method: 'POST', body: fd })
   }
 
+  it('forwards the uploaded filename to Whisper (iOS records mp4 — must not force .webm)', async () => {
+    const { groqWhisper } = await import('@/lib/agents/whisper')
+    const fd = new FormData()
+    fd.append('audio', new Blob(['x'], { type: 'audio/mp4' }), 'voice.mp4')
+    await consumeSSE(await POST(new Request('http://x/api/voice', { method: 'POST', body: fd })))
+    expect(groqWhisper).toHaveBeenLastCalledWith(expect.objectContaining({ filename: 'voice.mp4' }))
+  })
+
   it('emits 4 events in order for a log_money utterance', async () => {
     const res = await POST(multipartReq(new Blob(['fake'], { type: 'audio/webm' })))
     expect(res.headers.get('content-type')).toMatch(/event-stream/)

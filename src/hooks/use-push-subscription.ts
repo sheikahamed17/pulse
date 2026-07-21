@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { withTimeout } from '@/lib/with-timeout'
 
 export type PushStatus = 'unsupported' | 'denied' | 'unsubscribed' | 'subscribed' | 'pending'
 
@@ -46,18 +47,18 @@ export function usePushSubscription() {
         return
       }
 
-      // Get registration and check existing subscription
+      // Get registration and check existing subscription.
+      // serviceWorker.ready can pend forever on iOS standalone PWAs (never resolves,
+      // never rejects), which would leave status on 'pending' → "Loading…" forever.
+      // Bound it and fall back to getRegistration() (resolves promptly) so we always
+      // reach a definite state.
       try {
-        const reg = await navigator.serviceWorker.ready
-        const sub = await reg.pushManager.getSubscription()
-
-        if (sub) {
-          setStatus('subscribed')
-        } else if (permission === 'granted') {
-          setStatus('unsubscribed')
-        } else {
-          setStatus('unsubscribed') // default
-        }
+        const reg =
+          (await withTimeout(navigator.serviceWorker.ready, 3000)) ??
+          (await navigator.serviceWorker.getRegistration()) ??
+          null
+        const sub = reg ? await reg.pushManager.getSubscription() : null
+        setStatus(sub ? 'subscribed' : 'unsubscribed')
       } catch {
         setStatus('unsubscribed')
       }
@@ -75,8 +76,11 @@ export function usePushSubscription() {
         return
       }
 
-      // Get service worker registration
-      const reg = await navigator.serviceWorker.ready
+      // Get service worker registration (bounded — see detect()).
+      const reg =
+        (await withTimeout(navigator.serviceWorker.ready, 5000)) ??
+        (await navigator.serviceWorker.getRegistration())
+      if (!reg) throw new Error('service worker not ready — try reopening the app')
       const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
       if (!vapidKey) {
         throw new Error('NEXT_PUBLIC_VAPID_PUBLIC_KEY not set')
@@ -112,9 +116,11 @@ export function usePushSubscription() {
 
   const unsubscribe = useCallback(async () => {
     try {
-      // Get current subscription
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
+      // Get current subscription (bounded — see detect()).
+      const reg =
+        (await withTimeout(navigator.serviceWorker.ready, 5000)) ??
+        (await navigator.serviceWorker.getRegistration())
+      const sub = reg ? await reg.pushManager.getSubscription() : null
 
       if (sub) {
         // Unsubscribe locally

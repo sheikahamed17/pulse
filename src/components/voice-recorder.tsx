@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Mic } from 'lucide-react'
 import { callVoiceApiStreaming, type VoiceStreamEvent } from '@/lib/voice-sse'
 import { enqueueVoice } from '@/lib/voice-queue'
+import { pickAudioMime } from '@/lib/audio-format'
 
 type Props = {
   onParsed: (payload: unknown, transcript: string) => void
@@ -33,12 +34,18 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
         audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true },
       })
       streamRef.current = stream
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
-      const recorder = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 32000 })
+      // Pick a format the device actually supports. iOS Safari records audio/mp4,
+      // not webm; an empty pick means "let the UA choose its default".
+      const mime = pickAudioMime(m => MediaRecorder.isTypeSupported(m))
+      const recorder = new MediaRecorder(stream, mime
+        ? { mimeType: mime, audioBitsPerSecond: 32000 }
+        : { audioBitsPerSecond: 32000 })
       chunksRef.current = []
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
       recorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: mime })
+        // Label the blob with the recorder's NEGOTIATED type (the truth), not the
+        // requested string — so the upload filename/extension matches the real bytes.
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mime || 'audio/webm' })
         await processBlob(blob)
       }
       recorder.start()
@@ -108,7 +115,7 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
       <p className={`text-xs ${state === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
         {state === 'idle'         && 'tap to record'}
         {state === 'recording'    && 'tap again to stop'}
-        {state === 'transcribing' && 'Listening to your voice…'}
+        {state === 'transcribing' && 'Transcribing…'}
         {state === 'transcript'   && transcript && `I heard: "${transcript}"`}
         {state === 'parsing'      && 'Understanding…'}
         {state === 'error'        && (error ?? 'error')}

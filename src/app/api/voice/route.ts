@@ -38,6 +38,9 @@ export async function POST(req: Request) {
   if (!formData) return NextResponse.json({ error: 'expected multipart/form-data' }, { status: 400 })
   const audio = formData.get('audio')
   if (!(audio instanceof Blob)) return NextResponse.json({ error: 'audio blob missing' }, { status: 400 })
+  // Preserve the client's extension (voice.mp4 on iOS, voice.webm on desktop) so
+  // Whisper detects the container from the name; don't force everything to .webm.
+  const audioFilename = audio instanceof File && audio.name ? audio.name : 'voice.webm'
 
   const { env } = getCloudflareContext()
   const apiKey = (env as { GROQ_API_KEY?: string }).GROQ_API_KEY
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
 
       try {
         send({ step: 'transcribing' })
-        const { transcript } = await groqWhisper({ client: groq, blob: audio, filename: 'voice.webm' })
+        const { transcript } = await groqWhisper({ client: groq, blob: audio, filename: audioFilename })
         send({ step: 'transcript', text: transcript })
 
         send({ step: 'parsing' })

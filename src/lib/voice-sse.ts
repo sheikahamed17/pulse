@@ -1,6 +1,7 @@
 // Shared parser for /api/voice's SSE event stream.
 // Used by VoiceRecorder (foreground) and voice-queue drain (background).
 // EventSource can't POST a multipart body, so we use fetch + manual SSE parsing.
+import { filenameForMime } from '@/lib/audio-format'
 
 export type VoiceStreamEvent =
   | { step: 'transcribing' }
@@ -26,7 +27,7 @@ export async function callVoiceApiStreaming(
   onEvent: (e: VoiceStreamEvent) => void,
 ): Promise<VoiceFinalPayload | null> {
   const fd = new FormData()
-  fd.append('audio', blob, 'voice.webm')
+  fd.append('audio', blob, filenameForMime(blob.type))
 
   const res = await fetch('/api/voice', { method: 'POST', body: fd })
   if (!res.ok || !res.body) {
