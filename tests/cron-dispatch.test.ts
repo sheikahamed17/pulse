@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { CRON_DISPATCH, resolveCronRoute } from '@/lib/cron-dispatch'
+import { CRON_DISPATCH, resolveCronRoute, resolveSecondaryCronRoutes } from '@/lib/cron-dispatch'
 
 describe('cron-dispatch', () => {
-  it('exports CRON_DISPATCH with exactly 6 mappings', () => {
-    expect(Object.keys(CRON_DISPATCH)).toHaveLength(6)
+  it('stays within the Cloudflare limit of 5 cron triggers (API code 10072)', () => {
+    expect(Object.keys(CRON_DISPATCH).length).toBeLessThanOrEqual(5)
   })
 
   it('maps 0 2 * * * to /api/cron/recur', () => {
@@ -23,8 +23,9 @@ describe('cron-dispatch', () => {
     expect(CRON_DISPATCH['30 14 * * 1']).toBe('/api/cron/digest')
   })
 
-  it('maps 0 8 * * * to /api/cron/budgets', () => {
-    expect(CRON_DISPATCH['0 8 * * *']).toBe('/api/cron/budgets')
+  it('runs budget alerts as a secondary route on the daily FX tick (no extra trigger)', () => {
+    expect(resolveSecondaryCronRoutes('0 3 * * *')).toContain('/api/cron/budgets')
+    expect(CRON_DISPATCH['0 8 * * *']).toBeUndefined()
   })
 
   it('resolveCronRoute returns null for unknown pattern', () => {

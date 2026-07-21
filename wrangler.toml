@@ -27,7 +27,7 @@ enabled = true
 # Phase 2.4: daily ECB fx-rates fetcher (one hour later to avoid overlap)
 # Phase 3.1: 15-min due-tasks cache updater
 # Phase 3.2: weekly digest (Mon 2:30 AM + Mon 2:30 PM)
-crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1", "0 8 * * *"]
+crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1"]
 
 # Local-dev notes:
 # - `pnpm exec wrangler dev` uses --persist by default for D1 (file under .wrangler/)
