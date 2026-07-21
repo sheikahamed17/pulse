@@ -158,4 +158,34 @@ export const ROUTER_EVAL_CASES: EvalCase[] = [
     acceptable: ['chat'],
     note: 'rule: "what\'s my X budget" (query, not setting) → query_money or chat, not set_budget',
   },
+
+  // ── set_budget ↔ log_money ambiguous-verb edges (router-skeptic, Task 4) ──
+  // Allocation/reservation verbs straddle log_money and set_budget. Harm is LOW
+  // in either direction: set_budget produces a dismissible confirmation chip, so
+  // nothing is written until the user taps Set. Live-model tuning, un-pinnable in
+  // mocked unit tests — this is the intended home for these observations.
+  {
+    utterance: 'I allocated 8000 for food',
+    expected: 'log_money',
+    acceptable: ['set_budget'],
+    note: 'ambiguous verb "allocate" — leans budget/reserve but could be spend; chip makes either dismissible',
+  },
+  {
+    utterance: 'put 8000 aside for groceries',
+    expected: 'log_money',
+    acceptable: ['set_budget'],
+    note: 'ambiguous "set aside" — reserve vs spend; low-harm either way',
+  },
+  {
+    utterance: 'committed 8000 to food this month',
+    expected: 'log_money',
+    acceptable: ['set_budget'],
+    note: 'ambiguous "committed" + "this month"; low-harm either way',
+  },
+  {
+    utterance: 'set a budget for food',
+    expected: 'chat',
+    acceptable: ['query_money', 'set_budget'],
+    note: 'regression guard: the old "set a budget for food"→chat example was replaced; no amount → vague',
+  },
 ]
