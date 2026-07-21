@@ -81,3 +81,18 @@ export function priorWeekBounds(nowIso: string, tz: string): { startsAt: string;
     endsAt: localWallClockToUtc(curMon.getUTCFullYear(), curMon.getUTCMonth() + 1, curMon.getUTCDate(), 0, 0, tz),
   }
 }
+
+/**
+ * The IN-PROGRESS local week, as UTC ISO boundaries: startsAt = this week's
+ * Monday 00:00 local; endsAt = now (week-to-date). Companion to priorWeekBounds.
+ */
+export function currentWeekBounds(nowIso: string, tz: string): { startsAt: string; endsAt: string } {
+  const p = localParts(nowIso, tz)
+  const sinceMonday = p.weekday === 0 ? 6 : p.weekday - 1
+  const curMon = new Date(Date.UTC(p.year, p.month - 1, p.day))
+  curMon.setUTCDate(curMon.getUTCDate() - sinceMonday)
+  return {
+    startsAt: localWallClockToUtc(curMon.getUTCFullYear(), curMon.getUTCMonth() + 1, curMon.getUTCDate(), 0, 0, tz),
+    endsAt: nowIso,
+  }
+}

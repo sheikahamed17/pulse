@@ -97,6 +97,7 @@ const fakeDb = {
     else if (table === 'fx_rates') data = fxRatesTable
     // CRITICALLY: map op_log to read from the SAME array that inserts push into
     else if (table === 'op_log') data = opLogTable
+    else if (table === 'insights') data = insightsTable
 
     // Helper to apply where filters
     const applyWheres = (
@@ -125,6 +126,9 @@ const fakeDb = {
             if (col === 'user_id' && r.user_id !== val) return false
           }
           if (table === 'op_log') {
+            if (col === 'id' && r.id !== val) return false
+          }
+          if (table === 'insights') {
             if (col === 'id' && r.id !== val) return false
           }
         }
@@ -209,6 +213,24 @@ vi.mock('@opennextjs/cloudflare', () => ({
 }))
 vi.mock('@/lib/db', () => ({ createDb: () => fakeDb }))
 vi.mock('@/lib/web-push', () => ({ sendPushToUser: vi.fn().mockResolvedValue({ sent: 1, pruned: 0 }) }))
+vi.mock('@/lib/digest-aggregate', () => ({
+  aggregateWeek: vi.fn(async () => {
+    const hasEntries = moneyEntriesTable.length > 0 || tasksTable.length > 0
+    return {
+      currency: 'INR',
+      spend_total: hasEntries ? 1000 : 0,
+      income_total: 0,
+      top_categories: [],
+      tasks_completed: tasksTable.length > 0 ? 1 : 0,
+      tasks_created: tasksTable.length > 0 ? 1 : 0,
+      tasks_overdue: 0,
+      skipped_currencies: [],
+      entry_count: moneyEntriesTable.length + tasksTable.length,
+    }
+  }),
+}))
+vi.mock('@/lib/agents/digest-agent', () => ({ writeDigestNarrative: vi.fn().mockResolvedValue('Test summary'), fallbackSummary: vi.fn(() => 'Fallback summary') }))
+vi.mock('@/lib/materialize', () => ({ materializeRow: vi.fn().mockResolvedValue(undefined) }))
 
 const { POST } = await import('@/app/api/cron/digest/route')
 const { sendPushToUser } = await import('@/lib/web-push')

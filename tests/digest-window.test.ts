@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isLocalMonday, priorWeekBounds } from '@/lib/digest-window'
+import { isLocalMonday, priorWeekBounds, currentWeekBounds } from '@/lib/digest-window'
 
 describe('digest-window', () => {
   describe('isLocalMonday', () => {
@@ -117,6 +117,23 @@ describe('digest-window', () => {
       const boundsUTC = priorWeekBounds('2026-07-02T09:00:00.000Z', 'UTC')
       expect(boundsUTC.startsAt).toBe('2026-06-22T00:00:00.000Z')
       expect(boundsUTC.endsAt).toBe('2026-06-29T00:00:00.000Z')
+    })
+  })
+
+  describe('currentWeekBounds', () => {
+    it('starts at this week\'s local Monday 00:00 and ends now (IST)', () => {
+      // 2026-07-22T06:00:00Z is Wed 11:30 IST → this week's Monday = 2026-07-20 00:00 IST = 2026-07-19T18:30:00Z
+      const now = '2026-07-22T06:00:00.000Z'
+      const b = currentWeekBounds(now, 'Asia/Kolkata')
+      expect(b.startsAt).toBe('2026-07-19T18:30:00.000Z')
+      expect(b.endsAt).toBe(now)
+    })
+    it('on Monday, starts today', () => {
+      // 2026-07-20T04:00:00Z = Mon 09:30 IST → Monday start = 2026-07-19T18:30:00Z
+      const now = '2026-07-20T04:00:00.000Z'
+      const b = currentWeekBounds(now, 'Asia/Kolkata')
+      expect(b.startsAt).toBe('2026-07-19T18:30:00.000Z')
+      expect(b.endsAt).toBe(now)
     })
   })
 })
