@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { CRON_DISPATCH, resolveCronRoute } from '@/lib/cron-dispatch'
 
 describe('cron-dispatch', () => {
-  it('exports CRON_DISPATCH with exactly 5 mappings', () => {
-    expect(Object.keys(CRON_DISPATCH)).toHaveLength(5)
+  it('exports CRON_DISPATCH with exactly 6 mappings', () => {
+    expect(Object.keys(CRON_DISPATCH)).toHaveLength(6)
   })
 
   it('maps 0 2 * * * to /api/cron/recur', () => {
@@ -21,6 +21,10 @@ describe('cron-dispatch', () => {
   it('maps both Monday digest patterns to /api/cron/digest', () => {
     expect(CRON_DISPATCH['30 2 * * 1']).toBe('/api/cron/digest')
     expect(CRON_DISPATCH['30 14 * * 1']).toBe('/api/cron/digest')
+  })
+
+  it('maps 0 8 * * * to /api/cron/budgets', () => {
+    expect(CRON_DISPATCH['0 8 * * *']).toBe('/api/cron/budgets')
   })
 
   it('resolveCronRoute returns null for unknown pattern', () => {
