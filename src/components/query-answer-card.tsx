@@ -23,11 +23,12 @@ type Props = {
   userId: string
   plan: QueryMoneyPlan
   onDismiss: () => void
+  onResult?: (input: import('@/lib/speak-answer').SpokenAnswerInput) => void
 }
 
 const AUTO_DISMISS_MS = 30_000
 
-export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
+export function QueryAnswerCard({ userId, plan, onDismiss, onResult }: Props) {
   const { prefs } = useUserPrefs()
   const fetchRange = useMemo(() => {
     return deltaFetchRange(plan.mode, plan.period)
@@ -139,6 +140,22 @@ export function QueryAnswerCard({ userId, plan, onDismiss }: Props) {
       series,
     }
   }, [filteredEntries, previousEntries, plan, toPrimary, categoryNameOf])
+
+  // Emit spoken answer input once per plan/result
+  useEffect(() => {
+    if (!onResult) return
+    const base = { kind: 'money' as const, mode: plan.mode, direction: plan.direction, categoryName: plan.category_name, periodLabel: plan.period.label, currency: prefs.primary_currency }
+    if (plan.mode === 'breakdown') {
+      onResult({ ...base, top: modeData.breakdown.map(b => ({ name: b.categoryName, amount: b.amount })) })
+    } else if (plan.mode === 'delta') {
+      onResult({ ...base, current: modeData.delta.current, deltaPct: modeData.delta.deltaPct })
+    } else if (plan.mode === 'series') {
+      onResult({ ...base, total: modeData.series.reduce((s, p) => s + p.amount, 0) })
+    } else {
+      onResult({ ...base, total: modeData.total.amount })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, modeData])
 
   // Mode-specific rendering
   const headerText = useMemo(() => {

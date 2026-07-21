@@ -15,6 +15,8 @@ import { QueryAnswerCard } from '@/components/query-answer-card'
 import { QueryListAnswer } from '@/components/query-list-answer'
 import type { QueryPlan } from '@/lib/query-plans'
 import { isQueryPlan } from '@/lib/query-plans'
+import { speak, cancelSpeech } from '@/lib/speak'
+import { speakableAnswer, type SpokenAnswerInput } from '@/lib/speak-answer'
 import { filterTasksForQuery } from '@/lib/query-task-exec'
 import { filterLearningsForQuery } from '@/lib/query-learning-exec'
 import { filterNotesForQuery } from '@/lib/query-notes-exec'
@@ -70,11 +72,14 @@ function nextDueFromAnchor(anchorIso: string, period: 'daily'|'weekly'|'monthly'
   })
 }
 
-function QueryTaskListAnswer({ userId, plan, onDismiss }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_task' }>; onDismiss: () => void }) {
+function QueryTaskListAnswer({ userId, plan, onDismiss, onResult }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_task' }>; onDismiss: () => void; onResult?: (i: SpokenAnswerInput) => void }) {
   const allTasks = useTasks(userId, 'all')
   const nowIso = new Date().toISOString()
   const filtered = filterTasksForQuery(allTasks, plan, nowIso)
   const { prefs } = useUserPrefs()
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { onResult?.({ kind: 'task', count: filtered.length, status: plan.status }) }, [plan, filtered.length])
 
   const title = plan.status === 'open' ? 'Open tasks' :
     plan.status === 'overdue' ? 'Overdue tasks' :
@@ -129,10 +134,13 @@ function QueryTaskListAnswer({ userId, plan, onDismiss }: { userId: string; plan
   )
 }
 
-function QueryLearningListAnswer({ userId, plan, onDismiss }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_learning' }>; onDismiss: () => void }) {
+function QueryLearningListAnswer({ userId, plan, onDismiss, onResult }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_learning' }>; onDismiss: () => void; onResult?: (i: SpokenAnswerInput) => void }) {
   const allLearnings = useLearnings(userId)
   const filtered = filterLearningsForQuery(allLearnings, plan)
   const { prefs } = useUserPrefs()
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { onResult?.({ kind: 'learning', count: filtered.length, search: plan.search }) }, [plan, filtered.length])
 
   let title = 'Learnings'
   if (plan.search) title = `Learnings about ${plan.search}`
@@ -182,10 +190,13 @@ function QueryLearningListAnswer({ userId, plan, onDismiss }: { userId: string; 
   )
 }
 
-function QueryNotesListAnswer({ userId, plan, onDismiss }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_notes' }>; onDismiss: () => void }) {
+function QueryNotesListAnswer({ userId, plan, onDismiss, onResult }: { userId: string; plan: Extract<QueryPlan, { kind: 'query_notes' }>; onDismiss: () => void; onResult?: (i: SpokenAnswerInput) => void }) {
   const allNotes = useNotes(userId)
   const filtered = filterNotesForQuery(allNotes, plan)
   const { prefs } = useUserPrefs()
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { onResult?.({ kind: 'notes', count: filtered.length, search: plan.search }) }, [plan, filtered.length])
 
   let title = 'Notes'
   if (plan.search) title = `Notes about ${plan.search}`
@@ -237,6 +248,7 @@ function AppPageInner() {
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<ChipDraft | null>(null)
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null)
+  const [querySource, setQuerySource] = useState<'voice' | 'text' | null>(null)
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
@@ -336,6 +348,16 @@ function AppPageInner() {
     return openTasksForBadge.filter(t => !t.due_at || t.due_at <= now).length
   }, [openTasksForBadge])
 
+  function handleAnswerResult(input: SpokenAnswerInput) {
+    if (querySource === 'voice') speak(speakableAnswer(input))
+  }
+
+  function dismissQuery() {
+    cancelSpeech()
+    setQueryPlan(null)
+    setQuerySource(null)
+  }
+
   async function parseText() {
     if (!text.trim() || !user) return
     setParsing(true)
@@ -357,6 +379,7 @@ function AppPageInner() {
       }
       if (isQueryPlan(data.payload)) {
         setQueryPlan(data.payload)
+        setQuerySource('text')
         setText('')
       } else {
         setDraft(data.payload as ChipDraft)
@@ -552,8 +575,9 @@ function AppPageInner() {
                       occurred_at: new Date().toISOString(),
                       source: 'voice', raw_input: transcript,
                     })
-                  } else if ((payload as QueryPlan).kind === 'query_money') {
-                    setQueryPlan(payload as QueryPlan)
+                  } else if (isQueryPlan(payload)) {
+                    setQueryPlan(payload)
+                    setQuerySource('voice')
                   } else {
                     setDraft(payload as ChipDraft)
                   }
@@ -594,7 +618,8 @@ function AppPageInner() {
             <QueryAnswerCard
               userId={user.id}
               plan={queryPlan}
-              onDismiss={() => setQueryPlan(null)}
+              onResult={handleAnswerResult}
+              onDismiss={dismissQuery}
             />
           )}
 
@@ -602,7 +627,8 @@ function AppPageInner() {
             <QueryTaskListAnswer
               userId={user.id}
               plan={queryPlan}
-              onDismiss={() => setQueryPlan(null)}
+              onResult={handleAnswerResult}
+              onDismiss={dismissQuery}
             />
           )}
 
@@ -610,7 +636,8 @@ function AppPageInner() {
             <QueryLearningListAnswer
               userId={user.id}
               plan={queryPlan}
-              onDismiss={() => setQueryPlan(null)}
+              onResult={handleAnswerResult}
+              onDismiss={dismissQuery}
             />
           )}
 
@@ -618,7 +645,8 @@ function AppPageInner() {
             <QueryNotesListAnswer
               userId={user.id}
               plan={queryPlan}
-              onDismiss={() => setQueryPlan(null)}
+              onResult={handleAnswerResult}
+              onDismiss={dismissQuery}
             />
           )}
 
