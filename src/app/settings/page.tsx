@@ -18,6 +18,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/projects">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Projects</CardTitle>
+              <CardDescription>Group your tasks; rename, color, and archive projects.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/settings/recurring">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>
