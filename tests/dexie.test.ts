@@ -79,7 +79,7 @@ describe('Dexie schema v3 — Phase 2', () => {
       priority: 'medium' as const,
       completed_at: null,
       source: 'voice' as const, raw_input: 'remind me to call mom tomorrow at 3',
-      recur_period: null, recur_interval: null, tags: [], project_id: null,
+      recur_period: null, recur_interval: null, tags: [], project_id: null, parent_id: null,
       field_hlcs: { title: '0000000000000001-000000-d1' },
       deleted_at: null,
       created_at: '2026-06-18T14:30:00.000Z',
@@ -95,12 +95,12 @@ describe('Dexie schema v3 — Phase 2', () => {
     await db.tasks.bulkPut([
       { id: 'a', user_id: 'u1', title: 'a', due_at: '2026-06-19T00:00:00.000Z',
         priority: 'medium', completed_at: null, source: 'manual', raw_input: null,
-        recur_period: null, recur_interval: null, tags: [], project_id: null,
+        recur_period: null, recur_interval: null, tags: [], project_id: null, parent_id: null,
         field_hlcs: {}, deleted_at: null,
         created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z' },
       { id: 'b', user_id: 'u1', title: 'b', due_at: '2026-06-25T00:00:00.000Z',
         priority: 'high', completed_at: null, source: 'manual', raw_input: null,
-        recur_period: null, recur_interval: null, tags: [], project_id: null,
+        recur_period: null, recur_interval: null, tags: [], project_id: null, parent_id: null,
         field_hlcs: {}, deleted_at: null,
         created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z' },
     ])

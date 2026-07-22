@@ -5,7 +5,7 @@ import type { TaskRow } from '@/lib/dexie'
 const t = (over: Partial<TaskRow>): TaskRow => ({
   id: 'x', user_id: 'u1', title: 't', due_at: null, priority: 'medium', completed_at: null,
   source: 'manual', raw_input: null, recur_period: null, recur_interval: null,
-  tags: [], project_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...over,
+  tags: [], project_id: null, parent_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...over,
 })
 
 describe('addTag', () => {

@@ -152,6 +152,7 @@ export interface TaskTable {
   recur_interval: number | null
   tags: string | null          // JSON string[]
   project_id: string | null
+  parent_id: string | null
   field_hlcs: string
   deleted_at: string | null
   created_at: string
