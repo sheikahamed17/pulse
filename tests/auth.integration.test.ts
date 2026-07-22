@@ -10,7 +10,10 @@ describe('Better Auth integration', () => {
     // Dynamic import to avoid immediate context requirements
     const { handler } = await import('../src/lib/auth')
     expect(typeof handler).toBe('function')
-  })
+    // 30s: this first import instantiates Better Auth (passkey plugin etc.) — heavy
+    // enough to cross vitest's 5s default under full-suite parallel load (matches the
+    // pin-lock / auth-passkey timeout bumps). Later tests hit the module cache.
+  }, 30_000)
 
   it('getSession is an async function', async () => {
     const { getSession } = await import('../src/lib/auth')

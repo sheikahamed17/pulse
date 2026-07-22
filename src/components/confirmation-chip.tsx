@@ -18,7 +18,7 @@ import type { NotePayload } from '@/lib/op-schemas/note'
 import type { CategoryRow } from '@/lib/dexie'
 
 export type ChipDraft =
-  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string })
+  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; draftId?: string })
   | (TaskPayload & { kind: 'task' })
   | (LearningPayload & { kind: 'learning' })
   | (NotePayload & { kind: 'note' })

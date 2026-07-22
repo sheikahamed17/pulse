@@ -52,6 +52,8 @@ import { drainVoiceQueue } from '@/lib/voice-queue'
 import { callVoiceApiStreaming } from '@/lib/voice-sse'
 import { drainReceiptQueue } from '@/lib/receipt-queue'
 import { callReceiptApiStreaming } from '@/lib/receipt-sse'
+import { saveReceiptDraft, listReceiptDrafts, deleteReceiptDraft, pickNextReceiptDraft } from '@/lib/receipt-drafts'
+import type { MoneyPayload } from '@/lib/op-schemas/money'
 import { computeNextDue } from '@/lib/recurring'
 import { withWebLock } from '@/lib/web-lock'
 
@@ -248,6 +250,7 @@ function AppPageInner() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<ChipDraft | null>(null)
+  const [drainTick, setDrainTick] = useState(0)
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null)
   const [querySource, setQuerySource] = useState<'voice' | 'text' | null>(null)
   const [parsing, setParsing] = useState(false)
@@ -325,15 +328,14 @@ function AppPageInner() {
       withWebLock('pulse-receipt-drain', async () => {
         await drainReceiptQueue({
           processBlob: async (blob) => {
-            // Background drain — mirrors the voice-queue drain effect exactly.
-            // The R2 upload + vision parse happen server-side; the parsed payload
-            // is intentionally discarded here (no chip surfaced) so a background
-            // drain never clobbers an active edit. The receipt image is preserved
-            // in R2 regardless and is viewable via the T36 viewer. Surfacing a
-            // drained receipt as a chip would need a draftRef (to read current
-            // draft without putting `draft` in deps) — deliberately deferred.
+            // Background drain: parse server-side, then PERSIST the parsed money
+            // payload as a receipt draft so it survives reload and later surfaces as
+            // the confirmation chip (was discarded here). The R2 image is referenced
+            // by payload.receipt_key; drainTick nudges the surfacing effect.
             const final = await callReceiptApiStreaming(blob, () => {})
             if (!final) throw new Error('receipt drain failed')
+            await saveReceiptDraft(final.payload as MoneyPayload)
+            setDrainTick(t => t + 1)
             return { ok: true }
           },
           maxRetries: 3,
@@ -344,6 +346,25 @@ function AppPageInner() {
     onOnline()
     return () => window.removeEventListener('online', onOnline)
   }, [user])
+
+  // Surface a background-drained receipt as the confirmation chip — one at a time,
+  // only when the chip slot is free (never clobbers an active edit). Re-runs when
+  // `draft` clears (after confirm/cancel) → pops the next drained draft.
+  useEffect(() => {
+    if (!user || draft !== null || parsing || queryPlan !== null) return
+    let cancelled = false
+    ;(async () => {
+      const next = pickNextReceiptDraft(await listReceiptDrafts())
+      if (cancelled || !next) return
+      setDraft({
+        ...next.payload,
+        kind: 'money',
+        draftId: next.id,
+        receiptPreviewUrl: next.payload.receipt_key ? `/api/receipt/${next.payload.receipt_key}` : undefined,
+      } as ChipDraft)
+    })()
+    return () => { cancelled = true }
+  }, [user, draft, parsing, queryPlan, drainTick])
 
   const categories = useCategories(user?.id)
   const categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
@@ -539,6 +560,7 @@ function AppPageInner() {
       user_id: user.id,
     })
     await applyLocalOp(entryOp)
+    if (final.draftId) await deleteReceiptDraft(final.draftId)
     if (activeTab !== 'money') setTab('money')
     setDraft(null)
     pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
@@ -616,7 +638,10 @@ function AppPageInner() {
               draft={draft}
               categoryById={categoryById}
               onConfirm={confirmEntry}
-              onCancel={() => setDraft(null)}
+              onCancel={() => {
+                if (draft?.kind === 'money' && draft.draftId) deleteReceiptDraft(draft.draftId).catch(console.error)
+                setDraft(null)
+              }}
             />
           )}
 
