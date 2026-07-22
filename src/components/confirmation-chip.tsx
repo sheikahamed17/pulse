@@ -212,11 +212,14 @@ function ConfirmationChipTask({
   const [editingTitle, setEditingTitle] = useState(false)
   const [editingDue, setEditingDue] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [makeRecurring, setMakeRecurring] = useState(false)
+  const [period, setPeriod] = useState<Period>('daily')
+  const [intervalCount, setIntervalCount] = useState(1)
   const { prefs } = useUserPrefs()
 
   async function handleConfirm() {
     setBusy(true)
-    try { await onConfirm(d, { enabled: false, period: 'monthly', intervalCount: 1 }) }
+    try { await onConfirm(d, { enabled: makeRecurring, period, intervalCount }) }
     finally { setBusy(false) }
   }
 
@@ -286,6 +289,24 @@ function ConfirmationChipTask({
           <option value="medium">medium</option>
           <option value="high">high</option>
         </select>
+      </div>
+
+      <div className="mb-3 flex flex-col gap-2">
+        <label className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+          <span>Repeat after completion</span>
+          <input
+            type="checkbox"
+            checked={makeRecurring}
+            onChange={e => setMakeRecurring(e.currentTarget.checked)}
+          />
+        </label>
+        {makeRecurring && (
+          <PeriodPicker
+            period={period}
+            intervalCount={intervalCount}
+            onChange={(p, n) => { setPeriod(p); setIntervalCount(n) }}
+          />
+        )}
       </div>
 
       <div className="flex gap-2">

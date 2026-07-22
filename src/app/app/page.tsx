@@ -446,6 +446,8 @@ function AppPageInner() {
           completed_at: null,
           source: final.source,
           raw_input: final.raw_input ?? null,
+          recur_period: recurring.enabled ? recurring.period : null,
+          recur_interval: recurring.enabled ? recurring.intervalCount : null,
         },
         user_id: user.id,
       })
