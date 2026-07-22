@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable, type Table } from 'dexie'
 import type { Op } from '@/types/ops'
+import type { MoneyPayload } from '@/lib/op-schemas/money'
 
 type SyncMeta = {
   key: string
@@ -34,6 +35,12 @@ export type ReceiptQueueItem = {
   created_at: string
   retry_count: number
   status: 'queued' | 'processing' | 'done' | 'failed'
+}
+
+export type ReceiptDraftRow = {
+  id: string
+  payload: MoneyPayload
+  created_at: string
 }
 
 export type WidgetRow = {
@@ -180,6 +187,7 @@ class PulseDb extends Dexie {
   learning_entries!: EntityTable<LearningRow, 'id'>
   note_entries!: EntityTable<NoteRow, 'id'>
   budgets!: EntityTable<BudgetRow, 'id'>
+  receipt_drafts!: EntityTable<ReceiptDraftRow, 'id'>
   fx_rates!: Table<FxRateRow>
 
   constructor() {
@@ -212,6 +220,9 @@ class PulseDb extends Dexie {
     this.version(7).stores({
       budgets: 'id, user_id, category_id, [user_id+category_id]',
     })
+    this.version(8).stores({
+      receipt_drafts: 'id, created_at',
+    })
   }
 }
 
@@ -231,5 +242,6 @@ export async function resetDb() {
   await db.learning_entries.clear()
   await db.note_entries.clear()
   await db.budgets.clear()
+  await db.receipt_drafts.clear()
   await db.fx_rates.clear()
 }
