@@ -9,6 +9,8 @@ export const TaskPayloadSchema = z.object({
   raw_input:      z.string().nullable().optional(),
   recur_period:   z.enum(['daily', 'weekly', 'monthly', 'yearly']).nullable().optional(),
   recur_interval: z.number().int().positive().nullable().optional(),
+  tags:           z.array(z.string().min(1).max(40)).max(20).default([]),
+  project_id:     z.string().min(1).nullable().optional(),
 })
 
 export type TaskPayload = z.infer<typeof TaskPayloadSchema>

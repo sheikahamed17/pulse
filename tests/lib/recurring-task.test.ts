@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { nextRecurringTaskPayload, taskCompletionOps, formatRecurrence } from '@/lib/recurring-task'
 
-const base = { title: 'Water plants', priority: 'medium' as const, recur_period: 'daily' as const, recur_interval: 3 }
+const base = { title: 'Water plants', priority: 'medium' as const, recur_period: 'daily' as const, recur_interval: 3, tags: ['home'], project_id: 'p1' }
 
 describe('nextRecurringTaskPayload', () => {
   it('schedules the next instance interval-periods after completion', () => {
@@ -13,6 +13,8 @@ describe('nextRecurringTaskPayload', () => {
     expect(next.priority).toBe('medium')
     expect(next.recur_period).toBe('daily')
     expect(next.recur_interval).toBe(3)
+    expect(next.tags).toEqual(['home'])       // tags carry forward
+    expect(next.project_id).toBe('p1')        // project carries forward
   })
 
   it('handles weekly / monthly month-end clamp / yearly', () => {
@@ -34,7 +36,7 @@ describe('taskCompletionOps', () => {
   })
 
   it('completing a NON-recurring task: just marks done, no next', () => {
-    const r = taskCompletionOps({ completed_at: null, title: 'x', priority: 'low', recur_period: null, recur_interval: null }, '2026-07-22T09:00:00.000Z')
+    const r = taskCompletionOps({ completed_at: null, title: 'x', priority: 'low', recur_period: null, recur_interval: null, tags: [], project_id: null }, '2026-07-22T09:00:00.000Z')
     expect(r.update).toEqual({ completed_at: '2026-07-22T09:00:00.000Z' })
     expect(r.next).toBeNull()
   })

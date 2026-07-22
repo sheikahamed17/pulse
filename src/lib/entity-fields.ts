@@ -17,6 +17,7 @@ export const CATEGORY_FIELDS = [
 export const TASK_FIELDS = [
   'title', 'due_at', 'priority', 'completed_at',
   'source', 'raw_input', 'recur_period', 'recur_interval',
+  'tags', 'project_id',
 ] as const
 
 export const LEARNING_FIELDS = [

@@ -11,7 +11,7 @@ type Priority = 'low' | 'medium' | 'high'
  * completion time (the after-completion model).
  */
 export function nextRecurringTaskPayload(
-  task: { title: string; priority: Priority; recur_period: RecurPeriod; recur_interval: number },
+  task: { title: string; priority: Priority; recur_period: RecurPeriod; recur_interval: number; tags: string[]; project_id: string | null },
   completedAtIso: string,
 ): TaskPayload {
   const rule: RecurringRule = {
@@ -35,6 +35,8 @@ export function nextRecurringTaskPayload(
     raw_input: null,
     recur_period: task.recur_period,
     recur_interval: task.recur_interval,
+    tags: task.tags,
+    project_id: task.project_id,
   }
 }
 
@@ -44,7 +46,7 @@ export function nextRecurringTaskPayload(
  * create payload; every other toggle is a plain completed_at update with no next.
  */
 export function taskCompletionOps(
-  task: { completed_at: string | null; title: string; priority: Priority; recur_period: RecurPeriod | null; recur_interval: number | null },
+  task: { completed_at: string | null; title: string; priority: Priority; recur_period: RecurPeriod | null; recur_interval: number | null; tags: string[]; project_id: string | null },
   nowIso: string,
 ): { update: Partial<TaskPayload>; next: TaskPayload | null } {
   const completing = !task.completed_at
@@ -52,7 +54,7 @@ export function taskCompletionOps(
     return {
       update: { completed_at: nowIso, recur_period: null, recur_interval: null },
       next: nextRecurringTaskPayload(
-        { title: task.title, priority: task.priority, recur_period: task.recur_period, recur_interval: task.recur_interval },
+        { title: task.title, priority: task.priority, recur_period: task.recur_period, recur_interval: task.recur_interval, tags: task.tags, project_id: task.project_id },
         nowIso,
       ),
     }

@@ -121,6 +121,8 @@ export type TaskRow = {
   raw_input: string | null
   recur_period: 'daily' | 'weekly' | 'monthly' | 'yearly' | null
   recur_interval: number | null
+  tags: string[]
+  project_id: string | null
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string

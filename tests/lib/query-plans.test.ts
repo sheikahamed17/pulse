@@ -64,6 +64,7 @@ describe('isQueryPlan', () => {
       priority: 'medium',
       source: 'manual',
       raw_input: null,
+      tags: [],
     }
     expect(isQueryPlan(draft)).toBe(false)
   })
