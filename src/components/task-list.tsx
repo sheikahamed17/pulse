@@ -9,7 +9,7 @@ import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
-import type { TaskRow } from '@/lib/dexie'
+import { db, type TaskRow } from '@/lib/dexie'
 
 type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null }
 
@@ -47,12 +47,13 @@ export function TaskList({ userId, filter, projectId = null, tag = null }: Props
       }))
     }
     // Sub-task: roll the completion up to the parent (bottom-up auto-complete).
+    // Read siblings FRESH from Dexie (after the child op applied) so a concurrent
+    // sync can't leave us rolling up a stale sibling set.
     if (t.parent_id) {
-      const parent = tasks.find(x => x.id === t.parent_id)
-      if (parent) {
-        const siblings = tasks
-          .filter(x => x.parent_id === t.parent_id && !x.deleted_at)
-          .map(x => x.id === t.id ? { ...x, completed_at: update.completed_at ?? null } : x)
+      const all = await db.tasks.where('user_id').equals(userId).toArray()
+      const parent = all.find(x => x.id === t.parent_id)
+      if (parent && !parent.deleted_at) {
+        const siblings = all.filter(x => x.parent_id === t.parent_id && !x.deleted_at)
         const roll = rollupOps(parent, siblings, nowIso)
         if (roll) await applyLocalOp(await generateOp({ entity_kind: 'task', entity_id: parent.id, op_type: 'update', payload: roll, user_id: userId }))
       }
@@ -69,9 +70,10 @@ export function TaskList({ userId, filter, projectId = null, tag = null }: Props
     await applyLocalOp(await generateOp({ entity_kind: 'task', entity_id: t.id, op_type: 'delete', payload: {}, user_id: userId }))
     // Deleting a sub-task may leave the remaining siblings all-complete → roll up.
     if (t.parent_id) {
-      const parent = tasks.find(x => x.id === t.parent_id)
-      const remaining = tasks.filter(x => x.parent_id === t.parent_id && x.id !== t.id && !x.deleted_at)
-      const roll = parent ? rollupOps(parent, remaining, new Date().toISOString()) : null
+      const all = await db.tasks.where('user_id').equals(userId).toArray()
+      const parent = all.find(x => x.id === t.parent_id)
+      const remaining = all.filter(x => x.parent_id === t.parent_id && !x.deleted_at) // deleted child already tombstoned
+      const roll = parent && !parent.deleted_at ? rollupOps(parent, remaining, new Date().toISOString()) : null
       if (parent && roll) await applyLocalOp(await generateOp({ entity_kind: 'task', entity_id: parent.id, op_type: 'update', payload: roll, user_id: userId }))
     }
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
