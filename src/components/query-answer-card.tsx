@@ -55,9 +55,9 @@ export function QueryAnswerCard({ userId, plan, onDismiss, onResult }: Props) {
     if (entry.currency === prefs.primary_currency) {
       return entry.amount
     }
-    const conv = convertViaRates(entry.amount, entry.currency, prefs.primary_currency, entry.occurred_at, rates)
+    const conv = convertViaRates(entry.amount, entry.currency, prefs.primary_currency, entry.occurred_at, rates, prefs.fx_overrides ?? {})
     return conv ? conv.amount : 0
-  }, [prefs.primary_currency, rates])
+  }, [prefs.primary_currency, rates, prefs.fx_overrides])
 
   // Category name lookup function
   const categoryNameOf = useCallback((categoryId: string | null): string | null => {
@@ -396,7 +396,7 @@ function FilteredMoneyList({
                       aria-label={expandedFx === e.id ? `Hide currency conversion for ${currencySymbol(e.currency)}${(e.amount / 100).toFixed(2)}` : `Show currency conversion for ${currencySymbol(e.currency)}${(e.amount / 100).toFixed(2)}`}
                     >
                       {expandedFx === e.id ? (() => {
-                        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+                        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
                         return conv
                           ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
                           : 'No FX rate yet for this date'

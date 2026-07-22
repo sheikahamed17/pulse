@@ -105,7 +105,7 @@ export function MoneyList({ userId }: Props) {
                       onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
                     >
                       {expandedFx === e.id ? (() => {
-                        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+                        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
                         return conv
                           ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
                           : 'No FX rate yet for this date'

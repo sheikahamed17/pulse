@@ -35,7 +35,7 @@ export function MoneyCard({ userId }: Props) {
     if (e.currency === prefs.primary_currency) {
       primarySpend += e.amount
     } else {
-      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
       if (conv) {
         primarySpend += conv.amount
         conversionApplied = true
@@ -53,14 +53,14 @@ export function MoneyCard({ userId }: Props) {
     if (e.currency === prefs.primary_currency) {
       previousPrimary += e.amount
     } else {
-      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+      const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
       if (conv) previousPrimary += conv.amount
     }
   }
 
   const delta = previousPrimary === 0 ? null : ((primarySpend - previousPrimary) / previousPrimary) * 100
 
-  const topCategories = useMemo(() => topNByCategoryWithConversion(current, catName, prefs.primary_currency, rates, 3), [current, catName, prefs.primary_currency, rates])
+  const topCategories = useMemo(() => topNByCategoryWithConversion(current, catName, prefs.primary_currency, rates, prefs.fx_overrides ?? {}, 3), [current, catName, prefs.primary_currency, rates, prefs.fx_overrides])
   const topMax = Math.max(1, ...topCategories.map(([, amt]) => amt))
 
   // Compute sparkline data: group entries into daily totals (last 7 days)
@@ -81,7 +81,7 @@ export function MoneyCard({ userId }: Props) {
       if (dailyTotals.has(dateKey)) {
         let amount = e.amount
         if (e.currency !== prefs.primary_currency) {
-          const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates)
+          const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
           if (conv) amount = conv.amount
         }
         dailyTotals.set(dateKey, (dailyTotals.get(dateKey) ?? 0) + amount)
@@ -186,6 +186,7 @@ function topNByCategoryWithConversion(
   catName: Map<string, ReturnType<typeof useCategories>[number]>,
   primaryCurrency: string,
   rates: Array<{ date: string; target: string; rate: number }>,
+  overrides: Record<string, number>,
   n: number,
 ): Array<[ReturnType<typeof useCategories>[number] | undefined, number]> {
   const totals = new Map<string | undefined, number>()
@@ -195,7 +196,7 @@ function topNByCategoryWithConversion(
     if (e.currency === primaryCurrency) {
       totals.set(key, (totals.get(key) ?? 0) + e.amount)
     } else {
-      const conv = convertViaRates(e.amount, e.currency, primaryCurrency, e.occurred_at, rates)
+      const conv = convertViaRates(e.amount, e.currency, primaryCurrency, e.occurred_at, rates, overrides)
       if (conv) {
         totals.set(key, (totals.get(key) ?? 0) + conv.amount)
       }

@@ -38,6 +38,8 @@ export async function POST(req: Request) {
     const prefs = await db.selectFrom('user_prefs').where('user_id', '=', userId).selectAll().executeTakeFirst()
     const primary = prefs?.primary_currency ?? 'INR'
     const tz = prefs?.tz ?? 'Asia/Kolkata'
+    let fxOverrides: Record<string, number> = {}
+    if (prefs?.fx_overrides) { try { fxOverrides = JSON.parse(prefs.fx_overrides) as Record<string, number> } catch { /* ignore */ } }
     const monthKey = yearMonthInTz(now, tz)
 
     const money = await db.selectFrom('money_entries')
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
 
     const toPrimary = (e: MoneyEntryRow): number => {
       if (e.currency === primary) return e.amount
-      const conv = convertViaRates(e.amount, e.currency, primary, e.occurred_at, fxRates)
+      const conv = convertViaRates(e.amount, e.currency, primary, e.occurred_at, fxRates, fxOverrides)
       return conv ? conv.amount : e.amount
     }
 

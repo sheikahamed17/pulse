@@ -64,9 +64,9 @@ export function BudgetSection({ userId }: Props) {
 
   const toPrimary = useMemo(() => (e: MoneyEntryRow): number => {
     if (e.currency === primary) return e.amount
-    const conv = convertViaRates(e.amount, e.currency, primary, e.occurred_at, rates)
+    const conv = convertViaRates(e.amount, e.currency, primary, e.occurred_at, rates, prefs.fx_overrides ?? {})
     return conv ? conv.amount : e.amount
-  }, [primary, rates])
+  }, [primary, rates, prefs.fx_overrides])
 
   const progress = useMemo(
     () => computeBudgetProgress(entries, budgets, monthKey, prefs.tz, toPrimary),
