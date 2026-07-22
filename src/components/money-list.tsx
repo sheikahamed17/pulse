@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SwipeRow } from '@/components/swipe-row'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
@@ -15,17 +16,6 @@ import { convertViaRates } from '@/lib/fx'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import type { MoneyEntryRow } from '@/lib/dexie'
 
-function useLongPress<T>(onLongPress: (arg: T) => void, ms = 500) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  return {
-    onPointerDown: (arg: T) => {
-      timerRef.current = setTimeout(() => onLongPress(arg), ms)
-    },
-    onPointerUp: () => { if (timerRef.current) clearTimeout(timerRef.current) },
-    onPointerLeave: () => { if (timerRef.current) clearTimeout(timerRef.current) },
-  }
-}
-
 type Props = { userId: string }
 
 export function MoneyList({ userId }: Props) {
@@ -34,11 +24,10 @@ export function MoneyList({ userId }: Props) {
   const undo = useUndoStack()
   const router = useRouter()
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
   const [expandedFx, setExpandedFx] = useState<string | null>(null)
-
-  const longPress = useLongPress<MoneyEntryRow>(e => setMenuFor(e.id))
 
   const categoryById = useMemo(
     () => new Map(categories.map(c => [c.id, c])),
@@ -77,72 +66,75 @@ export function MoneyList({ userId }: Props) {
         {entries.map(e => {
           const cat = e.category_id ? categoryById.get(e.category_id) : undefined
           return (
-            <li
-              key={e.id}
-              className="glass-soft relative flex items-start justify-between gap-3 rounded-2xl p-3 text-sm transition-colors hover:bg-white/8"
-              onPointerDown={() => longPress.onPointerDown(e)}
-              onPointerUp={longPress.onPointerUp}
-              onPointerLeave={longPress.onPointerLeave}
-            >
-              <div className="flex flex-col flex-1 min-w-0">
-                {cat && (
-                  <div className="mb-1.5 inline-flex w-fit items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs">
-                    <span>{cat.icon ?? ''}</span>
-                    <span className="text-muted-foreground">{cat.name}</span>
+            <li key={e.id} className="relative">
+              <SwipeRow
+                isOpen={openId === e.id}
+                onOpenChange={o => setOpenId(o ? e.id : null)}
+                onLongPress={() => setMenuFor(e.id)}
+                onDelete={() => deleteEntry(e)}
+                deleteLabel={`Delete entry: ${e.description || formatAmount(e)}`}
+                className="glass-soft flex items-start justify-between gap-3 rounded-2xl p-3 text-sm transition-colors hover:bg-white/8"
+              >
+                <div className="flex flex-col flex-1 min-w-0">
+                  {cat && (
+                    <div className="mb-1.5 inline-flex w-fit items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs">
+                      <span>{cat.icon ?? ''}</span>
+                      <span className="text-muted-foreground">{cat.name}</span>
+                    </div>
+                  )}
+                  <div className="text-sm font-medium text-foreground">
+                    {e.description ? e.description : (cat ? cat.name : 'Uncategorized')}
                   </div>
-                )}
-                <div className="text-sm font-medium text-foreground">
-                  {e.description ? e.description : (cat ? cat.name : 'Uncategorized')}
-                </div>
-                {e.description && cat && (
-                  <span className="text-xs text-muted-foreground">{cat.name}</span>
-                )}
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  {e.currency !== prefs.primary_currency && (
-                    <button
-                      type="button"
-                      className="text-[10px] text-muted-foreground hover:text-accent-2 transition text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
-                      onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
-                    >
-                      {expandedFx === e.id ? (() => {
-                        const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
-                        return conv
-                          ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
-                          : 'No FX rate yet for this date'
-                      })() : '≈ convert'}
-                    </button>
+                  {e.description && cat && (
+                    <span className="text-xs text-muted-foreground">{cat.name}</span>
                   )}
-                  {e.receipt_key && (
-                    <button
-                      type="button"
-                      className="text-[10px] border border-white/20 rounded-full px-1.5 py-0.5 text-muted-foreground hover:text-accent-2 hover:border-accent-2 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
-                      onClick={(ev) => {
-                        ev.stopPropagation()
-                        window.open(`/api/receipt/${e.receipt_key}`, '_blank', 'noopener')
-                      }}
-                    >
-                      📎 receipt
-                    </button>
-                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {e.currency !== prefs.primary_currency && (
+                      <button
+                        type="button"
+                        className="text-[10px] text-muted-foreground hover:text-accent-2 transition text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+                        onClick={(ev) => { ev.stopPropagation(); setExpandedFx(expandedFx === e.id ? null : e.id) }}
+                      >
+                        {expandedFx === e.id ? (() => {
+                          const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
+                          return conv
+                            ? `≈ ${currencySymbol(prefs.primary_currency)}${(conv.amount / (prefs.primary_currency === 'JPY' ? 1 : 100)).toFixed(2)} at ${conv.rateDate}`
+                            : 'No FX rate yet for this date'
+                        })() : '≈ convert'}
+                      </button>
+                    )}
+                    {e.receipt_key && (
+                      <button
+                        type="button"
+                        className="text-[10px] border border-white/20 rounded-full px-1.5 py-0.5 text-muted-foreground hover:text-accent-2 hover:border-accent-2 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                        onClick={(ev) => {
+                          ev.stopPropagation()
+                          window.open(`/api/receipt/${e.receipt_key}`, '_blank', 'noopener')
+                        }}
+                      >
+                        📎 receipt
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-col items-end gap-2">
-                <span className={`font-mono tabular-nums text-sm font-medium whitespace-nowrap ${
-                  e.direction === 'out' ? 'text-destructive' : 'text-income'
-                }`}>
-                  {formatAmount(e)}
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="min-h-[44px] px-2 text-xs"
-                  aria-label={`Delete entry: ${e.description || formatAmount(e)}`}
-                  onClick={() => deleteEntry(e)}
-                >
-                  Delete
-                </Button>
-              </div>
+                <div className="flex flex-col items-end gap-2">
+                  <span className={`font-mono tabular-nums text-sm font-medium whitespace-nowrap ${
+                    e.direction === 'out' ? 'text-destructive' : 'text-income'
+                  }`}>
+                    {formatAmount(e)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-[44px] px-2 text-xs"
+                    aria-label={`Delete entry: ${e.description || formatAmount(e)}`}
+                    onClick={() => deleteEntry(e)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </SwipeRow>
 
               {menuFor === e.id && (
                 <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">

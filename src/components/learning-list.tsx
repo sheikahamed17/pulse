@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useLearnings } from '@/hooks/use-learnings'
+import { SwipeRow } from '@/components/swipe-row'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { LearningRow } from '@/lib/dexie'
@@ -11,20 +12,11 @@ import { cn } from '@/lib/utils'
 
 type Props = { userId: string; selectedTag: string | null }
 
-function useLongPress<T>(onLongPress: (arg: T) => void, ms = 500) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  return {
-    onPointerDown: (arg: T) => { timerRef.current = setTimeout(() => onLongPress(arg), ms) },
-    onPointerUp:   () => { if (timerRef.current) clearTimeout(timerRef.current) },
-    onPointerLeave:() => { if (timerRef.current) clearTimeout(timerRef.current) },
-  }
-}
-
 export function LearningList({ userId, selectedTag }: Props) {
   const learnings = useLearnings(userId)
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
-  const longPress = useLongPress<LearningRow>(e => setMenuFor(e.id))
 
   const filtered = selectedTag
     ? learnings.filter(e => e.tags.includes(selectedTag))
@@ -52,48 +44,44 @@ export function LearningList({ userId, selectedTag }: Props) {
   return (
     <ul className="flex flex-col gap-2">
       {filtered.map(e => (
-        <li
-          key={e.id}
-          className="glass-soft rounded-2xl relative flex flex-col gap-2 p-3 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
-          onPointerDown={() => longPress.onPointerDown(e)}
-          onPointerUp={longPress.onPointerUp}
-          onPointerLeave={longPress.onPointerLeave}
-          onKeyDown={(keyEvent) => {
-            if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
-              if (keyEvent.key === ' ') keyEvent.preventDefault()
-              setMenuFor(e.id)
-            }
-          }}
-          tabIndex={0}
-        >
-          <p className="text-sm">{e.text}</p>
-          {e.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {e.tags.map(tag => (
-                <span
-                  key={tag}
-                  className={cn(
-                    'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
-                    selectedTag === tag
-                      ? 'bg-accent-2/30 text-accent-2 border border-accent-2/50'
-                      : 'bg-white/10 text-muted-foreground border border-white/20',
-                  )}
-                >
-                  {tag}
-                </span>
-              ))}
+        <li key={e.id} className="relative">
+          <SwipeRow
+            isOpen={openId === e.id}
+            onOpenChange={o => setOpenId(o ? e.id : null)}
+            onLongPress={() => setMenuFor(e.id)}
+            onDelete={() => deleteLearning(e)}
+            deleteLabel={`Delete learning: ${e.text.slice(0, 30)}${e.text.length > 30 ? '…' : ''}`}
+            className="glass-soft rounded-2xl flex flex-col gap-2 p-3"
+          >
+            <p className="text-sm">{e.text}</p>
+            {e.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {e.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className={cn(
+                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                      selectedTag === tag
+                        ? 'bg-accent-2/30 text-accent-2 border border-accent-2/50'
+                        : 'bg-white/10 text-muted-foreground border border-white/20',
+                    )}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
+              <div className="flex items-center gap-2">
+                {e.attribution && (
+                  <span className="truncate">— {e.attribution}</span>
+                )}
+              </div>
+              <span className="font-mono tabular-nums flex-shrink-0">
+                {formatLocalDateTime(e.occurred_at, prefs.tz)}
+              </span>
             </div>
-          )}
-          <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
-            <div className="flex items-center gap-2">
-              {e.attribution && (
-                <span className="truncate">— {e.attribution}</span>
-              )}
-            </div>
-            <span className="font-mono tabular-nums flex-shrink-0">
-              {formatLocalDateTime(e.occurred_at, prefs.tz)}
-            </span>
-          </div>
+          </SwipeRow>
 
           {menuFor === e.id && (
             <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
