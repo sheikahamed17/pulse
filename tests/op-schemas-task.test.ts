@@ -48,7 +48,7 @@ describe('TaskPayloadSchema', () => {
   it('rejects invalid source', () => {
     const r = TaskPayloadSchema.safeParse({
       title: 'ok',
-      source: 'recurring',                   // Phase 1's source enum had this, but tasks don't
+      source: 'receipt',                     // valid for money, not for tasks (task sources: voice|manual|recurring)
     })
     expect(r.success).toBe(false)
   })

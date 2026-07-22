@@ -1,8 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Circle, CheckCircle2, Trash2 } from 'lucide-react'
+import { Circle, CheckCircle2, Trash2, Repeat } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
+import { taskCompletionOps, formatRecurrence } from '@/lib/recurring-task'
 import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
@@ -26,13 +27,18 @@ export function TaskList({ userId, filter }: Props) {
   const longPress = useLongPress<TaskRow>(t => setMenuFor(t.id))
 
   async function toggleComplete(t: TaskRow) {
-    const op = await generateOp({
-      entity_kind: 'task', entity_id: t.id,
-      op_type: 'update',
-      payload: { completed_at: t.completed_at ? null : new Date().toISOString() },
-      user_id: userId,
-    })
-    await applyLocalOp(op)
+    const nowIso = new Date().toISOString()
+    // Completing a recurring task clears its recurrence + spawns the next instance
+    // (due completedAt + interval); every other toggle is a plain completed_at flip.
+    const { update, next } = taskCompletionOps(t, nowIso)
+    await applyLocalOp(await generateOp({
+      entity_kind: 'task', entity_id: t.id, op_type: 'update', payload: update, user_id: userId,
+    }))
+    if (next) {
+      await applyLocalOp(await generateOp({
+        entity_kind: 'task', entity_id: crypto.randomUUID(), op_type: 'create', payload: next, user_id: userId,
+      }))
+    }
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
   }
 
@@ -94,6 +100,11 @@ export function TaskList({ userId, filter }: Props) {
                   {t.title}
                 </span>
                 <span className="text-xs text-muted-foreground">
+                  {t.recur_period && t.recur_interval && (
+                    <span className="mr-2 inline-flex items-center gap-0.5 text-accent-2">
+                      <Repeat className="h-3 w-3" /> {formatRecurrence(t.recur_period, t.recur_interval)}
+                    </span>
+                  )}
                   {t.priority !== 'medium' && (
                     <span className={`mr-2 ${t.priority === 'high' ? 'text-destructive' : ''}`}>
                       {t.priority}
