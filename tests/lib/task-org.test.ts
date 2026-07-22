@@ -35,4 +35,9 @@ describe('filterTasks', () => {
   it('combines project AND tag', () => {
     expect(filterTasks(tasks, { projectId: 'p1', tag: 'finance' }).map(x => x.id)).toEqual(['1'])
   })
+  it('does not crash on a legacy task whose tags are undefined', () => {
+    const legacy = { ...t({ id: 'L' }), tags: undefined as unknown as string[] }
+    expect(filterTasks([legacy], { projectId: null, tag: 'finance' })).toEqual([]) // excluded, no throw
+    expect(filterTasks([legacy], { projectId: null, tag: null }).map(x => x.id)).toEqual(['L'])
+  })
 })

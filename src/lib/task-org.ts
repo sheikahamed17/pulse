@@ -11,6 +11,7 @@ export function addTag(tags: string[], raw: string): string[] {
 export function filterTasks(tasks: TaskRow[], f: { projectId: string | null; tag: string | null }): TaskRow[] {
   return tasks.filter(t =>
     (f.projectId == null || t.project_id === f.projectId) &&
-    (f.tag == null || t.tags.includes(f.tag)),
+    // ?? [] guards legacy tasks materialized before tags existed (Dexie row has no tags field)
+    (f.tag == null || (t.tags ?? []).includes(f.tag)),
   )
 }
