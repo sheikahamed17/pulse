@@ -21,6 +21,7 @@ export default function PreferencesPage() {
   const [state, setState] = useState({
     primaryCurrency: prefs.primary_currency,
     tz: prefs.tz,
+    fxOverrides: prefs.fx_overrides,
   })
   const [tzQuery, setTzQuery] = useState('')
   const [busy, setBusy] = useState(false)
@@ -42,6 +43,7 @@ export default function PreferencesPage() {
       setState({
         primaryCurrency: prefs.primary_currency,
         tz: prefs.tz,
+        fxOverrides: prefs.fx_overrides,
       })
     }
     previousPrefsRef.current = prefs
@@ -61,7 +63,7 @@ export default function PreferencesPage() {
     setBusy(true)
     setSaveError(null)
     try {
-      await savePrefs({ primary_currency: state.primaryCurrency, tz: state.tz, fx_overrides: prefs.fx_overrides })
+      await savePrefs({ primary_currency: state.primaryCurrency, tz: state.tz, fx_overrides: state.fxOverrides })
       setDirty(false)
     } catch (err) {
       console.error('save prefs', err)
@@ -107,6 +109,28 @@ export default function PreferencesPage() {
           <p className="text-xs text-muted-foreground">
             Dashboard sums convert non-primary entries via ECB rates (Phase 2.4).
           </p>
+        </section>
+
+        <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+          <Label className="uppercase text-xs">Manual exchange rates</Label>
+          <p className="text-xs text-muted-foreground">Used only when the daily ECB feed has no rate for a currency (e.g. AED).</p>
+          <ul className="flex flex-col gap-1">
+            {Object.entries(state.fxOverrides).map(([cur, rate]) => (
+              <li key={cur} className="flex items-center justify-between text-sm">
+                <span className="font-mono tabular-nums">1 EUR = {rate} {cur}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${cur} rate`}
+                  onClick={() => { setState(s => { const n = { ...s.fxOverrides }; delete n[cur]; return { ...s, fxOverrides: n } }); setDirty(true); setSaveError(null) }}
+                  className="text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded px-2 py-1"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+            {Object.keys(state.fxOverrides).length === 0 && <li className="text-xs text-muted-foreground">None set.</li>}
+          </ul>
+          <FxAddRow onAdd={(cur, rate) => { setState(s => ({ ...s, fxOverrides: { ...s.fxOverrides, [cur]: rate } })); setDirty(true); setSaveError(null) }} />
         </section>
 
         <section className="glass flex flex-col gap-2 rounded-2xl p-4">
@@ -207,6 +231,7 @@ export default function PreferencesPage() {
                 setState({
                   primaryCurrency: prefs.primary_currency,
                   tz: prefs.tz,
+                  fxOverrides: prefs.fx_overrides,
                 })
                 setDirty(false)
                 setSaveError(null)
@@ -216,5 +241,21 @@ export default function PreferencesPage() {
         </div>
       </main>
     </>
+  )
+}
+
+function FxAddRow({ onAdd }: { onAdd: (cur: string, rate: number) => void }) {
+  const [cur, setCur] = useState<string>(SUPPORTED_CURRENCIES[0])
+  const [rate, setRate] = useState('')
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground">1 EUR =</span>
+      <Input value={rate} onChange={e => setRate(e.target.value)} inputMode="decimal" placeholder="rate" aria-label="Rate" className="h-8 w-24 text-sm" />
+      <select value={cur} onChange={e => setCur(e.target.value)} aria-label="Currency"
+        className="glass-soft rounded-lg border border-input px-2 py-1 text-sm">
+        {SUPPORTED_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <Button type="button" size="sm" onClick={() => { const r = parseFloat(rate); if (isFinite(r) && r > 0) { onAdd(cur, r); setRate('') } }}>Add</Button>
+    </div>
   )
 }
