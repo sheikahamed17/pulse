@@ -9,3 +9,5 @@ Prereq: the D1 migration 0009 columns exist in remote D1 (`recur_period`, `recur
 5. **Stop:** long-press the open recurring task → Delete → it's gone and nothing respawns.
 6. **Non-recurring unchanged:** a normal task (Repeat off) completes with no spawn.
 7. **Sync:** the spawned instance appears on another signed-in device after sync.
+
+Known limitation (v1): completing the SAME recurring instance on two devices *before they sync* spawns two next instances (a deletable duplicate) — the client-driven model can't dedup concurrent spawns. Single-device use is unaffected. Harden later via a deterministic spawn id or server-side dedup if needed.

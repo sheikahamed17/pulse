@@ -82,3 +82,4 @@ delete the open instance → series ends (nothing respawns)
 - Skip-one-occurrence (complete advances, delete stops — no skip).
 - Editing an existing task's recurrence (set at create; to change, delete + recreate).
 - Schedule-based recurrence for tasks (that's the money model; deliberately not chosen).
+- **Concurrent-completion dedup (documented limitation, not fixed in v1).** Because spawning is client-driven, completing the SAME instance on two devices before they sync produces two next instances (each with a random id — LWW can't merge them). The single-device path is correct; the concurrent case yields a deletable duplicate, not corruption. If it ever bites in practice, harden with a deterministic spawn id (LWW converges) or a server-side dedup on (user_id, title, due_at). Money avoids this only because its spawner is the server cron.
