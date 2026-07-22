@@ -34,3 +34,7 @@ export const INSIGHT_FIELDS = [
 export const BUDGET_FIELDS = [
   'category_id', 'amount', 'currency',
 ] as const
+
+export const PROJECT_FIELDS = [
+  'name', 'color', 'archived',
+] as const

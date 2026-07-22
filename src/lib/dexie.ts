@@ -167,6 +167,18 @@ export type BudgetRow = {
   updated_at: string
 }
 
+export type ProjectRow = {
+  id: string
+  user_id: string
+  name: string
+  color: string | null
+  archived: 0 | 1
+  field_hlcs: Record<string, string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type FxRateRow = {
   date: string                  // 'YYYY-MM-DD'
   base: string                  // 'EUR' from ECB
@@ -190,6 +202,7 @@ class PulseDb extends Dexie {
   note_entries!: EntityTable<NoteRow, 'id'>
   budgets!: EntityTable<BudgetRow, 'id'>
   receipt_drafts!: EntityTable<ReceiptDraftRow, 'id'>
+  projects!: EntityTable<ProjectRow, 'id'>
   fx_rates!: Table<FxRateRow>
 
   constructor() {
@@ -225,6 +238,9 @@ class PulseDb extends Dexie {
     this.version(8).stores({
       receipt_drafts: 'id, created_at',
     })
+    this.version(9).stores({
+      projects: 'id, user_id',
+    })
   }
 }
 
@@ -244,6 +260,7 @@ export async function resetDb() {
   await db.learning_entries.clear()
   await db.note_entries.clear()
   await db.budgets.clear()
+  await db.projects.clear()
   await db.receipt_drafts.clear()
   await db.fx_rates.clear()
 }

@@ -196,6 +196,18 @@ export interface BudgetTable {
   updated_at: string
 }
 
+export interface ProjectTable {
+  id: string
+  user_id: string
+  name: string
+  color: string | null
+  archived: number
+  field_hlcs: string          // JSON Record<string,string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface FxRateTable {
   date: string                                   // 'YYYY-MM-DD'
   base: string                                   // always 'EUR' from ECB
@@ -259,6 +271,7 @@ export interface DB {
   learning_entries: LearningEntryTable
   note_entries: NoteEntryTable
   budgets: BudgetTable
+  projects: ProjectTable
   fx_rates: FxRateTable
   insights: InsightTable
   push_subscriptions: PushSubscriptionTable
