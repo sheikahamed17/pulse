@@ -13,7 +13,9 @@ const DEFAULTS = { primary_currency: 'INR', tz: 'Asia/Kolkata' } as const
 const PutSchema = z.object({
   primary_currency: z.enum(SUPPORTED_CURRENCIES),
   tz: z.string().min(1).max(64),
-  fx_overrides: z.record(z.enum(SUPPORTED_CURRENCIES), z.number().positive().finite()).optional(),
+  // string keys (a z.enum key would make the record exhaustive/require all currencies);
+  // non-currency keys are filtered out server-side before persisting.
+  fx_overrides: z.record(z.string(), z.number().positive().finite()).optional(),
 })
 
 function parseOverrides(raw: unknown): Record<string, number> {
@@ -64,7 +66,10 @@ export async function PUT(req: Request) {
   const { env } = getCloudflareContext()
   const db = createDb((env as { DB: D1Database }).DB)
 
-  const fxJson = parsed.data.fx_overrides ? JSON.stringify(parsed.data.fx_overrides) : null
+  const fxClean = parsed.data.fx_overrides
+    ? Object.fromEntries(Object.entries(parsed.data.fx_overrides).filter(([k]) => (SUPPORTED_CURRENCIES as readonly string[]).includes(k)))
+    : {}
+  const fxJson = Object.keys(fxClean).length ? JSON.stringify(fxClean) : null
   const now = new Date().toISOString()
   await db
     .insertInto('user_prefs')
@@ -87,7 +92,7 @@ export async function PUT(req: Request) {
     user_id: session.user.id,
     primary_currency: parsed.data.primary_currency,
     tz: parsed.data.tz,
-    fx_overrides: parsed.data.fx_overrides ?? {},
+    fx_overrides: fxClean,
     updated_at: now,
   })
 }
