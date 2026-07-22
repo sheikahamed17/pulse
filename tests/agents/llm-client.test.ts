@@ -41,6 +41,19 @@ describe('callGroqJSON', () => {
       system: 'sys', user: 'usr',
     })).rejects.toThrow(/no choice/i)
   })
+
+  it('uses low reasoning effort + reasoning headroom on top of the output budget', async () => {
+    // gpt-oss spends reasoning tokens BEFORE the JSON; those count against max_tokens.
+    // A cap sized for the JSON alone (router used 64) truncates mid-reasoning →
+    // Groq 400 json_validate_failed "max completion tokens reached".
+    const create = vi.fn().mockResolvedValue({ choices: [{ message: { content: '{"ok":true}' } }] })
+    const fakeGroq = { chat: { completions: { create } } }
+    await callGroqJSON({ client: fakeGroq as never, model: 'openai/gpt-oss-20b', system: 's', user: 'u', maxTokens: 64 })
+    const params = create.mock.calls[0][0]
+    expect(params.reasoning_effort).toBe('low')
+    // 64 output + 2048 reasoning headroom → well clear of the truncation cliff
+    expect(params.max_tokens).toBeGreaterThanOrEqual(2048)
+  })
 })
 
 describe('withRetry', () => {

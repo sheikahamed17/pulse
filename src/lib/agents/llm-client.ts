@@ -21,12 +21,22 @@ type CallArgs = {
   maxTokens?: number
 }
 
+// gpt-oss are reasoning models: they emit reasoning tokens BEFORE the JSON, and
+// those count against max_tokens. The per-agent maxTokens size the JSON OUTPUT
+// (carried over from the non-reasoning llama era), so we add a fixed reasoning
+// allowance on top — otherwise a small cap (the router's 64) is exhausted mid-
+// reasoning and Groq returns 400 json_validate_failed "max completion tokens
+// reached before generating a valid document". max_tokens is a ceiling (unused
+// tokens are free — the model stops at the JSON's end), so generous headroom is safe.
+const REASONING_HEADROOM = 2048
+
 export async function callGroqJSON<T = unknown>(args: CallArgs): Promise<T> {
   const completion = await args.client.chat.completions.create({
     model: args.model,
     response_format: { type: 'json_object' },
+    reasoning_effort: 'low', // short reasoning — these are simple structured extractions
     temperature: args.temperature ?? 0,
-    max_tokens: args.maxTokens ?? 512,
+    max_tokens: (args.maxTokens ?? 256) + REASONING_HEADROOM,
     messages: [
       { role: 'system', content: args.system },
       { role: 'user', content: args.user },
