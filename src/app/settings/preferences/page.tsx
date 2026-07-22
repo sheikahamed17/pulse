@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { usePushSubscription } from '@/hooks/use-push-subscription'
+import { pushTestMessage, type PushTestResult } from '@/lib/push-test-message'
 import { isVoiceAnswersEnabled, setVoiceAnswersEnabled } from '@/lib/speak'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { IANA_TIMEZONES } from '@/lib/iana-timezones'
@@ -28,6 +29,8 @@ export default function PreferencesPage() {
   const [dirty, setDirty] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [speakAnswers, setSpeakAnswers] = useState(true)
+  const [testing, setTesting] = useState(false)
+  const [testMsg, setTestMsg] = useState<string | null>(null)
   const previousPrefsRef = useRef(prefs)
 
   useEffect(() => {
@@ -70,6 +73,19 @@ export default function PreferencesPage() {
       setSaveError((err as Error).message || 'Could not save preferences. Please try again.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function sendTest() {
+    setTesting(true); setTestMsg(null)
+    try {
+      const res = await fetch('/api/push/test', { method: 'POST' })
+      const body = await res.json().catch(() => null) as PushTestResult | null
+      setTestMsg(body ? pushTestMessage(body) : "Couldn't reach the server — try again.")
+    } catch {
+      setTestMsg("Couldn't reach the server — try again.")
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -182,13 +198,24 @@ export default function PreferencesPage() {
             </p>
           )}
           {pushStatus === 'subscribed' && (
-            <button
-              type="button"
-              onClick={pushUnsubscribe}
-              className="glass rounded-lg px-3 py-2 text-sm font-medium text-emerald-400 hover:bg-white/15 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
-            >
-              ✓ Notifications enabled — tap to disable
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={pushUnsubscribe}
+                className="glass rounded-lg px-3 py-2 text-sm font-medium text-emerald-400 hover:bg-white/15 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+              >
+                ✓ Notifications enabled — tap to disable
+              </button>
+              <button
+                type="button"
+                onClick={sendTest}
+                disabled={testing}
+                className="glass rounded-lg px-3 py-2 text-sm font-medium hover:bg-white/15 transition focus-visible:ring-2 focus-visible:ring-accent-2 outline-none disabled:opacity-50"
+              >
+                {testing ? 'Sending…' : 'Send test notification'}
+              </button>
+              {testMsg && <p className="text-xs text-muted-foreground">{testMsg}</p>}
+            </>
           )}
           {pushStatus === 'unsubscribed' && (
             <>
