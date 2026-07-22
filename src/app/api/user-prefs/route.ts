@@ -13,7 +13,20 @@ const DEFAULTS = { primary_currency: 'INR', tz: 'Asia/Kolkata' } as const
 const PutSchema = z.object({
   primary_currency: z.enum(SUPPORTED_CURRENCIES),
   tz: z.string().min(1).max(64),
+  fx_overrides: z.record(z.enum(SUPPORTED_CURRENCIES), z.number().positive().finite()).optional(),
 })
+
+function parseOverrides(raw: unknown): Record<string, number> {
+  if (typeof raw !== 'string' || !raw) return {}
+  try {
+    const o = JSON.parse(raw) as Record<string, unknown>
+    const out: Record<string, number> = {}
+    for (const [k, v] of Object.entries(o)) {
+      if ((SUPPORTED_CURRENCIES as readonly string[]).includes(k) && typeof v === 'number' && isFinite(v) && v > 0) out[k] = v
+    }
+    return out
+  } catch { return {} }
+}
 
 export async function GET(req: Request) {
   const session = await getSession(req)
@@ -29,12 +42,13 @@ export async function GET(req: Request) {
     .executeTakeFirst()
 
   if (!row) {
-    return NextResponse.json({ ...DEFAULTS, user_id: session.user.id })
+    return NextResponse.json({ ...DEFAULTS, fx_overrides: {}, user_id: session.user.id })
   }
   return NextResponse.json({
     user_id: row.user_id,
     primary_currency: row.primary_currency,
     tz: row.tz,
+    fx_overrides: parseOverrides(row.fx_overrides),
     updated_at: row.updated_at,
   })
 }
@@ -50,6 +64,7 @@ export async function PUT(req: Request) {
   const { env } = getCloudflareContext()
   const db = createDb((env as { DB: D1Database }).DB)
 
+  const fxJson = parsed.data.fx_overrides ? JSON.stringify(parsed.data.fx_overrides) : null
   const now = new Date().toISOString()
   await db
     .insertInto('user_prefs')
@@ -57,11 +72,13 @@ export async function PUT(req: Request) {
       user_id: session.user.id,
       primary_currency: parsed.data.primary_currency,
       tz: parsed.data.tz,
+      fx_overrides: fxJson,
       updated_at: now,
     })
     .onConflict(oc => oc.column('user_id').doUpdateSet({
       primary_currency: parsed.data.primary_currency,
       tz: parsed.data.tz,
+      fx_overrides: fxJson,
       updated_at: now,
     }))
     .execute()
@@ -70,6 +87,7 @@ export async function PUT(req: Request) {
     user_id: session.user.id,
     primary_currency: parsed.data.primary_currency,
     tz: parsed.data.tz,
+    fx_overrides: parsed.data.fx_overrides ?? {},
     updated_at: now,
   })
 }

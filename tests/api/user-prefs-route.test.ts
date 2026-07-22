@@ -3,7 +3,7 @@
 // Kysely's internal types; typing it precisely here is fixture-only ceremony.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const userPrefsTable: Array<{ user_id: string; primary_currency: string; tz: string; updated_at: string }> = []
+const userPrefsTable: Array<{ user_id: string; primary_currency: string; tz: string; fx_overrides?: string | null; updated_at: string }> = []
 
 const fakeDb = {
   selectFrom: (_table: string) => ({
@@ -14,11 +14,11 @@ const fakeDb = {
     }),
   }),
   insertInto: (_table: string) => ({
-    values: (v: { user_id: string; primary_currency: string; tz: string; updated_at: string }) => ({
+    values: (v: { user_id: string; primary_currency: string; tz: string; fx_overrides?: string | null; updated_at: string }) => ({
       onConflict: (cb: (oc: any) => any) => {
         const builder = {
           column: (_col: string) => ({
-            doUpdateSet: (updates: { primary_currency: string; tz: string; updated_at: string }) => ({
+            doUpdateSet: (updates: { primary_currency: string; tz: string; fx_overrides?: string | null; updated_at: string }) => ({
               execute: async () => {
                 const existing = userPrefsTable.findIndex(r => r.user_id === v.user_id)
                 const payload = { ...v, ...updates }
@@ -70,6 +70,19 @@ describe('/api/user-prefs', () => {
       const res = await GET(new Request('http://x/api/user-prefs'))
       expect(res.status).toBe(401)
     })
+
+    it('parses fx_overrides JSON from the row (dropping invalid entries)', async () => {
+      userPrefsTable.push({ user_id: 'u1', primary_currency: 'INR', tz: 'UTC', fx_overrides: '{"AED":3.95,"XYZ":9,"USD":-1}', updated_at: '2026-07-22T00:00:00Z' })
+      const res = await GET(new Request('http://x/api/user-prefs'))
+      const body = await res.json() as { fx_overrides: Record<string, number> }
+      expect(body.fx_overrides).toEqual({ AED: 3.95 }) // XYZ not a currency, USD negative → dropped
+    })
+
+    it('defaults fx_overrides to {} when no row exists', async () => {
+      const res = await GET(new Request('http://x/api/user-prefs'))
+      const body = await res.json() as { fx_overrides: Record<string, number> }
+      expect(body.fx_overrides).toEqual({})
+    })
   })
 
   describe('PUT', () => {
@@ -83,6 +96,27 @@ describe('/api/user-prefs', () => {
       expect(userPrefsTable).toHaveLength(1)
       expect(userPrefsTable[0].primary_currency).toBe('EUR')
       expect(userPrefsTable[0].tz).toBe('Europe/Berlin')
+    })
+
+    it('persists fx_overrides as a JSON string', async () => {
+      const res = await PUT(new Request('http://x/api/user-prefs', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ primary_currency: 'INR', tz: 'UTC', fx_overrides: { AED: 3.95 } }),
+      }))
+      expect(res.status).toBe(200)
+      expect(userPrefsTable[0].fx_overrides).toBe('{"AED":3.95}')
+      const body = await res.json() as { fx_overrides: Record<string, number> }
+      expect(body.fx_overrides).toEqual({ AED: 3.95 })
+    })
+
+    it('rejects a non-positive fx_overrides value', async () => {
+      const res = await PUT(new Request('http://x/api/user-prefs', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ primary_currency: 'INR', tz: 'UTC', fx_overrides: { AED: -3 } }),
+      }))
+      expect(res.status).toBe(400)
     })
 
     it('rejects invalid currency code', async () => {

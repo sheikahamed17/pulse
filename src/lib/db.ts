@@ -255,6 +255,7 @@ export interface UserPrefsTable {
   user_id: string
   primary_currency: string
   tz: string
+  fx_overrides: string | null          // JSON Record<string, number> (currency → EUR-rate)
   updated_at: string
 }
 

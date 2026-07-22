@@ -61,7 +61,7 @@ export default function PreferencesPage() {
     setBusy(true)
     setSaveError(null)
     try {
-      await savePrefs({ primary_currency: state.primaryCurrency, tz: state.tz })
+      await savePrefs({ primary_currency: state.primaryCurrency, tz: state.tz, fx_overrides: prefs.fx_overrides })
       setDirty(false)
     } catch (err) {
       console.error('save prefs', err)

@@ -5,9 +5,10 @@ import { useCallback, useEffect, useState } from 'react'
 export type UserPrefs = {
   primary_currency: string
   tz: string
+  fx_overrides: Record<string, number>
 }
 
-const DEFAULTS: UserPrefs = { primary_currency: 'INR', tz: 'Asia/Kolkata' }
+const DEFAULTS: UserPrefs = { primary_currency: 'INR', tz: 'Asia/Kolkata', fx_overrides: {} }
 
 // Module-level cache so multiple component instances share state without
 // thrashing the network. Re-fetched on app mount (one component's effect
@@ -23,7 +24,7 @@ async function fetchPrefs(): Promise<UserPrefs> {
     .then(async r => {
       if (!r.ok) return DEFAULTS                                       // 401 / 500 → fall back
       const body = await r.json() as UserPrefs
-      cached = { primary_currency: body.primary_currency, tz: body.tz }
+      cached = { primary_currency: body.primary_currency, tz: body.tz, fx_overrides: body.fx_overrides ?? {} }
       for (const l of listeners) l(cached)
       return cached
     })
