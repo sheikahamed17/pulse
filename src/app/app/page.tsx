@@ -34,6 +34,8 @@ import { ReceiptButton } from '@/components/receipt-button'
 import { TabBar } from '@/components/tab-bar'
 import { TaskList } from '@/components/task-list'
 import { TaskFilter } from '@/components/task-filter'
+import { TaskTagFilter } from '@/components/task-tag-filter'
+import { ProjectPicker } from '@/components/project-picker'
 import { TaskSummary } from '@/components/task-summary'
 import { LearningList } from '@/components/learning-list'
 import { LearningTagFilter } from '@/components/learning-tag-filter'
@@ -256,6 +258,8 @@ function AppPageInner() {
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
+  const [taskProjectId, setTaskProjectId] = useState<string | null>(null)
+  const [taskTag, setTaskTag] = useState<string | null>(null)
   const [selectedLearningTag, setSelectedLearningTag] = useState<string | null>(null)
   const [selectedNotesTag, setSelectedNotesTag] = useState<string | null>(null)
   const [notesSearchQuery, setNotesSearchQuery] = useState('')
@@ -733,7 +737,9 @@ function AppPageInner() {
           {activeTab === 'tasks' && (
             <div className="flex flex-col gap-3">
               <TaskFilter active={taskFilter} onChange={setTaskFilter} />
-              <TaskList userId={user.id} filter={taskFilter} />
+              <ProjectPicker userId={user.id} selectedId={taskProjectId} onSelect={setTaskProjectId} noneLabel="All projects" />
+              <TaskTagFilter userId={user.id} selectedTag={taskTag} onChange={setTaskTag} />
+              <TaskList userId={user.id} filter={taskFilter} projectId={taskProjectId} tag={taskTag} />
             </div>
           )}
           {activeTab === 'learning' && (

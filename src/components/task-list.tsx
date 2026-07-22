@@ -1,15 +1,17 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { Circle, CheckCircle2, Trash2, Repeat } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { taskCompletionOps, formatRecurrence } from '@/lib/recurring-task'
+import { filterTasks } from '@/lib/task-org'
 import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
+import { useProjects } from '@/hooks/use-projects'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { TaskRow } from '@/lib/dexie'
 
-type Props = { userId: string; filter: TaskFilter }
+type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null }
 
 function useLongPress<T>(onLongPress: (arg: T) => void, ms = 500) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -20,8 +22,11 @@ function useLongPress<T>(onLongPress: (arg: T) => void, ms = 500) {
   }
 }
 
-export function TaskList({ userId, filter }: Props) {
+export function TaskList({ userId, filter, projectId = null, tag = null }: Props) {
   const tasks = useTasks(userId, filter)
+  const projects = useProjects(userId, true)
+  const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects])
+  const shown = useMemo(() => filterTasks(tasks, { projectId, tag }), [tasks, projectId, tag])
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
   const longPress = useLongPress<TaskRow>(t => setMenuFor(t.id))
@@ -53,7 +58,7 @@ export function TaskList({ userId, filter }: Props) {
     setMenuFor(null)
   }
 
-  if (tasks.length === 0) {
+  if (shown.length === 0) {
     return (
       <div className="glass-soft rounded-2xl p-4 text-center text-sm text-muted-foreground">
         {filter === 'open' && 'No open tasks. Add one by saying or typing "remind me to…"'}
@@ -65,7 +70,7 @@ export function TaskList({ userId, filter }: Props) {
 
   return (
     <ul className="flex flex-col gap-2">
-      {tasks.map(t => {
+      {shown.map(t => {
         const isCompleted = !!t.completed_at
         const isOverdue = !isCompleted && t.due_at && t.due_at < new Date().toISOString()
         return (
@@ -105,6 +110,17 @@ export function TaskList({ userId, filter }: Props) {
                       <Repeat className="h-3 w-3" /> {formatRecurrence(t.recur_period, t.recur_interval)}
                     </span>
                   )}
+                  {t.project_id && projectById.get(t.project_id) && (
+                    <span className="mr-2 inline-flex items-center gap-1">
+                      {projectById.get(t.project_id)!.color && (
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: projectById.get(t.project_id)!.color! }} />
+                      )}
+                      {projectById.get(t.project_id)!.name}
+                    </span>
+                  )}
+                  {(t.tags ?? []).map(tag => (
+                    <span key={tag} className="mr-1 text-accent-2">#{tag}</span>
+                  ))}
                   {t.priority !== 'medium' && (
                     <span className={`mr-2 ${t.priority === 'high' ? 'text-destructive' : ''}`}>
                       {t.priority}
