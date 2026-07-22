@@ -448,6 +448,8 @@ function AppPageInner() {
           raw_input: final.raw_input ?? null,
           recur_period: recurring.enabled ? recurring.period : null,
           recur_interval: recurring.enabled ? recurring.intervalCount : null,
+          tags: final.tags ?? [],
+          project_id: final.project_id ?? null,
         },
         user_id: user.id,
       })

@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CategoryPicker } from '@/components/category-picker'
 import { PeriodPicker, type Period } from '@/components/period-picker'
+import { ProjectPicker } from '@/components/project-picker'
+import { addTag } from '@/lib/task-org'
 import { cn } from '@/lib/utils'
 import { currencySymbol } from '@/lib/currency'
 import { formatLocalDateTime } from '@/lib/format'
@@ -34,7 +36,7 @@ type Props = {
 
 export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCancel }: Props) {
   if (draft.kind === 'task') {
-    return <ConfirmationChipTask draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+    return <ConfirmationChipTask userId={userId} draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
   }
   if (draft.kind === 'learning') {
     return <ConfirmationChipLearning draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
@@ -200,10 +202,12 @@ function ConfirmationChipMoney({
 }
 
 function ConfirmationChipTask({
+  userId,
   draft,
   onConfirm,
   onCancel,
 }: {
+  userId: string
   draft: TaskPayload & { kind: 'task' }
   onConfirm: Props['onConfirm']
   onCancel: () => void
@@ -215,6 +219,7 @@ function ConfirmationChipTask({
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [period, setPeriod] = useState<Period>('daily')
   const [intervalCount, setIntervalCount] = useState(1)
+  const [newTag, setNewTag] = useState('')
   const { prefs } = useUserPrefs()
 
   async function handleConfirm() {
@@ -289,6 +294,24 @@ function ConfirmationChipTask({
           <option value="medium">medium</option>
           <option value="high">high</option>
         </select>
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-1.5 items-start" role="group" aria-label="Tags">
+        {(d.tags ?? []).map(tag => (
+          <div key={tag} className="flex items-center gap-1 rounded-md border bg-muted px-2 py-0.5 text-xs">
+            <span>{tag}</span>
+            <button type="button" onClick={() => setD(s => ({ ...s, tags: (s.tags ?? []).filter(t => t !== tag) }))}
+              aria-label={`Remove tag "${tag}"`} className="ml-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        <Input value={newTag} onChange={e => setNewTag(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setD(s => ({ ...s, tags: addTag(s.tags ?? [], newTag) })); setNewTag('') } }}
+          placeholder="add tag…" aria-label="Add task tag" className="h-7 text-xs max-w-[100px]" />
+      </div>
+      <div className="mb-3">
+        <ProjectPicker userId={userId} selectedId={d.project_id ?? null} onSelect={id => setD(s => ({ ...s, project_id: id }))} />
       </div>
 
       <div className="mb-3 flex flex-col gap-2">
