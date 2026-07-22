@@ -146,8 +146,10 @@ export interface TaskTable {
   due_at: string | null
   priority: 'low' | 'medium' | 'high'
   completed_at: string | null
-  source: 'voice' | 'manual'
+  source: 'voice' | 'manual' | 'recurring'
   raw_input: string | null
+  recur_period: 'daily' | 'weekly' | 'monthly' | 'yearly' | null
+  recur_interval: number | null
   field_hlcs: string
   deleted_at: string | null
   created_at: string

@@ -7,43 +7,43 @@ const mockTasks: TaskRow[] = [
   {
     id: 't1', user_id: 'u1', title: 'Buy milk', priority: 'low',
     due_at: '2026-07-21T10:00:00Z', completed_at: null, deleted_at: null,
-    source: 'manual', raw_input: null, field_hlcs: {},
+    source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
     created_at: '2026-07-15T08:00:00Z', updated_at: '2026-07-15T08:00:00Z',
   },
   {
     id: 't2', user_id: 'u1', title: 'Call mom', priority: 'medium',
     due_at: '2026-07-19T14:00:00Z', completed_at: null, deleted_at: null,
-    source: 'manual', raw_input: null, field_hlcs: {},
+    source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
     created_at: '2026-07-14T09:00:00Z', updated_at: '2026-07-14T09:00:00Z',
   },
   {
     id: 't3', user_id: 'u1', title: 'Review PR', priority: 'high',
     due_at: '2026-07-18T16:00:00Z', completed_at: '2026-07-18T17:00:00Z', deleted_at: null,
-    source: 'manual', raw_input: null, field_hlcs: {},
+    source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
     created_at: '2026-07-16T10:00:00Z', updated_at: '2026-07-18T17:00:00Z',
   },
   {
     id: 't4', user_id: 'u1', title: 'Overdue task', priority: 'high',
     due_at: '2026-07-17T09:00:00Z', completed_at: null, deleted_at: null,
-    source: 'manual', raw_input: null, field_hlcs: {},
+    source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
     created_at: '2026-07-10T08:00:00Z', updated_at: '2026-07-10T08:00:00Z',
   },
   {
     id: 't5', user_id: 'u1', title: 'Deleted task', priority: 'low',
     due_at: '2026-07-25T10:00:00Z', completed_at: null, deleted_at: '2026-07-19T12:00:00Z',
-    source: 'manual', raw_input: null, field_hlcs: {},
+    source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
     created_at: '2026-07-15T08:00:00Z', updated_at: '2026-07-19T12:00:00Z',
   },
   {
     id: 't6', user_id: 'u1', title: 'No due date', priority: 'medium',
     due_at: null, completed_at: null, deleted_at: null,
-    source: 'manual', raw_input: null, field_hlcs: {},
+    source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
     created_at: '2026-07-16T11:00:00Z', updated_at: '2026-07-16T11:00:00Z',
   },
   {
     id: 't7', user_id: 'u1', title: 'Completed no due', priority: 'low',
     due_at: null, completed_at: '2026-07-19T15:00:00Z', deleted_at: null,
-    source: 'manual', raw_input: null, field_hlcs: {},
+    source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
     created_at: '2026-07-17T09:00:00Z', updated_at: '2026-07-19T15:00:00Z',
   },
 ]
@@ -110,7 +110,7 @@ describe('filterTasksForQuery', () => {
       const taskDueNow: TaskRow = {
         id: 'exact', user_id: 'u1', title: 'Due now', priority: 'medium',
         due_at: nowIso, completed_at: null, deleted_at: null,
-        source: 'manual', raw_input: null, field_hlcs: {},
+        source: 'manual', raw_input: null, recur_period: null, recur_interval: null, field_hlcs: {},
         created_at: '2026-07-19T08:00:00Z', updated_at: '2026-07-19T08:00:00Z',
       }
       const plan: QueryTaskPlan = {

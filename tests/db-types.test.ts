@@ -73,7 +73,7 @@ describe('Phase 2 DB types', () => {
     expectTypeOf<TaskTable>().toHaveProperty('due_at').toEqualTypeOf<string | null>()
     expectTypeOf<TaskTable>().toHaveProperty('priority').toEqualTypeOf<'low' | 'medium' | 'high'>()
     expectTypeOf<TaskTable>().toHaveProperty('completed_at').toEqualTypeOf<string | null>()
-    expectTypeOf<TaskTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual'>()
+    expectTypeOf<TaskTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring'>()
     expectTypeOf<TaskTable>().toHaveProperty('field_hlcs').toEqualTypeOf<string>()
   })
 
