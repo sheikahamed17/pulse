@@ -98,7 +98,7 @@ Row → `xRowToDraft` → chip `d` state → user edits → `onConfirm(d)` → `
 ## Error handling
 
 - `updateEntry` reuses `generateOp`/`applyLocalOp`/`pushPullOnce` (sync errors already caught + logged).
-- **Concurrent delete race:** editing a row deleted on another device before sync — the update materializes the fields but `deleted_at` stays set, so the row remains hidden (no resurrection). Benign, documented.
+- **Concurrent delete race:** editing a row deleted on another device before sync. The op-log engine (`op-log.ts` `applyUpdate`) *intentionally* resurrects — an `update` with an HLC later than `deleted_at` clears the tombstone (an explicit, pre-existing LWW rule that applies to every update op in the app, not just edit). So a later edit un-deletes the row, carrying the edits. This is a rare concurrent edge with a defensible outcome (the user's most-recent action wins) and is **not** specific to this feature; no engine change is made here.
 - **Chip already open:** `editX` no-ops when `draft !== null`, so opening an edit never clobbers an in-progress capture or another edit.
 - Cancel clears both `draft` and `editId`.
 

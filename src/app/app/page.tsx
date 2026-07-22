@@ -454,11 +454,11 @@ function AppPageInner() {
         break
       case 'learning':
         entity_kind = 'learning'
-        payload = { text: final.text, tags: final.tags, attribution: final.attribution ?? null }
+        payload = { text: final.text, tags: final.tags ?? [], attribution: final.attribution ?? null }
         break
       case 'note':
         entity_kind = 'note'
-        payload = { body: final.body, title: final.title ?? null, tags: final.tags }
+        payload = { body: final.body, title: final.title ?? null, tags: final.tags ?? [] }
         break
       default:
         setDraft(null); setEditId(null)
@@ -499,6 +499,7 @@ function AppPageInner() {
       await applyLocalOp(op)
       if (activeTab !== 'tasks') setTab('tasks')
       setDraft(null)
+      setEditId(null)
       if (final.due_at && pushStatus === 'unsubscribed') {
         try {
           const shown = await db.sync_meta.get('push-nudge-shown')
@@ -527,6 +528,7 @@ function AppPageInner() {
       })
       await applyLocalOp(op)
       setDraft(null)
+      setEditId(null)
       pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
       return
     }
@@ -547,6 +549,7 @@ function AppPageInner() {
       })
       await applyLocalOp(op)
       setDraft(null)
+      setEditId(null)
       pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
       return
     }
@@ -562,6 +565,7 @@ function AppPageInner() {
       })
       await applyLocalOp(op)
       setDraft(null)
+      setEditId(null)
       pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
       return
     }
@@ -610,6 +614,7 @@ function AppPageInner() {
     if (final.draftId) await deleteReceiptDraft(final.draftId)
     if (activeTab !== 'money') setTab('money')
     setDraft(null)
+    setEditId(null)
     pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
   }
 
