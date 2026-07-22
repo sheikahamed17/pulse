@@ -71,6 +71,7 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
     setTranscript(null)
     setError(null)
 
+    let serverError: string | null = null
     const final = await callVoiceApiStreaming(blob, (event: VoiceStreamEvent) => {
       if (event.step === 'transcribing') setState('transcribing')
       else if (event.step === 'transcript') {
@@ -78,22 +79,30 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
         setState('transcript')
       }
       else if (event.step === 'parsing') setState('parsing')
-      else if (event.step === 'error') {
-        setError(event.message)
-        setState('error')
-      }
+      else if (event.step === 'error') serverError = event.message
     })
 
     if (final) {
       onParsed(final.payload, final.transcript)
       setState('idle')
       setTranscript(null)
-    } else {
-      console.warn('voice-sse: no final payload, queuing')
+      return
+    }
+
+    // No result. Only a genuine offline/network drop is worth queuing — the queue
+    // drains on the next offline→online transition, so re-queuing while online just
+    // silently re-fails, and "will retry when online" is misleading when you're online.
+    // An online failure (bad audio, rate limit, server error) must surface its real
+    // message so it's actionable instead of masked behind a fake "queued".
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false
+    if (offline) {
       await enqueueVoice(blob)
       setError('Queued — will retry when online')
-      setState('idle')
+    } else {
+      console.warn('voice-sse: no payload while online:', serverError)
+      setError(serverError ?? "Couldn't process that — please try again")
     }
+    setState('idle')
   }
 
   return (
