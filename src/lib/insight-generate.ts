@@ -14,15 +14,16 @@ export type GenerateInsightArgs = {
   userId: string
   bounds: { startsAt: string; endsAt: string }
   primaryCurrency: string
+  fx_overrides?: Record<string, number>
   nowIso: string
   opId: string
   opType: 'create' | 'update'
 }
 
 export async function generateInsight(args: GenerateInsightArgs): Promise<{ skipped: boolean; insight: InsightRow | null }> {
-  const { db, groq, userId, bounds, primaryCurrency, nowIso, opId, opType } = args
+  const { db, groq, userId, bounds, primaryCurrency, fx_overrides, nowIso, opId, opType } = args
 
-  const metrics = await aggregateWeek(db, userId, bounds, primaryCurrency)
+  const metrics = await aggregateWeek(db, userId, bounds, primaryCurrency, fx_overrides)
   if (metrics.entry_count === 0 && metrics.tasks_created === 0 && metrics.tasks_completed === 0) {
     return { skipped: true, insight: null }
   }

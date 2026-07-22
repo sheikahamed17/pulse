@@ -17,6 +17,20 @@ function overrideRate(overrides: Record<string, number> | undefined, target: str
   return typeof o === 'number' && isFinite(o) && o > 0 ? { date: '(manual)', rate: o } : null
 }
 
+// Parse the user_prefs.fx_overrides JSON column into a rate map (server readers).
+// Keeps only positive-finite values; the converter ignores anything else anyway.
+export function parseFxOverrides(raw: unknown): Record<string, number> {
+  if (typeof raw !== 'string' || !raw) return {}
+  try {
+    const o = JSON.parse(raw) as Record<string, unknown>
+    const out: Record<string, number> = {}
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v === 'number' && isFinite(v) && v > 0) out[k] = v
+    }
+    return out
+  } catch { return {} }
+}
+
 // Find the most-recent date ≤ asOfDate with a rate for the given target.
 // `base` is implicitly 'EUR' (ECB's reference).
 async function freshestRate(

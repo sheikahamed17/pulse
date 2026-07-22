@@ -19,6 +19,7 @@ export async function aggregateWeek(
   userId: string,
   bounds: { startsAt: string; endsAt: string },
   primaryCurrency: string,
+  fxOverrides?: Record<string, number>,
 ): Promise<DigestMetrics> {
   // Fetch money entries in the window (non-deleted)
   const entries = await db
@@ -49,7 +50,7 @@ export async function aggregateWeek(
     let convertedAmount = entry.amount
 
     if (entry.currency !== primaryCurrency) {
-      const converted = await convertToPrimary(db, entry.amount, entry.currency, primaryCurrency, entry.occurred_at)
+      const converted = await convertToPrimary(db, entry.amount, entry.currency, primaryCurrency, entry.occurred_at, fxOverrides)
       if (!converted) {
         // Conversion failed — skip this entry's amount, record currency
         skippedCurrencies.add(entry.currency)

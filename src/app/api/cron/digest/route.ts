@@ -6,6 +6,7 @@ import { isAuthorizedCron } from '@/lib/cron-auth'
 import { isLocalMonday, priorWeekBounds } from '@/lib/digest-window'
 import { makeGroqClient } from '@/lib/agents/llm-client'
 import { generateInsight } from '@/lib/insight-generate'
+import { parseFxOverrides } from '@/lib/fx'
 import { sendPushToUser } from '@/lib/web-push'
 
 export const dynamic = 'force-dynamic'
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     if (existingOp) continue
 
     const { skipped, insight } = await generateInsight({
-      db, groq, userId: user.id, bounds, primaryCurrency, nowIso: now,
+      db, groq, userId: user.id, bounds, primaryCurrency, fx_overrides: parseFxOverrides(prefs?.fx_overrides), nowIso: now,
       opId, opType: 'create',
     })
     if (skipped) continue

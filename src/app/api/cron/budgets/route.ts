@@ -4,7 +4,7 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { createDb } from '@/lib/db'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 import { sendPushToUser } from '@/lib/web-push'
-import { convertViaRates } from '@/lib/fx'
+import { convertViaRates, parseFxOverrides } from '@/lib/fx'
 import { computeBudgetProgress, yearMonthInTz } from '@/lib/budget-exec'
 import type { BudgetRow, MoneyEntryRow } from '@/lib/dexie'
 
@@ -38,8 +38,7 @@ export async function POST(req: Request) {
     const prefs = await db.selectFrom('user_prefs').where('user_id', '=', userId).selectAll().executeTakeFirst()
     const primary = prefs?.primary_currency ?? 'INR'
     const tz = prefs?.tz ?? 'Asia/Kolkata'
-    let fxOverrides: Record<string, number> = {}
-    if (prefs?.fx_overrides) { try { fxOverrides = JSON.parse(prefs.fx_overrides) as Record<string, number> } catch { /* ignore */ } }
+    const fxOverrides = parseFxOverrides(prefs?.fx_overrides)
     const monthKey = yearMonthInTz(now, tz)
 
     const money = await db.selectFrom('money_entries')

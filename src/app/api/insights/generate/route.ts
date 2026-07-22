@@ -6,6 +6,7 @@ import { createDb } from '@/lib/db'
 import { makeGroqClient } from '@/lib/agents/llm-client'
 import { currentWeekBounds } from '@/lib/digest-window'
 import { generateInsight } from '@/lib/insight-generate'
+import { parseFxOverrides } from '@/lib/fx'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   const opType = existing ? 'update' : 'create'
   const opId = `insight-ondemand-${userId}-${weekStart}-${Date.now()}`
 
-  const { skipped, insight } = await generateInsight({ db, groq, userId, bounds, primaryCurrency, nowIso, opId, opType })
+  const { skipped, insight } = await generateInsight({ db, groq, userId, bounds, primaryCurrency, fx_overrides: parseFxOverrides(prefs?.fx_overrides), nowIso, opId, opType })
   if (skipped) return NextResponse.json({ ok: false, reason: 'empty_week' })
   return NextResponse.json({ ok: true, insight })
 }
