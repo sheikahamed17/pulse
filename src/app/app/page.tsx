@@ -46,7 +46,8 @@ import { useTabState } from '@/hooks/use-tab-state'
 import { useCategories } from '@/hooks/use-categories'
 import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
 import { usePushSubscription } from '@/hooks/use-push-subscription'
-import { db } from '@/lib/dexie'
+import { db, type MoneyEntryRow, type TaskRow, type LearningRow, type NoteRow } from '@/lib/dexie'
+import { moneyRowToDraft, taskRowToDraft, learningRowToDraft, noteRowToDraft } from '@/lib/entry-to-draft'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { runCategoryDedupeOnce } from '@/lib/dedupe-categories-migration'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
@@ -252,6 +253,7 @@ function AppPageInner() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<ChipDraft | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
   const [drainTick, setDrainTick] = useState(0)
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null)
   const [querySource, setQuerySource] = useState<'voice' | 'text' | null>(null)
@@ -432,11 +434,48 @@ function AppPageInner() {
     }
   }
 
+  function editMoney(r: MoneyEntryRow) { if (draft) return; setEditId(r.id); setDraft(moneyRowToDraft(r)) }
+  function editTask(r: TaskRow) { if (draft) return; setEditId(r.id); setDraft(taskRowToDraft(r)) }
+  function editLearning(r: LearningRow) { if (draft) return; setEditId(r.id); setDraft(learningRowToDraft(r)) }
+  function editNote(r: NoteRow) { if (draft) return; setEditId(r.id); setDraft(noteRowToDraft(r)) }
+
+  async function updateEntry(final: ChipDraft, id: string) {
+    if (!user) return
+    let entity_kind: 'money' | 'task' | 'learning' | 'note'
+    let payload: Record<string, unknown>
+    switch (final.kind) {
+      case 'money':
+        entity_kind = 'money'
+        payload = { amount: final.amount, currency: final.currency, direction: final.direction, category_id: final.category_id ?? null, description: final.description ?? null }
+        break
+      case 'task':
+        entity_kind = 'task'
+        payload = { title: final.title, due_at: final.due_at ?? null, priority: final.priority, tags: final.tags ?? [], project_id: final.project_id ?? null }
+        break
+      case 'learning':
+        entity_kind = 'learning'
+        payload = { text: final.text, tags: final.tags, attribution: final.attribution ?? null }
+        break
+      case 'note':
+        entity_kind = 'note'
+        payload = { body: final.body, title: final.title ?? null, tags: final.tags }
+        break
+      default:
+        setDraft(null); setEditId(null)
+        return // budget is not edited via the chip
+    }
+    const op = await generateOp({ entity_kind, entity_id: id, op_type: 'update', payload, user_id: user.id })
+    await applyLocalOp(op)
+    setDraft(null); setEditId(null)
+    pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
+  }
+
   async function confirmEntry(
     final: ChipDraft,
     recurring: { enabled: boolean; period: 'daily'|'weekly'|'monthly'|'yearly'; intervalCount: number },
   ) {
     if (!user) return
+    if (editId) { await updateEntry(final, editId); return }
 
     if (final.kind === 'task') {
       const op = await generateOp({
@@ -646,9 +685,11 @@ function AppPageInner() {
               draft={draft}
               categoryById={categoryById}
               onConfirm={confirmEntry}
+              mode={editId ? 'edit' : 'create'}
               onCancel={() => {
                 if (draft?.kind === 'money' && draft.draftId) deleteReceiptDraft(draft.draftId).catch(console.error)
                 setDraft(null)
+                setEditId(null)
               }}
             />
           )}
@@ -731,7 +772,7 @@ function AppPageInner() {
               <div className="md:hidden">
                 <MoneyCard userId={user.id} />
               </div>
-              <MoneyList userId={user.id} />
+              <MoneyList userId={user.id} onEdit={editMoney} />
             </div>
           )}
           {activeTab === 'tasks' && (
@@ -739,13 +780,13 @@ function AppPageInner() {
               <TaskFilter active={taskFilter} onChange={setTaskFilter} />
               <ProjectPicker userId={user.id} selectedId={taskProjectId} onSelect={setTaskProjectId} noneLabel="All projects" />
               <TaskTagFilter userId={user.id} selectedTag={taskTag} onChange={setTaskTag} />
-              <TaskList userId={user.id} filter={taskFilter} projectId={taskProjectId} tag={taskTag} />
+              <TaskList userId={user.id} filter={taskFilter} projectId={taskProjectId} tag={taskTag} onEdit={editTask} />
             </div>
           )}
           {activeTab === 'learning' && (
             <div className="flex flex-col gap-3">
               <LearningTagFilter userId={user.id} selectedTag={selectedLearningTag} onChange={setSelectedLearningTag} />
-              <LearningList userId={user.id} selectedTag={selectedLearningTag} />
+              <LearningList userId={user.id} selectedTag={selectedLearningTag} onEdit={editLearning} />
             </div>
           )}
           {activeTab === 'notes' && (
@@ -762,6 +803,7 @@ function AppPageInner() {
                 userId={user.id}
                 selectedTag={selectedNotesTag}
                 searchQuery={notesSearchQuery}
+                onEdit={editNote}
               />
             </div>
           )}

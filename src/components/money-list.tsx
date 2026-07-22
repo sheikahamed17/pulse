@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SwipeRow } from '@/components/swipe-row'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
@@ -16,9 +16,9 @@ import { convertViaRates } from '@/lib/fx'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import type { MoneyEntryRow } from '@/lib/dexie'
 
-type Props = { userId: string }
+type Props = { userId: string; onEdit?: (row: MoneyEntryRow) => void }
 
-export function MoneyList({ userId }: Props) {
+export function MoneyList({ userId, onEdit }: Props) {
   const entries = useMoneyEntries(userId)
   const categories = useCategories(userId)
   const undo = useUndoStack()
@@ -138,6 +138,17 @@ export function MoneyList({ userId }: Props) {
 
               {menuFor === e.id && (
                 <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      aria-label={`Edit entry: ${e.description || formatAmount(e)}`}
+                      className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                      onClick={() => { onEdit(e); setMenuFor(null) }}
+                    >
+                      <Pencil className="w-3 h-3" />
+                      Edit
+                    </button>
+                  )}
                   <button
                     type="button"
                     aria-label={`Delete entry: ${e.description || formatAmount(e)}`}
