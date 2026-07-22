@@ -1,10 +1,11 @@
 'use client'
 
-import { useRef, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Circle, CheckCircle2, Trash2, Repeat, Plus } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { taskCompletionOps, formatRecurrence } from '@/lib/recurring-task'
 import { groupTasks, subtaskProgress, rollupOps, visibleNodes, type TaskNode } from '@/lib/subtasks'
+import { SwipeRow } from '@/components/swipe-row'
 import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { formatLocalDateTime } from '@/lib/format'
@@ -12,15 +13,6 @@ import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { db, type TaskRow } from '@/lib/dexie'
 
 type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null }
-
-function useLongPress<T>(onLongPress: (arg: T) => void, ms = 500) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  return {
-    onPointerDown: (arg: T) => { timerRef.current = setTimeout(() => onLongPress(arg), ms) },
-    onPointerUp:   () => { if (timerRef.current) clearTimeout(timerRef.current) },
-    onPointerLeave:() => { if (timerRef.current) clearTimeout(timerRef.current) },
-  }
-}
 
 export function TaskList({ userId, filter, projectId = null, tag = null }: Props) {
   // Group from the FULL set so progress counts include completed children even in
@@ -30,8 +22,8 @@ export function TaskList({ userId, filter, projectId = null, tag = null }: Props
   const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects])
   const nodes = useMemo(() => visibleNodes(groupTasks(tasks), filter, projectId, tag), [tasks, filter, projectId, tag])
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
-  const longPress = useLongPress<TaskRow>(t => setMenuFor(t.id))
 
   async function toggleComplete(t: TaskRow) {
     const nowIso = new Date().toISOString()
@@ -97,68 +89,64 @@ export function TaskList({ userId, filter, projectId = null, tag = null }: Props
     const isCompleted = hasChildren ? progress!.done === progress!.total : !!t.completed_at
     const isOverdue = !isCompleted && t.due_at && t.due_at < new Date().toISOString()
     return (
-      <div
-        className="glass-soft rounded-2xl relative flex items-start justify-between gap-3 p-3 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
-        onPointerDown={() => longPress.onPointerDown(t)}
-        onPointerUp={longPress.onPointerUp}
-        onPointerLeave={longPress.onPointerLeave}
-        onKeyDown={(keyEvent) => {
-          if (keyEvent.target !== keyEvent.currentTarget) return
-          if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
-            if (keyEvent.key === ' ') keyEvent.preventDefault()
-            setMenuFor(t.id)
-          }
-        }}
-        tabIndex={0}
-      >
-        <button
-          type="button"
-          onClick={() => { if (!hasChildren) toggleComplete(t) }}
-          className="flex flex-1 items-start gap-2 text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
-          aria-label={hasChildren ? `${t.title} (${progress!.done} of ${progress!.total} done)` : (isCompleted ? `Mark "${t.title}" open` : `Complete "${t.title}"`)}
-          aria-disabled={hasChildren}
+      <div className="relative">
+        <SwipeRow
+          isOpen={openId === t.id}
+          onOpenChange={o => setOpenId(o ? t.id : null)}
+          onLongPress={() => setMenuFor(t.id)}
+          onDelete={() => deleteTask(t)}
+          deleteLabel={`Delete task: ${t.title.slice(0, 30)}${t.title.length > 30 ? '…' : ''}`}
+          className="glass-soft flex items-start justify-between gap-3 rounded-2xl p-3"
         >
-          {isCompleted ? (
-            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-2" />
-          ) : (
-            <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
-          )}
-          <div className="flex flex-col">
-            <span className={isCompleted ? 'text-muted-foreground line-through' : ''}>
-              {t.title}
-              {progress && <span className="ml-2 font-mono tabular-nums text-xs text-muted-foreground">{progress.done}/{progress.total}</span>}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {t.recur_period && t.recur_interval && (
-                <span className="mr-2 inline-flex items-center gap-0.5 text-accent-2">
-                  <Repeat className="h-3 w-3" /> {formatRecurrence(t.recur_period, t.recur_interval)}
-                </span>
-              )}
-              {t.project_id && projectById.get(t.project_id) && (
-                <span className="mr-2 inline-flex items-center gap-1">
-                  {projectById.get(t.project_id)!.color && (
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: projectById.get(t.project_id)!.color! }} />
-                  )}
-                  {projectById.get(t.project_id)!.name}
-                </span>
-              )}
-              {(t.tags ?? []).map(tg => (
-                <span key={tg} className="mr-1 text-accent-2">#{tg}</span>
-              ))}
-              {t.priority !== 'medium' && (
-                <span className={`mr-2 ${t.priority === 'high' ? 'text-destructive' : ''}`}>
-                  {t.priority}
-                </span>
-              )}
-              {t.due_at && (
-                <span className={`font-mono tabular-nums ${isOverdue ? 'text-warning' : ''}`}>
-                  due {formatLocalDateTime(t.due_at, prefs.tz)}
-                  {isOverdue && ' · overdue'}
-                </span>
-              )}
-            </span>
-          </div>
-        </button>
+          <button
+            type="button"
+            onClick={() => { if (!hasChildren) toggleComplete(t) }}
+            className="flex flex-1 items-start gap-2 text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+            aria-label={hasChildren ? `${t.title} (${progress!.done} of ${progress!.total} done)` : (isCompleted ? `Mark "${t.title}" open` : `Complete "${t.title}"`)}
+            aria-disabled={hasChildren}
+          >
+            {isCompleted ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-2" />
+            ) : (
+              <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            )}
+            <div className="flex flex-col">
+              <span className={isCompleted ? 'text-muted-foreground line-through' : ''}>
+                {t.title}
+                {progress && <span className="ml-2 font-mono tabular-nums text-xs text-muted-foreground">{progress.done}/{progress.total}</span>}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t.recur_period && t.recur_interval && (
+                  <span className="mr-2 inline-flex items-center gap-0.5 text-accent-2">
+                    <Repeat className="h-3 w-3" /> {formatRecurrence(t.recur_period, t.recur_interval)}
+                  </span>
+                )}
+                {t.project_id && projectById.get(t.project_id) && (
+                  <span className="mr-2 inline-flex items-center gap-1">
+                    {projectById.get(t.project_id)!.color && (
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: projectById.get(t.project_id)!.color! }} />
+                    )}
+                    {projectById.get(t.project_id)!.name}
+                  </span>
+                )}
+                {(t.tags ?? []).map(tg => (
+                  <span key={tg} className="mr-1 text-accent-2">#{tg}</span>
+                ))}
+                {t.priority !== 'medium' && (
+                  <span className={`mr-2 ${t.priority === 'high' ? 'text-destructive' : ''}`}>
+                    {t.priority}
+                  </span>
+                )}
+                {t.due_at && (
+                  <span className={`font-mono tabular-nums ${isOverdue ? 'text-warning' : ''}`}>
+                    due {formatLocalDateTime(t.due_at, prefs.tz)}
+                    {isOverdue && ' · overdue'}
+                  </span>
+                )}
+              </span>
+            </div>
+          </button>
+        </SwipeRow>
 
         {menuFor === t.id && (
           <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
