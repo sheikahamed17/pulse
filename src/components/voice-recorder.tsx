@@ -109,7 +109,9 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
           {state !== 'idle' && state !== 'recording' ? '…' : <Mic className="h-6 w-6" />}
         </button>
         {state === 'recording' && (
-          <div className="absolute inset-0 rounded-full border-2 border-[var(--accent-2)]/50 motion-safe:animate-pulse" />
+          // pointer-events-none: this decorative ring overlays the button; without
+          // it, the ring swallows the tap and "tap again to stop" never fires stop().
+          <div className="pointer-events-none absolute inset-0 rounded-full border-2 border-[var(--accent-2)]/50 motion-safe:animate-pulse" />
         )}
       </div>
       <p className={`text-xs ${state === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
