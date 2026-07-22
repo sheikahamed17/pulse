@@ -37,15 +37,20 @@ try {
     process.exit(1)
   }
 
-  // Get file list for precache manifest
+  // Get file list for precache manifest.
+  // nodir: '**/*' matches directories too — a directory entry (e.g. "icons") becomes
+  // a precache URL "/icons" that 404s, and ONE failed precache fetch rejects the whole
+  // install → the SW never activates (breaking push subscribe + offline caching).
   const files = globSync('**/*', {
     cwd: publicDir,
+    nodir: true,
     ignore: ['sw.js', '**/*.map', '**/manifest*.json'],
   })
 
-  // Create precache manifest
+  // Create precache manifest. Normalize path separators: glob returns native "\" on
+  // Windows, which would emit URLs like "/icons\icon-192.png" that don't resolve.
   const manifest = files.map((file) => ({
-    url: `/${file}`,
+    url: `/${file.split(path.sep).join('/')}`,
     revision: null, // In real apps, this would be a hash
   }))
 
