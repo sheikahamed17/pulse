@@ -9,6 +9,14 @@ function minorUnitMultiplier(currency: string): number {
   return ZERO_MINOR_UNIT_CURRENCIES.has(currency) ? 1 : 100
 }
 
+// A manual FX override is a dateless EUR→target rate, used ONLY as a fill-the-gap
+// fallback when the ECB feed has no rate for `target`. A value must be positive +
+// finite or it's ignored (so a bad entry can never poison a conversion).
+function overrideRate(overrides: Record<string, number> | undefined, target: string): { date: string; rate: number } | null {
+  const o = overrides?.[target]
+  return typeof o === 'number' && isFinite(o) && o > 0 ? { date: '(manual)', rate: o } : null
+}
+
 // Find the most-recent date ≤ asOfDate with a rate for the given target.
 // `base` is implicitly 'EUR' (ECB's reference).
 async function freshestRate(
@@ -35,6 +43,7 @@ export async function convertToPrimary(
   currency: string,
   primary: string,
   occurredAt: string,                           // ISO 8601
+  overrides?: Record<string, number>,
 ): Promise<{ amount: number; rateDate: string } | null> {
   if (currency === primary) {
     return { amount, rateDate: occurredAt.slice(0, 10) }
@@ -42,16 +51,16 @@ export async function convertToPrimary(
 
   const asOfDate = occurredAt.slice(0, 10)
 
-  // EUR→currency rate (1 EUR = `rate` units of currency)
+  // EUR→currency rate (1 EUR = `rate` units of currency); manual override fills a gap.
   const eurToCurrency = currency === 'EUR'
     ? { date: asOfDate, rate: 1 }
-    : await freshestRate(db, currency, asOfDate)
+    : (await freshestRate(db, currency, asOfDate)) ?? overrideRate(overrides, currency)
   if (!eurToCurrency) return null
 
   // EUR→primary rate
   const eurToPrimary = primary === 'EUR'
     ? { date: asOfDate, rate: 1 }
-    : await freshestRate(db, primary, asOfDate)
+    : (await freshestRate(db, primary, asOfDate)) ?? overrideRate(overrides, primary)
   if (!eurToPrimary) return null
 
   // Convert smallest-unit → major-unit → EUR → primary major → primary smallest
@@ -77,6 +86,7 @@ export function convertViaRates(
   primary: string,
   occurredAt: string,
   rates: Array<{ date: string; target: string; rate: number }>,
+  overrides?: Record<string, number>,
 ): { amount: number; rateDate: string } | null {
   if (currency === primary) {
     return { amount, rateDate: occurredAt.slice(0, 10) }
@@ -92,6 +102,7 @@ export function convertViaRates(
       if (r.date > asOfDate) continue
       if (!best || r.date > best.date) best = { date: r.date, rate: r.rate }
     }
+    if (!best) return overrideRate(overrides, target)   // fill-the-gap: ECB missing → manual
     return best
   }
 
