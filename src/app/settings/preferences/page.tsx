@@ -17,7 +17,7 @@ export default function PreferencesPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
   const { prefs, savePrefs } = useUserPrefs()
-  const { status: pushStatus, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription()
+  const { status: pushStatus, error: pushError, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription()
   const [state, setState] = useState({
     primaryCurrency: prefs.primary_currency,
     tz: prefs.tz,
@@ -167,9 +167,14 @@ export default function PreferencesPage() {
             </button>
           )}
           {pushStatus === 'unsubscribed' && (
-            <Button onClick={pushSubscribe}>
-              Enable notifications
-            </Button>
+            <>
+              <Button onClick={pushSubscribe}>
+                Enable notifications
+              </Button>
+              {pushError && (
+                <p role="alert" className="mt-2 text-xs text-rose-500 break-words">{pushError}</p>
+              )}
+            </>
           )}
           {pushStatus === 'pending' && (
             <p className="text-xs text-muted-foreground">Loading…</p>

@@ -26,6 +26,7 @@ function base64urlToUint8Array(base64url: string): Uint8Array {
  */
 export function usePushSubscription() {
   const [status, setStatus] = useState<PushStatus>('pending')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function detect() {
@@ -68,11 +69,14 @@ export function usePushSubscription() {
   }, [])
 
   const subscribe = useCallback(async () => {
+    setError(null)
     try {
       // Request notification permission (must be called from a user gesture)
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
-        setStatus('denied')
+        // 'denied' = blocked in settings; 'default' = prompt dismissed (retryable)
+        setStatus(permission === 'denied' ? 'denied' : 'unsubscribed')
+        if (permission !== 'denied') setError('Permission was not granted — tap Enable and choose Allow.')
         return
       }
 
@@ -105,11 +109,12 @@ export function usePushSubscription() {
         }),
       })
 
-      if (!res.ok) throw new Error(`subscribe ${res.status}`)
+      if (!res.ok) throw new Error(`Server rejected the subscription (HTTP ${res.status})`)
 
       setStatus('subscribed')
     } catch (err) {
       console.error('subscribe failed:', err)
+      setError((err as Error)?.message || String(err))
       setStatus('unsubscribed')
     }
   }, [])
@@ -142,5 +147,5 @@ export function usePushSubscription() {
     }
   }, [])
 
-  return { status, subscribe, unsubscribe }
+  return { status, error, subscribe, unsubscribe }
 }
