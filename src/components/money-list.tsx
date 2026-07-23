@@ -66,7 +66,7 @@ export function MoneyList({ userId, onEdit }: Props) {
         {entries.map(e => {
           const cat = e.category_id ? categoryById.get(e.category_id) : undefined
           return (
-            <li key={e.id} className="relative">
+            <li key={e.id} id={`pulse-row-${e.id}`} className="relative">
               <SwipeRow
                 isOpen={openId === e.id}
                 onOpenChange={o => setOpenId(o ? e.id : null)}

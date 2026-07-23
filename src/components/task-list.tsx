@@ -117,7 +117,7 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
     const isCompleted = hasChildren ? progress!.done === progress!.total : !!t.completed_at
     const isOverdue = !isCompleted && t.due_at && t.due_at < new Date().toISOString()
     return (
-      <div className="relative">
+      <div id={`pulse-row-${t.id}`} className="relative">
         <SwipeRow
           isOpen={openId === t.id}
           onOpenChange={o => setOpenId(o ? t.id : null)}
