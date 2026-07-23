@@ -275,7 +275,10 @@ function AppPageInner() {
       if (el) {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' })
         el.classList.add('pulse-flash')
-        timers.push(setTimeout(() => el.classList.remove('pulse-flash'), 1200))
+        // NOT pushed to `timers`: setFocusId(null) below re-runs this effect, whose
+        // cleanup clears `timers`. The removal must survive that so the class is
+        // actually removed (else a later jump to the same row can't re-animate).
+        setTimeout(() => el.classList.remove('pulse-flash'), 1200)
         setFocusId(null)
         return
       }
