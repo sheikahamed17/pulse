@@ -153,6 +153,7 @@ export interface TaskTable {
   tags: string | null          // JSON string[]
   project_id: string | null
   parent_id: string | null
+  nudge_muted_at: string | null
   field_hlcs: string
   deleted_at: string | null
   created_at: string

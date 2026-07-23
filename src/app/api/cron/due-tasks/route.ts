@@ -5,6 +5,7 @@ import { createDb } from '@/lib/db'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 import { sendPushToUser } from '@/lib/web-push'
 import { formatLocalDateTime } from '@/lib/format'
+import { overdueNudge } from '@/lib/overdue-nudge'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     .where('due_at', '<=', now)
     .where('completed_at', 'is', null)
     .where('deleted_at', 'is', null)
-    .select(['id', 'user_id', 'title', 'due_at'])
+    .selectAll()
     .execute()
 
   // Group by user_id to load prefs once per user
@@ -48,37 +49,57 @@ export async function POST(req: Request) {
 
   for (const task of dueTasks) {
     const dueAtStr = task.due_at ?? ''
+    const userTz = userPrefsMap.get(task.user_id)?.tz ?? 'Asia/Kolkata'
+
+    // Once-ever due notification.
     const notifId = `due-${task.id}-${dueAtStr}`
     const exists = await db
       .selectFrom('push_notifications')
       .where('id', '=', notifId)
       .select('id')
       .executeTakeFirst()
+    if (!exists) {
+      await db
+        .insertInto('push_notifications')
+        .values({
+          id: notifId,
+          user_id: task.user_id,
+          title: `Task due: ${task.title.slice(0, 60)}`,
+          body: formatLocalDateTime(dueAtStr, userTz),
+          url: '/app?tab=tasks',
+          created_at: now,
+          read_at: null,
+        })
+        .execute()
+      notifIds.add(task.user_id)
+      notifiedTaskCount++
+    }
 
-    if (exists) continue
-
-    const userTz = userPrefsMap.get(task.user_id)?.tz ?? 'Asia/Kolkata'
-    const dueTime = formatLocalDateTime(dueAtStr, userTz)
-
-    // Clamp title to 60 chars
-    const title = `Task due: ${task.title.slice(0, 60)}`
-    const body = dueTime
-
-    await db
-      .insertInto('push_notifications')
-      .values({
-        id: notifId,
-        user_id: task.user_id,
-        title,
-        body,
-        url: '/app?tab=tasks',
-        created_at: now,
-        read_at: null,
-      })
-      .execute()
-
-    notifIds.add(task.user_id)
-    notifiedTaskCount++
+    // Daily overdue re-nudge (rides this same sweep; per-day dedup id).
+    const nudge = overdueNudge(task, now, userTz)
+    if (nudge) {
+      const nExists = await db
+        .selectFrom('push_notifications')
+        .where('id', '=', nudge.notifId)
+        .select('id')
+        .executeTakeFirst()
+      if (!nExists) {
+        await db
+          .insertInto('push_notifications')
+          .values({
+            id: nudge.notifId,
+            user_id: task.user_id,
+            title: nudge.title,
+            body: nudge.body,
+            url: '/app?tab=tasks',
+            created_at: now,
+            read_at: null,
+          })
+          .execute()
+        notifIds.add(task.user_id)
+        notifiedTaskCount++
+      }
+    }
   }
 
   // Step 4: Send push to each distinct user with new notifications
