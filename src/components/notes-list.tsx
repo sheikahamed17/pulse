@@ -63,7 +63,7 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
   return (
     <ul className="flex flex-col gap-2">
       {filtered.map(e => (
-        <li key={e.id} className="relative">
+        <li key={e.id} id={`pulse-row-${e.id}`} className="relative">
           <SwipeRow
             isOpen={openId === e.id}
             onOpenChange={o => setOpenId(o ? e.id : null)}
