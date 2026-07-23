@@ -5,6 +5,8 @@ import { Trash2, Pencil } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useNotes } from '@/hooks/use-notes'
 import { SwipeRow } from '@/components/swipe-row'
+import { useUndo } from '@/components/undo-provider'
+import { resurrectPayload } from '@/lib/undo-delete'
 import { searchNotes } from '@/lib/search-notes'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
@@ -23,6 +25,7 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
+  const undo = useUndo()
 
   const searched = searchNotes(notes, searchQuery)
   const filtered = selectedTag
@@ -38,6 +41,15 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
     await applyLocalOp(op)
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
     setMenuFor(null)
+    undo.push('Deleted note', async () => {
+      const undoOp = await generateOp({
+        entity_kind: 'note', entity_id: e.id,
+        op_type: 'update', payload: resurrectPayload('note', e),
+        user_id: userId,
+      })
+      await applyLocalOp(undoOp)
+      pushPullOnce({ userId }).catch(err => console.error('sync', err))
+    })
   }
 
   if (filtered.length === 0) {
