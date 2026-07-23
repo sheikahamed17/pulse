@@ -6,6 +6,8 @@ import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { taskCompletionOps, formatRecurrence } from '@/lib/recurring-task'
 import { groupTasks, subtaskProgress, rollupOps, visibleNodes, type TaskNode } from '@/lib/subtasks'
 import { SwipeRow } from '@/components/swipe-row'
+import { useUndo } from '@/components/undo-provider'
+import { resurrectPayload } from '@/lib/undo-delete'
 import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { formatLocalDateTime } from '@/lib/format'
@@ -24,6 +26,7 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
+  const undo = useUndo()
 
   async function toggleComplete(t: TaskRow) {
     const nowIso = new Date().toISOString()
@@ -56,6 +59,7 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
   async function deleteTask(t: TaskRow) {
     // Cascade-delete a parent's sub-tasks (meaningless without the parent).
     const children = tasks.filter(x => x.parent_id === t.id && !x.deleted_at)
+    const deletedRows = [...children, t]   // exact rows this action tombstones
     for (const c of children) {
       await applyLocalOp(await generateOp({ entity_kind: 'task', entity_id: c.id, op_type: 'delete', payload: {}, user_id: userId }))
     }
@@ -70,6 +74,21 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
     }
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
     setMenuFor(null)
+    undo.push(`Deleted "${t.title}"`, async () => {
+      // Resurrect the whole tombstoned set (parent + sub-tasks, or a single sub-task).
+      for (const r of deletedRows) {
+        await applyLocalOp(await generateOp({ entity_kind: 'task', entity_id: r.id, op_type: 'update', payload: resurrectPayload('task', r), user_id: userId }))
+      }
+      // Re-derive the parent's completion after resurrecting a sub-task.
+      if (t.parent_id) {
+        const all = await db.tasks.where('user_id').equals(userId).toArray()
+        const parent = all.find(x => x.id === t.parent_id)
+        const siblings = all.filter(x => x.parent_id === t.parent_id && !x.deleted_at)
+        const roll = parent && !parent.deleted_at ? rollupOps(parent, siblings, new Date().toISOString()) : null
+        if (parent && roll) await applyLocalOp(await generateOp({ entity_kind: 'task', entity_id: parent.id, op_type: 'update', payload: roll, user_id: userId }))
+      }
+      pushPullOnce({ userId }).catch(err => console.error('sync', err))
+    })
   }
 
   async function addSubtask(parentId: string, title: string) {

@@ -8,7 +8,8 @@ import { SwipeRow } from '@/components/swipe-row'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
-import { useUndoStack } from '@/hooks/use-undo-stack'
+import { useUndo } from '@/components/undo-provider'
+import { resurrectPayload } from '@/lib/undo-delete'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
 import { currencySymbol } from '@/lib/currency'
@@ -21,7 +22,7 @@ type Props = { userId: string; onEdit?: (row: MoneyEntryRow) => void }
 export function MoneyList({ userId, onEdit }: Props) {
   const entries = useMoneyEntries(userId)
   const categories = useCategories(userId)
-  const undo = useUndoStack()
+  const undo = useUndo()
   const router = useRouter()
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -48,7 +49,7 @@ export function MoneyList({ userId, onEdit }: Props) {
       async () => {
         const undoOp = await generateOp({
           entity_kind: 'money', entity_id: e.id,
-          op_type: 'update', payload: { description: e.description ?? null },
+          op_type: 'update', payload: resurrectPayload('money', e),
           user_id: userId,
         })
         await applyLocalOp(undoOp)
@@ -58,8 +59,7 @@ export function MoneyList({ userId, onEdit }: Props) {
   }
 
   return (
-    <>
-      <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col gap-2">
         {entries.length === 0 && (
           <li className="p-4 text-sm text-muted-foreground">No entries yet. Tap the mic above (Phase 1.3) or type below.</li>
         )}
@@ -180,17 +180,6 @@ export function MoneyList({ userId, onEdit }: Props) {
           )
         })}
       </ul>
-
-      <div className="fixed bottom-[calc(1.5rem_+_env(safe-area-inset-bottom))] left-1/2 z-50 flex -translate-x-1/2 flex-col gap-2">
-        {undo.entries.map(u => (
-          <div key={u.id} className="flex items-center gap-3 rounded-md border bg-background px-3 py-1.5 text-xs shadow">
-            <span>{u.label}</span>
-            <button type="button" className="font-semibold text-blue-600 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded" onClick={() => undo.trigger(u.id)}>Undo</button>
-            <button type="button" className="text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded" onClick={() => undo.dismiss(u.id)}>×</button>
-          </div>
-        ))}
-      </div>
-    </>
   )
 }
 

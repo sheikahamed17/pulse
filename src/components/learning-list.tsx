@@ -5,6 +5,8 @@ import { Trash2, Pencil } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useLearnings } from '@/hooks/use-learnings'
 import { SwipeRow } from '@/components/swipe-row'
+import { useUndo } from '@/components/undo-provider'
+import { resurrectPayload } from '@/lib/undo-delete'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { LearningRow } from '@/lib/dexie'
@@ -17,6 +19,7 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
+  const undo = useUndo()
 
   const filtered = selectedTag
     ? learnings.filter(e => e.tags.includes(selectedTag))
@@ -31,6 +34,15 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
     await applyLocalOp(op)
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
     setMenuFor(null)
+    undo.push('Deleted learning', async () => {
+      const undoOp = await generateOp({
+        entity_kind: 'learning', entity_id: e.id,
+        op_type: 'update', payload: resurrectPayload('learning', e),
+        user_id: userId,
+      })
+      await applyLocalOp(undoOp)
+      pushPullOnce({ userId }).catch(err => console.error('sync', err))
+    })
   }
 
   if (filtered.length === 0) {

@@ -48,6 +48,7 @@ import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
 import { usePushSubscription } from '@/hooks/use-push-subscription'
 import { db, type MoneyEntryRow, type TaskRow, type LearningRow, type NoteRow } from '@/lib/dexie'
 import { moneyRowToDraft, taskRowToDraft, learningRowToDraft, noteRowToDraft } from '@/lib/entry-to-draft'
+import { UndoProvider } from '@/components/undo-provider'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { runCategoryDedupeOnce } from '@/lib/dedupe-categories-migration'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
@@ -621,7 +622,7 @@ function AppPageInner() {
   if (!user) return <p className="p-8">Loading…</p>
 
   return (
-    <>
+    <UndoProvider>
       <AuroraBackground />
       <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:pb-6 md:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
@@ -828,7 +829,7 @@ function AppPageInner() {
       <div className="md:hidden">
         <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
       </div>
-    </>
+    </UndoProvider>
   )
 }
 
