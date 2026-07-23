@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Circle, CheckCircle2, Trash2, Repeat, Plus, Pencil } from 'lucide-react'
+import { Circle, CheckCircle2, Trash2, Repeat, Plus, Pencil, Bell, BellOff } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { taskCompletionOps, formatRecurrence } from '@/lib/recurring-task'
 import { groupTasks, subtaskProgress, rollupOps, visibleNodes, type TaskNode } from '@/lib/subtasks'
@@ -91,6 +91,15 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
     })
   }
 
+  async function toggleMute(t: TaskRow) {
+    await applyLocalOp(await generateOp({
+      entity_kind: 'task', entity_id: t.id, op_type: 'update',
+      payload: { nudge_muted_at: t.nudge_muted_at ? null : new Date().toISOString() },
+      user_id: userId,
+    }))
+    pushPullOnce({ userId }).catch(err => console.error('sync', err))
+  }
+
   async function addSubtask(parentId: string, title: string) {
     const trimmed = title.trim()
     if (!trimmed) return
@@ -162,6 +171,11 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
                     {isOverdue && ' · overdue'}
                   </span>
                 )}
+                {isOverdue && t.nudge_muted_at && (
+                  <span className="ml-1 inline-flex items-center align-middle" aria-label="Reminders muted">
+                    <BellOff className="h-3 w-3" />
+                  </span>
+                )}
               </span>
             </div>
           </button>
@@ -178,6 +192,17 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
               >
                 <Pencil className="w-3 h-3" />
                 Edit
+              </button>
+            )}
+            {isOverdue && (
+              <button
+                type="button"
+                aria-label={t.nudge_muted_at ? `Resume reminders for: ${t.title.slice(0, 30)}` : `Stop reminders for: ${t.title.slice(0, 30)}`}
+                className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                onClick={() => { toggleMute(t); setMenuFor(null) }}
+              >
+                {t.nudge_muted_at ? <Bell className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
+                {t.nudge_muted_at ? 'Resume reminding' : 'Stop reminding'}
               </button>
             )}
             <button

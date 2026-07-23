@@ -163,6 +163,8 @@ describe('/api/cron/due-tasks', () => {
   it('is idempotent: re-running does not insert duplicate notifications', async () => {
     const insertedRows: Row[] = []
     currentFakeDb = makeFakeDb({
+      // Past-dated → this task gets a once-ever `due-` notification AND (being overdue
+      // since a prior day) a per-day `overdue-` re-nudge on the first run.
       tasks: [{ id: 'task-1', user_id: 'user-1', title: 'Test', due_at: '2026-07-02T14:00:00.000Z', completed_at: null, deleted_at: null }],
       userPrefs: [{ user_id: 'user-1', tz: 'Asia/Kolkata' }],
       notifExists: (id: string) => insertedRows.some(r => r.id === id),
@@ -171,17 +173,18 @@ describe('/api/cron/due-tasks', () => {
       },
     })
 
-    // First run: inserts
+    // First run: inserts exactly one `due-` notification (idempotency key = due-{id}-{due_at}).
     const res1 = await POST(cronReq())
     expect(res1.status).toBe(200)
-    const body1 = await res1.json() as { notified_tasks: number }
-    expect(body1.notified_tasks).toBe(1)
+    expect(insertedRows.filter(r => String(r.id).startsWith('due-'))).toHaveLength(1)
+    const countAfterFirst = insertedRows.length
 
-    // Second run: finds existing, skips
+    // Second run: every id (due + overdue) already exists → zero new inserts.
     const res2 = await POST(cronReq())
     expect(res2.status).toBe(200)
     const body2 = await res2.json() as { notified_tasks: number }
     expect(body2.notified_tasks).toBe(0)
+    expect(insertedRows).toHaveLength(countAfterFirst)
   })
 
   it('sends push once per distinct user with new notifications', async () => {
@@ -222,15 +225,11 @@ describe('/api/cron/due-tasks', () => {
       },
     })
 
-    // First run with due_at=T1
+    // First run with due_at=T1 → a `due-T1` notification is inserted.
     sendPushMock.mockClear()
     const res1 = await POST(cronReq())
     expect(res1.status).toBe(200)
-    const body1 = await res1.json() as { notified_tasks: number }
-    expect(body1.notified_tasks).toBe(1)
-    // Should have inserted row with id 'due-task-1-2026-07-02T14:00:00.000Z'
-    expect(insertedRows).toHaveLength(1)
-    expect(insertedRows[0].id).toBe(`due-${taskId}-${t1}`)
+    expect(insertedRows.some(r => r.id === `due-${taskId}-${t1}`)).toBe(true)
 
     // Simulate task's due_at being edited to T2
     currentFakeDb = makeFakeDb({
@@ -245,10 +244,8 @@ describe('/api/cron/due-tasks', () => {
     sendPushMock.mockClear()
     const res2 = await POST(cronReq())
     expect(res2.status).toBe(200)
-    const body2 = await res2.json() as { notified_tasks: number }
-    // Old T1 key still blocks T1, but T2 key is new → inserts
-    expect(body2.notified_tasks).toBe(1)
-    expect(insertedRows).toHaveLength(2)
-    expect(insertedRows[1].id).toBe(`due-${taskId}-${t2}`)
+    // Old T1 due key still blocks T1, but the new T2 due key inserts (the overdue
+    // re-nudge's per-day key is unchanged, so it does not re-insert).
+    expect(insertedRows.some(r => r.id === `due-${taskId}-${t2}`)).toBe(true)
   })
 })
