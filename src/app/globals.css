@@ -94,6 +94,9 @@
   -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
 @keyframes aurora-drift { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(3vw,3vw) scale(1.1)} }
+@keyframes pulse-flash { 0% { box-shadow: 0 0 0 2px var(--accent-2) } 100% { box-shadow: 0 0 0 2px transparent } }
+.pulse-flash { animation: pulse-flash 1.2s ease-out; border-radius: 1rem; }
+@media (prefers-reduced-motion: reduce) { .pulse-flash { animation: none; box-shadow: 0 0 0 2px var(--accent-2) } }
 
 body {
   padding-top: env(safe-area-inset-top);

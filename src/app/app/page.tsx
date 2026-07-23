@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Settings } from 'lucide-react'
+import { Settings, Search } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { LockGate } from '@/components/lock-gate'
 import { PulseLogo } from '@/components/pulse-logo'
@@ -49,6 +49,7 @@ import { usePushSubscription } from '@/hooks/use-push-subscription'
 import { db, type MoneyEntryRow, type TaskRow, type LearningRow, type NoteRow } from '@/lib/dexie'
 import { moneyRowToDraft, taskRowToDraft, learningRowToDraft, noteRowToDraft } from '@/lib/entry-to-draft'
 import { UndoProvider } from '@/components/undo-provider'
+import { GlobalSearch } from '@/components/global-search'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { runCategoryDedupeOnce } from '@/lib/dedupe-categories-migration'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
@@ -255,11 +256,35 @@ function AppPageInner() {
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<ChipDraft | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [focusId, setFocusId] = useState<string | null>(null)
   const [drainTick, setDrainTick] = useState(0)
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null)
   const [querySource, setQuerySource] = useState<'voice' | 'text' | null>(null)
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
+
+  // Global search "jump to row": after switching tabs, scroll the target row into
+  // view + flash it. Retries because the destination list renders async (useLiveQuery).
+  useEffect(() => {
+    if (!focusId) return
+    let tries = 0
+    const timers: ReturnType<typeof setTimeout>[] = []
+    const tryScroll = () => {
+      const el = document.getElementById(`pulse-row-${focusId}`)
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        el.classList.add('pulse-flash')
+        timers.push(setTimeout(() => el.classList.remove('pulse-flash'), 1200))
+        setFocusId(null)
+        return
+      }
+      if (tries++ < 8) timers.push(setTimeout(tryScroll, 120))
+      else setFocusId(null)
+    }
+    timers.push(setTimeout(tryScroll, 0))
+    return () => { timers.forEach(clearTimeout) }
+  }, [focusId, activeTab])
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
   const [taskProjectId, setTaskProjectId] = useState<string | null>(null)
   const [taskTag, setTaskTag] = useState<string | null>(null)
@@ -632,6 +657,14 @@ function AppPageInner() {
               <h1 className="text-2xl font-semibold">Pulse</h1>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                aria-label="Search"
+                onClick={() => setSearchOpen(true)}
+                className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+              >
+                <Search className="h-5 w-5" />
+              </button>
               <Link href="/settings" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors">
                 <Settings className="h-5 w-5" />
               </Link>
@@ -829,6 +862,14 @@ function AppPageInner() {
       <div className="md:hidden">
         <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
       </div>
+
+      {searchOpen && (
+        <GlobalSearch
+          userId={user.id}
+          onClose={() => setSearchOpen(false)}
+          onSelect={(kind, id) => { setSearchOpen(false); setTab(kind); setFocusId(id) }}
+        />
+      )}
     </UndoProvider>
   )
 }
