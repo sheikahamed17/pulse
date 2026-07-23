@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useLearnings } from '@/hooks/use-learnings'
 import { SwipeRow } from '@/components/swipe-row'
@@ -10,9 +10,9 @@ import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { LearningRow } from '@/lib/dexie'
 import { cn } from '@/lib/utils'
 
-type Props = { userId: string; selectedTag: string | null }
+type Props = { userId: string; selectedTag: string | null; onEdit?: (row: LearningRow) => void }
 
-export function LearningList({ userId, selectedTag }: Props) {
+export function LearningList({ userId, selectedTag, onEdit }: Props) {
   const learnings = useLearnings(userId)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -85,6 +85,17 @@ export function LearningList({ userId, selectedTag }: Props) {
 
           {menuFor === e.id && (
             <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
+              {onEdit && (
+                <button
+                  type="button"
+                  aria-label={`Edit learning: ${e.text.slice(0, 30)}${e.text.length > 30 ? '…' : ''}`}
+                  className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                  onClick={() => { onEdit(e); setMenuFor(null) }}
+                >
+                  <Pencil className="w-3 h-3" />
+                  Edit
+                </button>
+              )}
               <button
                 type="button"
                 aria-label={`Delete learning: ${e.text.slice(0, 30)}${e.text.length > 30 ? '…' : ''}`}

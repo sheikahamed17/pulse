@@ -32,22 +32,23 @@ type Props = {
   categoryById: Map<string, CategoryRow>
   onConfirm: (final: ChipDraft, recurring: { enabled: boolean; period: Period; intervalCount: number }) => Promise<void>
   onCancel: () => void
+  mode?: 'create' | 'edit'
 }
 
-export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCancel }: Props) {
+export function ConfirmationChip({ userId, draft, categoryById, onConfirm, onCancel, mode = 'create' }: Props) {
   if (draft.kind === 'task') {
-    return <ConfirmationChipTask userId={userId} draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+    return <ConfirmationChipTask userId={userId} draft={draft} onConfirm={onConfirm} onCancel={onCancel} mode={mode} />
   }
   if (draft.kind === 'learning') {
-    return <ConfirmationChipLearning draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+    return <ConfirmationChipLearning draft={draft} onConfirm={onConfirm} onCancel={onCancel} mode={mode} />
   }
   if (draft.kind === 'note') {
-    return <ConfirmationChipNote draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
+    return <ConfirmationChipNote draft={draft} onConfirm={onConfirm} onCancel={onCancel} mode={mode} />
   }
   if (draft.kind === 'budget') {
     return <ConfirmationChipBudget draft={draft} onConfirm={onConfirm} onCancel={onCancel} />
   }
-  return <ConfirmationChipMoney userId={userId} draft={draft} categoryById={categoryById} onConfirm={onConfirm} onCancel={onCancel} />
+  return <ConfirmationChipMoney userId={userId} draft={draft} categoryById={categoryById} onConfirm={onConfirm} onCancel={onCancel} mode={mode} />
 }
 
 function ConfirmationChipMoney({
@@ -56,12 +57,14 @@ function ConfirmationChipMoney({
   categoryById,
   onConfirm,
   onCancel,
+  mode,
 }: {
   userId: string
   draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }
   categoryById: Map<string, CategoryRow>
   onConfirm: Props['onConfirm']
   onCancel: () => void
+  mode: 'create' | 'edit'
 }) {
   const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }>(draft)
   const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category'>(null)
@@ -69,6 +72,7 @@ function ConfirmationChipMoney({
   const [period, setPeriod] = useState<Period>('monthly')
   const [intervalCount, setIntervalCount] = useState(1)
   const [busy, setBusy] = useState(false)
+  const isEdit = mode === 'edit'
 
   const major = (d.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
   const symbol = currencySymbol(d.currency)
@@ -171,28 +175,30 @@ function ConfirmationChipMoney({
         </div>
       )}
 
-      <div className="mb-3 flex flex-col gap-2">
-        <label className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
-          <span>Make recurring</span>
-          <input
-            type="checkbox"
-            checked={makeRecurring}
-            onChange={e => setMakeRecurring(e.currentTarget.checked)}
-          />
-        </label>
-        {makeRecurring && (
-          <PeriodPicker
-            period={period}
-            intervalCount={intervalCount}
-            onChange={(p, n) => { setPeriod(p); setIntervalCount(n) }}
-          />
-        )}
-      </div>
+      {!isEdit && (
+        <div className="mb-3 flex flex-col gap-2">
+          <label className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+            <span>Make recurring</span>
+            <input
+              type="checkbox"
+              checked={makeRecurring}
+              onChange={e => setMakeRecurring(e.currentTarget.checked)}
+            />
+          </label>
+          {makeRecurring && (
+            <PeriodPicker
+              period={period}
+              intervalCount={intervalCount}
+              onChange={(p, n) => { setPeriod(p); setIntervalCount(n) }}
+            />
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy}>
-          Confirm {symbol}{major}
+          {isEdit ? 'Save changes' : `Confirm ${symbol}${major}`}
         </Button>
       </div>
 
@@ -206,11 +212,13 @@ function ConfirmationChipTask({
   draft,
   onConfirm,
   onCancel,
+  mode,
 }: {
   userId: string
   draft: TaskPayload & { kind: 'task' }
   onConfirm: Props['onConfirm']
   onCancel: () => void
+  mode: 'create' | 'edit'
 }) {
   const [d, setD] = useState<TaskPayload & { kind: 'task' }>(draft)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -221,6 +229,7 @@ function ConfirmationChipTask({
   const [intervalCount, setIntervalCount] = useState(1)
   const [newTag, setNewTag] = useState('')
   const { prefs } = useUserPrefs()
+  const isEdit = mode === 'edit'
 
   async function handleConfirm() {
     setBusy(true)
@@ -314,28 +323,30 @@ function ConfirmationChipTask({
         <ProjectPicker userId={userId} selectedId={d.project_id ?? null} onSelect={id => setD(s => ({ ...s, project_id: id }))} />
       </div>
 
-      <div className="mb-3 flex flex-col gap-2">
-        <label className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
-          <span>Repeat after completion</span>
-          <input
-            type="checkbox"
-            checked={makeRecurring}
-            onChange={e => setMakeRecurring(e.currentTarget.checked)}
-          />
-        </label>
-        {makeRecurring && (
-          <PeriodPicker
-            period={period}
-            intervalCount={intervalCount}
-            onChange={(p, n) => { setPeriod(p); setIntervalCount(n) }}
-          />
-        )}
-      </div>
+      {!isEdit && (
+        <div className="mb-3 flex flex-col gap-2">
+          <label className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+            <span>Repeat after completion</span>
+            <input
+              type="checkbox"
+              checked={makeRecurring}
+              onChange={e => setMakeRecurring(e.currentTarget.checked)}
+            />
+          </label>
+          {makeRecurring && (
+            <PeriodPicker
+              period={period}
+              intervalCount={intervalCount}
+              onChange={(p, n) => { setPeriod(p); setIntervalCount(n) }}
+            />
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.title.trim()}>
-          Confirm task
+          {isEdit ? 'Save changes' : 'Confirm task'}
         </Button>
       </div>
 
@@ -348,16 +359,19 @@ function ConfirmationChipLearning({
   draft,
   onConfirm,
   onCancel,
+  mode,
 }: {
   draft: LearningPayload & { kind: 'learning' }
   onConfirm: Props['onConfirm']
   onCancel: () => void
+  mode: 'create' | 'edit'
 }) {
   const [d, setD] = useState<LearningPayload & { kind: 'learning' }>(draft)
   const [editingText, setEditingText] = useState(false)
   const [editingAttribution, setEditingAttribution] = useState(false)
   const [newTag, setNewTag] = useState('')
   const [busy, setBusy] = useState(false)
+  const isEdit = mode === 'edit'
 
   async function handleConfirm() {
     setBusy(true)
@@ -476,7 +490,7 @@ function ConfirmationChipLearning({
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.text.trim()}>
-          Confirm learning
+          {isEdit ? 'Save changes' : 'Confirm learning'}
         </Button>
       </div>
 
@@ -489,16 +503,19 @@ function ConfirmationChipNote({
   draft,
   onConfirm,
   onCancel,
+  mode,
 }: {
   draft: NotePayload & { kind: 'note' }
   onConfirm: Props['onConfirm']
   onCancel: () => void
+  mode: 'create' | 'edit'
 }) {
   const [d, setD] = useState<NotePayload & { kind: 'note' }>(draft)
   const [editingBody, setEditingBody] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [newTag, setNewTag] = useState('')
   const [busy, setBusy] = useState(false)
+  const isEdit = mode === 'edit'
 
   async function handleConfirm() {
     setBusy(true)
@@ -620,7 +637,7 @@ function ConfirmationChipNote({
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || !d.body.trim()}>
-          Confirm note
+          {isEdit ? 'Save changes' : 'Confirm note'}
         </Button>
       </div>
 

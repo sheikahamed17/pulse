@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Circle, CheckCircle2, Trash2, Repeat, Plus } from 'lucide-react'
+import { Circle, CheckCircle2, Trash2, Repeat, Plus, Pencil } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { taskCompletionOps, formatRecurrence } from '@/lib/recurring-task'
 import { groupTasks, subtaskProgress, rollupOps, visibleNodes, type TaskNode } from '@/lib/subtasks'
@@ -12,9 +12,9 @@ import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { db, type TaskRow } from '@/lib/dexie'
 
-type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null }
+type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null; onEdit?: (row: TaskRow) => void }
 
-export function TaskList({ userId, filter, projectId = null, tag = null }: Props) {
+export function TaskList({ userId, filter, projectId = null, tag = null, onEdit }: Props) {
   // Group from the FULL set so progress counts include completed children even in
   // the "open" view; visibleNodes then filters at the PARENT level.
   const tasks = useTasks(userId, 'all')
@@ -150,6 +150,17 @@ export function TaskList({ userId, filter, projectId = null, tag = null }: Props
 
         {menuFor === t.id && (
           <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
+            {onEdit && (
+              <button
+                type="button"
+                aria-label={`Edit task: ${t.title.slice(0, 30)}${t.title.length > 30 ? '…' : ''}`}
+                className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                onClick={() => { onEdit(t); setMenuFor(null) }}
+              >
+                <Pencil className="w-3 h-3" />
+                Edit
+              </button>
+            )}
             <button
               type="button"
               aria-label={`Delete task: ${t.title.slice(0, 30)}${t.title.length > 30 ? '…' : ''}`}

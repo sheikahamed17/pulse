@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useNotes } from '@/hooks/use-notes'
 import { SwipeRow } from '@/components/swipe-row'
@@ -11,14 +11,14 @@ import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { NoteRow } from '@/lib/dexie'
 import { cn } from '@/lib/utils'
 
-type Props = { userId: string; selectedTag: string | null; searchQuery?: string }
+type Props = { userId: string; selectedTag: string | null; searchQuery?: string; onEdit?: (row: NoteRow) => void }
 
 function truncatePreview(text: string, maxChars: number = 100): string {
   if (text.length <= maxChars) return text
   return text.slice(0, maxChars) + '…'
 }
 
-export function NotesList({ userId, selectedTag, searchQuery = '' }: Props) {
+export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Props) {
   const notes = useNotes(userId)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -90,6 +90,17 @@ export function NotesList({ userId, selectedTag, searchQuery = '' }: Props) {
 
           {menuFor === e.id && (
             <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
+              {onEdit && (
+                <button
+                  type="button"
+                  aria-label={`Edit note: ${(e.title || e.body).slice(0, 30)}${(e.title || e.body).length > 30 ? '…' : ''}`}
+                  className="flex items-center gap-2 px-3 py-2 min-h-[44px] text-xs hover:bg-accent focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                  onClick={() => { onEdit(e); setMenuFor(null) }}
+                >
+                  <Pencil className="w-3 h-3" />
+                  Edit
+                </button>
+              )}
               <button
                 type="button"
                 aria-label={`Delete note: ${(e.title || e.body).slice(0, 30)}${(e.title || e.body).length > 30 ? '…' : ''}`}
