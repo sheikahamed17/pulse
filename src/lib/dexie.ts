@@ -124,6 +124,7 @@ export type TaskRow = {
   tags: string[]
   project_id: string | null
   parent_id: string | null
+  nudge_muted_at?: string | null
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string
