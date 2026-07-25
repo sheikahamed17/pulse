@@ -20,9 +20,9 @@ const TABS: { id: Tab; icon: React.ComponentType<{ className?: string }>; label:
 export function TabBar({ active, onChange, taskBadgeCount }: Props) {
   return (
     <>
-      {/* Desktop: segmented glass control at top */}
+      {/* Desktop: inline segmented glass control, in document flow above the tab content */}
       <nav
-        className="hidden md:flex fixed top-0 left-0 right-0 z-40 gap-1 px-2 pb-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] border-b glass"
+        className="hidden md:flex gap-1 rounded-2xl glass p-1"
         aria-label="Primary"
       >
         {TABS.map(t => {
