@@ -2,14 +2,13 @@
 
 ## One-time setup (iPhone)
 1. Pulse → Settings → Auto-import from SMS → Generate token → copy it (shown once).
-2. iOS Shortcuts app → Automation → New → "When I Receive a Message".
-   - Sender: your bank's SMS sender IDs (add each bank alert sender).
-   - (Optional) "Message contains": debited / credited / UPI.
-   - Run Immediately (turn OFF "Ask Before Running").
-3. Add actions: "Get Details of Messages" → Content; then "Get Contents of URL":
+2. iOS Shortcuts app → **+** to create a Shortcut (NOT an Automation). Name it "Add to Pulse".
+3. Add action "Get Contents of URL":
    - URL: the endpoint shown in Settings (…/api/ingest/sms)
    - Method: POST · Headers: Authorization = `Bearer <your token>`, Content-Type = application/json
-   - Request Body (JSON): { "text": [Message Content] }
+   - Request Body (JSON): { "text": [Shortcut Input] }
+   Then in the shortcut's details (ⓘ): turn ON "Show in Share Sheet" and accept Text.
+   Use it: in Messages, select the bank SMS text → Share → "Add to Pulse".
 
 ## Verify
 4. Trigger a real bank transaction (or have someone send a matching test SMS).
