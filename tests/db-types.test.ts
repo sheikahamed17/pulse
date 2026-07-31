@@ -46,7 +46,7 @@ describe('Phase 1 DB types', () => {
   it('MoneyEntryTable has required fields', () => {
     expectTypeOf<MoneyEntryTable>().toHaveProperty('amount').toEqualTypeOf<number>()
     expectTypeOf<MoneyEntryTable>().toHaveProperty('direction').toEqualTypeOf<'out' | 'in'>()
-    expectTypeOf<MoneyEntryTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring' | 'receipt' | 'sms'>()
+    expectTypeOf<MoneyEntryTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring' | 'receipt' | 'sms' | 'email'>()
     expectTypeOf<MoneyEntryTable>().toHaveProperty('field_hlcs').toEqualTypeOf<string>()
   })
 
@@ -133,7 +133,7 @@ describe('Phase 3 DB types', () => {
   })
 
   it('MoneyEntryTable.source includes receipt + sms', () => {
-    expectTypeOf<MoneyEntryTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring' | 'receipt' | 'sms'>()
+    expectTypeOf<MoneyEntryTable>().toHaveProperty('source').toEqualTypeOf<'voice' | 'manual' | 'recurring' | 'receipt' | 'sms' | 'email'>()
   })
 
   it('MoneyEntryTable has receipt_key field', () => {

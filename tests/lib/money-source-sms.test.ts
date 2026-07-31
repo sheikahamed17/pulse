@@ -9,4 +9,12 @@ describe('money source enum', () => {
     })
     expect(r.success).toBe(true)
   })
+
+  it("accepts source 'email'", () => {
+    const r = MoneyPayloadSchema.safeParse({
+      amount: 50000, currency: 'INR', direction: 'out',
+      occurred_at: '2026-07-31T10:00:00.000Z', source: 'email',
+    })
+    expect(r.success).toBe(true)
+  })
 })

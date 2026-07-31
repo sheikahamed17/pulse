@@ -7,6 +7,7 @@ export function smsToMoneyPayload(
   primaryCurrency: string,
   nowIso: string,
   text: string,
+  source: MoneyPayload['source'] = 'sms',
 ): MoneyPayload | null {
   if (!r.is_transaction || r.amount == null) return null
   return {
@@ -16,7 +17,7 @@ export function smsToMoneyPayload(
     category_id: null,
     description: r.merchant ?? null,
     occurred_at: nowIso,
-    source: 'sms',
+    source,
     raw_input: text,
   }
 }
