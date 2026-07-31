@@ -115,6 +115,11 @@ export function MoneyList({ userId, onEdit }: Props) {
                         📎 receipt
                       </button>
                     )}
+                    {e.source === 'sms' && (
+                      <span className="text-[10px] border border-white/20 rounded-full px-1.5 py-0.5 text-muted-foreground">
+                        💳 SMS
+                      </span>
+                    )}
                   </div>
                 </div>
 
