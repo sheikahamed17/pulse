@@ -40,6 +40,7 @@ import { TaskSummary } from '@/components/task-summary'
 import { LearningList } from '@/components/learning-list'
 import { LearningTagFilter } from '@/components/learning-tag-filter'
 import { LearningSummary } from '@/components/learning-summary'
+import { NotesSummary } from '@/components/notes-summary'
 import { NotesList } from '@/components/notes-list'
 import { NotesTagFilter } from '@/components/notes-tag-filter'
 import { useTabState } from '@/hooks/use-tab-state'
@@ -860,6 +861,7 @@ function AppPageInner() {
             {activeTab === 'money' && <MoneyCard userId={user.id} />}
             {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
             {activeTab === 'learning' && <LearningSummary userId={user.id} />}
+            {activeTab === 'notes' && <NotesSummary userId={user.id} />}
           </div>
         </aside>
       </main>
