@@ -65,7 +65,7 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
             deleteLabel={`Delete learning: ${e.text.slice(0, 30)}${e.text.length > 30 ? '…' : ''}`}
             className="glass-soft rounded-2xl flex flex-col gap-2 p-3"
           >
-            <p className="text-sm">{e.text}</p>
+            <p className="text-sm md:text-base">{e.text}</p>
             {e.tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {e.tags.map(tag => (

@@ -40,6 +40,7 @@ import { TaskSummary } from '@/components/task-summary'
 import { LearningList } from '@/components/learning-list'
 import { LearningTagFilter } from '@/components/learning-tag-filter'
 import { LearningSummary } from '@/components/learning-summary'
+import { NotesSummary } from '@/components/notes-summary'
 import { NotesList } from '@/components/notes-list'
 import { NotesTagFilter } from '@/components/notes-tag-filter'
 import { useTabState } from '@/hooks/use-tab-state'
@@ -653,8 +654,8 @@ function AppPageInner() {
   return (
     <UndoProvider>
       <AuroraBackground />
-      <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:pb-6 md:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-6">
+      <main className="mx-auto grid w-full max-w-6xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:gap-8 md:p-8 md:pb-8 md:grid-cols-[1fr_360px]">
+        <div className="flex flex-col gap-6 md:gap-7">
           <header className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <PulseLogo className="size-6" />
@@ -860,6 +861,7 @@ function AppPageInner() {
             {activeTab === 'money' && <MoneyCard userId={user.id} />}
             {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
             {activeTab === 'learning' && <LearningSummary userId={user.id} />}
+            {activeTab === 'notes' && <NotesSummary userId={user.id} />}
           </div>
         </aside>
       </main>

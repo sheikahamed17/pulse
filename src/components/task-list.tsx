@@ -139,7 +139,7 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
               <Circle className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
             )}
             <div className="flex flex-col">
-              <span className={isCompleted ? 'text-muted-foreground line-through' : ''}>
+              <span className={`md:text-base ${isCompleted ? 'text-muted-foreground line-through' : ''}`}>
                 {t.title}
                 {progress && <span className="ml-2 font-mono tabular-nums text-xs text-muted-foreground">{progress.done}/{progress.total}</span>}
               </span>
