@@ -129,7 +129,7 @@ export interface MoneyEntryTable {
   category_id: string | null
   description: string | null
   occurred_at: string
-  source: 'voice' | 'manual' | 'recurring' | 'receipt'
+  source: 'voice' | 'manual' | 'recurring' | 'receipt' | 'sms'
   receipt_key: string | null
   raw_input: string | null
   recurring_rule_id: string | null
@@ -258,6 +258,7 @@ export interface UserPrefsTable {
   primary_currency: string
   tz: string
   fx_overrides: string | null          // JSON Record<string, number> (currency → EUR-rate)
+  sms_ingest_token_hash: string | null // SHA-256 hex of the personal SMS-ingest token secret
   updated_at: string
 }
 
