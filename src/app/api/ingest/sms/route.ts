@@ -28,10 +28,11 @@ export async function POST(req: Request) {
   }
   const userId = parsed.userId
 
-  let body: { text?: unknown }
+  let body: { text?: unknown; source?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
-  const text = typeof body.text === 'string' ? body.text.trim() : ''
+  const text = (typeof body.text === 'string' ? body.text.trim() : '').slice(0, 4000)
   if (!text) return NextResponse.json({ error: 'missing text' }, { status: 400 })
+  const source = body.source === 'email' ? 'email' : 'sms'
 
   if (!cfEnv.GROQ_API_KEY) return NextResponse.json({ error: 'no parser' }, { status: 503 })
   const client = makeGroqClient(cfEnv.GROQ_API_KEY)
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   const nowIso = new Date().toISOString()
   const primary = prefs.primary_currency ?? 'INR'
   const agentOut = await parseSms({ client, text, defaultCurrency: primary })
-  const payload = smsToMoneyPayload(agentOut, primary, nowIso, text)
+  const payload = smsToMoneyPayload(agentOut, primary, nowIso, text, source)
   if (!payload) return NextResponse.json({ ok: true, added: false })
 
   const opId = await smsOpId(userId, text)

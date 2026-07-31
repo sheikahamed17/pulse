@@ -53,6 +53,18 @@ function req(token: string, text: string) {
   })
 }
 
+function reqS(token: string, text: string, source?: string) {
+  return new Request('http://x/api/ingest/sms', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify(source === undefined ? { text } : { text, source }),
+  })
+}
+
+function storedPayload() {
+  return JSON.parse(String(opLog[0].payload)) as { source: string; raw_input: string }
+}
+
 describe('POST /api/ingest/sms', () => {
   beforeEach(async () => {
     opLog.length = 0
@@ -95,5 +107,31 @@ describe('POST /api/ingest/sms', () => {
     const second = await (await POST(req(goodToken, 'Rs.500 debited AMAZON'))).json() as { added: boolean }
     expect(second.added).toBe(false)
     expect(opLog).toHaveLength(1)
+  })
+
+  it("stores source 'email' when the body says so", async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    const res = await POST(reqS(goodToken, 'debited Rs.500 AMAZON via email', 'email'))
+    expect((await res.json() as { added: boolean }).added).toBe(true)
+    expect(storedPayload().source).toBe('email')
+  })
+
+  it("falls back to 'sms' for an unknown source (whitelist)", async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    await POST(reqS(goodToken, 'debited Rs.500 AMAZON evil', 'evil'))
+    expect(storedPayload().source).toBe('sms')
+  })
+
+  it("defaults to 'sms' when source is omitted", async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    await POST(reqS(goodToken, 'debited Rs.500 AMAZON plain'))
+    expect(storedPayload().source).toBe('sms')
+  })
+
+  it('clips the body to 4000 chars before store', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    const long = 'debited Rs.500 AMAZON ' + 'x'.repeat(5000)
+    await POST(reqS(goodToken, long, 'email'))
+    expect(storedPayload().raw_input.length).toBe(4000)
   })
 })
