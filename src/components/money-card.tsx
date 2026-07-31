@@ -6,6 +6,7 @@ import { useCategories } from '@/hooks/use-categories'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
 import { convertViaRates } from '@/lib/fx'
+import { weeklySpendBars } from '@/lib/weekly-spend'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 
@@ -20,6 +21,12 @@ export function MoneyCard({ userId }: Props) {
 
   const current = useMoneyEntries(userId, range)
   const previous = useMoneyEntries(userId, prevRange)
+  const eightWeeks = useMemo(() => {
+    const to = new Date()
+    const from = new Date(to.getTime() - 8 * 7 * 24 * 60 * 60 * 1000)
+    return { from: from.toISOString(), to: to.toISOString() }
+  }, [])
+  const trend = useMoneyEntries(userId, eightWeeks)
   const categories = useCategories(userId)
   const { prefs } = useUserPrefs()
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
@@ -63,33 +70,10 @@ export function MoneyCard({ userId }: Props) {
   const topCategories = useMemo(() => topNByCategoryWithConversion(current, catName, prefs.primary_currency, rates, prefs.fx_overrides ?? {}, 3), [current, catName, prefs.primary_currency, rates, prefs.fx_overrides])
   const topMax = Math.max(1, ...topCategories.map(([, amt]) => amt))
 
-  // Compute sparkline data: group entries into daily totals (last 7 days)
-  const sparklinePoints = useMemo(() => {
-    const dailyTotals = new Map<string, number>()
-    const now = new Date(range.to)
-
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now)
-      d.setUTCDate(d.getUTCDate() - i)
-      const dateKey = d.toISOString().split('T')[0]
-      dailyTotals.set(dateKey, 0)
-    }
-
-    for (const e of current) {
-      if (e.direction !== 'out') continue
-      const dateKey = e.occurred_at.split('T')[0]
-      if (dailyTotals.has(dateKey)) {
-        let amount = e.amount
-        if (e.currency !== prefs.primary_currency) {
-          const conv = convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})
-          if (conv) amount = conv.amount
-        }
-        dailyTotals.set(dateKey, (dailyTotals.get(dateKey) ?? 0) + amount)
-      }
-    }
-
-    return Array.from(dailyTotals.values())
-  }, [current, prefs.primary_currency, rates, range.to])
+  const weeklyBars = useMemo(
+    () => weeklySpendBars(trend, prefs.primary_currency, rates, prefs.fx_overrides ?? {}, new Date().toISOString()),
+    [trend, prefs.primary_currency, rates, prefs.fx_overrides],
+  )
 
   return (
     <section className="glass flex flex-col gap-4 rounded-2xl p-4">
@@ -102,20 +86,16 @@ export function MoneyCard({ userId }: Props) {
         )}
       </header>
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-[38px] font-semibold font-mono tabular-nums leading-tight" style={{
-            textShadow: '0 0 20px rgb(52 230 255 / 0.4), 0 0 40px rgb(52 230 255 / 0.2)'
-          }}>
-            <span className="text-accent-2">{currencySymbol(prefs.primary_currency)}</span>
-            {(primarySpend / (prefs.primary_currency === 'JPY' ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </div>
+      <div>
+        <div className="text-[38px] font-semibold font-mono tabular-nums leading-tight" style={{
+          textShadow: '0 0 20px rgb(52 230 255 / 0.4), 0 0 40px rgb(52 230 255 / 0.2)'
+        }}>
+          <span className="text-accent-2">{currencySymbol(prefs.primary_currency)}</span>
+          {(primarySpend / (prefs.primary_currency === 'JPY' ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
-
-        {sparklinePoints.length > 0 && (
-          <Sparkline points={sparklinePoints} width={80} height={48} />
-        )}
       </div>
+
+      <WeeklyBars values={weeklyBars} symbol={currencySymbol(prefs.primary_currency)} jpy={prefs.primary_currency === 'JPY'} />
 
       <ul className="flex flex-col gap-1.5">
         {topCategories.length === 0 && (
@@ -149,35 +129,35 @@ export function MoneyCard({ userId }: Props) {
   )
 }
 
-function Sparkline({ points, width = 80, height = 48 }: { points: number[], width?: number, height?: number }) {
-  if (points.length < 2) return null
-
-  const max = Math.max(...points, 1)
-  const min = 0
-  const range = max - min
-
-  const padding = 4
-  const chartWidth = width - 2 * padding
-  const chartHeight = height - 2 * padding
-
-  const xs = points.map((_, i) => padding + (i / (points.length - 1)) * chartWidth)
-  const ys = points.map(p => padding + chartHeight - (((p - min) / range) * chartHeight))
-
-  const pathPoints = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
-  const areaPath = `M${padding},${height - padding} ${pathPoints} L${width - padding},${height - padding}`
-
+// Single-series magnitude-over-time bars (last N weekly spend totals). Current
+// week emphasized in accent, prior weeks recessive; per-bar native title is the
+// hover layer + accessibility. Single series → no legend (the caption names it).
+function WeeklyBars({ values, symbol, jpy }: { values: number[]; symbol: string; jpy: boolean }) {
+  const max = Math.max(1, ...values)
+  const fmt = (v: number) => `${symbol}${(v / (jpy ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+  const last = values.length - 1
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="flex-shrink-0">
-      <defs>
-        <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style={{ stopColor: 'rgb(52 230 255)', stopOpacity: 0.3 }} />
-          <stop offset="100%" style={{ stopColor: 'rgb(52 230 255)', stopOpacity: 0.05 }} />
-        </linearGradient>
-      </defs>
-      <polyline points={pathPoints} fill="none" stroke="rgb(52 230 255)" strokeWidth="1.5" />
-      <path d={areaPath} fill="url(#sparkGradient)" />
-      <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="2.5" fill="rgb(52 230 255)" />
-    </svg>
+    <div className="flex flex-col gap-1">
+      <div
+        className="flex h-12 items-end gap-1"
+        role="img"
+        aria-label={`Weekly spend, last ${values.length} weeks; most recent ${fmt(values[last] ?? 0)}`}
+      >
+        {values.map((v, i) => {
+          const weeksAgo = last - i
+          const pct = v > 0 ? Math.max(6, (v / max) * 100) : 3
+          return (
+            <div
+              key={i}
+              title={`${weeksAgo === 0 ? 'This week' : `${weeksAgo} wk ago`}: ${fmt(v)}`}
+              className={`flex-1 rounded-t ${i === last ? 'bg-accent-2' : 'bg-white/20'}`}
+              style={{ height: `${pct}%` }}
+            />
+          )
+        })}
+      </div>
+      <span className="text-[10px] text-muted-foreground">Last {values.length} weeks</span>
+    </div>
   )
 }
 
