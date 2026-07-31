@@ -50,6 +50,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/sms-import">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Auto-import from SMS</CardTitle>
+              <CardDescription>Turn bank transaction SMS into money entries via an iOS Shortcut.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/insights">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>
