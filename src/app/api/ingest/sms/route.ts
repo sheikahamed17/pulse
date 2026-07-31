@@ -57,11 +57,14 @@ export async function POST(req: Request) {
     payload: payload as unknown as Record<string, unknown>,
     schema_version: 1,
   }
+  // on-conflict-do-nothing: a concurrent duplicate POST (both past the dup-check
+  // above before either inserts) must not throw a PK violation — the deterministic
+  // op.id makes the second insert a no-op, keeping the endpoint idempotent.
   await db.insertInto('op_log').values({
     id: op.id, user_id: op.user_id, hlc: op.hlc, device_id: op.device_id,
     entity_kind: op.entity_kind, entity_id: op.entity_id, op_type: op.op_type,
     payload: JSON.stringify(op.payload), schema_version: op.schema_version, applied_at: Date.now(),
-  }).execute()
+  }).onConflict(oc => oc.column('id').doNothing()).execute()
   await materializeRow(db, op, userId)
 
   return NextResponse.json({ ok: true, added: true })

@@ -22,7 +22,12 @@ function makeFakeDb() {
       }
       return b
     },
-    insertInto: () => ({ values: (v: Row) => ({ execute: async () => { opLog.push(v) } }) }),
+    insertInto: () => ({
+      values: (v: Row) => {
+        const r: any = { execute: async () => { opLog.push(v) }, onConflict: () => r }
+        return r
+      },
+    }),
   } as any
 }
 
@@ -81,5 +86,14 @@ describe('POST /api/ingest/sms', () => {
     const body = await res.json() as { added: boolean }
     expect(body.added).toBe(false)
     expect(opLog).toHaveLength(0)
+  })
+
+  it('is idempotent: re-POSTing the same SMS makes no duplicate', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    const first = await (await POST(req(goodToken, 'Rs.500 debited AMAZON'))).json() as { added: boolean }
+    expect(first.added).toBe(true)
+    const second = await (await POST(req(goodToken, 'Rs.500 debited AMAZON'))).json() as { added: boolean }
+    expect(second.added).toBe(false)
+    expect(opLog).toHaveLength(1)
   })
 })
