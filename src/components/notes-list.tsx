@@ -72,7 +72,7 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
             deleteLabel={`Delete note: ${(e.title || e.body).slice(0, 30)}${(e.title || e.body).length > 30 ? '…' : ''}`}
             className="glass-soft rounded-2xl flex flex-col gap-2 p-3"
           >
-            <p className="text-sm font-medium">{e.title || truncatePreview(e.body)}</p>
+            <p className="text-sm md:text-base font-medium">{e.title || truncatePreview(e.body)}</p>
             {e.title && (
               <p className="text-xs text-muted-foreground line-clamp-2">{truncatePreview(e.body, 150)}</p>
             )}

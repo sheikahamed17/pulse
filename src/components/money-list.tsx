@@ -82,7 +82,7 @@ export function MoneyList({ userId, onEdit }: Props) {
                       <span className="text-muted-foreground">{cat.name}</span>
                     </div>
                   )}
-                  <div className="text-sm font-medium text-foreground">
+                  <div className="text-sm md:text-base font-medium text-foreground">
                     {e.description ? e.description : (cat ? cat.name : 'Uncategorized')}
                   </div>
                   {e.description && cat && (

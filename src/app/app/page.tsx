@@ -654,8 +654,8 @@ function AppPageInner() {
   return (
     <UndoProvider>
       <AuroraBackground />
-      <main className="mx-auto grid w-full max-w-5xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:pb-6 md:grid-cols-[1fr_320px]">
-        <div className="flex flex-col gap-6">
+      <main className="mx-auto grid w-full max-w-6xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:gap-8 md:p-8 md:pb-8 md:grid-cols-[1fr_360px]">
+        <div className="flex flex-col gap-6 md:gap-7">
           <header className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <PulseLogo className="size-6" />
