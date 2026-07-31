@@ -120,6 +120,11 @@ export function MoneyList({ userId, onEdit }: Props) {
                         💳 SMS
                       </span>
                     )}
+                    {e.source === 'email' && (
+                      <span className="text-[10px] border border-white/20 rounded-full px-1.5 py-0.5 text-muted-foreground">
+                        📧 Email
+                      </span>
+                    )}
                   </div>
                 </div>
 
