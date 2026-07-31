@@ -25,6 +25,19 @@ describe('smsToMoneyPayload', () => {
     expect(smsToMoneyPayload({ is_transaction: false }, 'INR', '2026-07-23T10:00:00.000Z', 'OTP is 1234')).toBeNull()
     expect(smsToMoneyPayload({ is_transaction: true }, 'INR', '2026-07-23T10:00:00.000Z', 'x')).toBeNull()
   })
+
+  it("uses the source arg when given (email), defaults to sms", () => {
+    const email = smsToMoneyPayload(
+      { is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' },
+      'INR', '2026-07-31T10:00:00.000Z', 'debited Rs.500 AMAZON', 'email',
+    )
+    expect(email?.source).toBe('email')
+    const dflt = smsToMoneyPayload(
+      { is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' },
+      'INR', '2026-07-31T10:00:00.000Z', 'debited Rs.500 AMAZON',
+    )
+    expect(dflt?.source).toBe('sms')
+  })
 })
 
 describe('dedup ids', () => {

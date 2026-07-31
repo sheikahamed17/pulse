@@ -129,7 +129,7 @@ export interface MoneyEntryTable {
   category_id: string | null
   description: string | null
   occurred_at: string
-  source: 'voice' | 'manual' | 'recurring' | 'receipt' | 'sms'
+  source: 'voice' | 'manual' | 'recurring' | 'receipt' | 'sms' | 'email'
   receipt_key: string | null
   raw_input: string | null
   recurring_rule_id: string | null
