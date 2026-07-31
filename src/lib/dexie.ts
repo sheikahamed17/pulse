@@ -100,7 +100,7 @@ export type MoneyEntryRow = {
   category_id: string | null
   description: string | null
   occurred_at: string
-  source: 'voice' | 'manual' | 'recurring' | 'receipt'
+  source: 'voice' | 'manual' | 'recurring' | 'receipt' | 'sms'
   receipt_key: string | null
   raw_input: string | null
   recurring_rule_id: string | null
