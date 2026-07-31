@@ -50,6 +50,7 @@ import { db, type MoneyEntryRow, type TaskRow, type LearningRow, type NoteRow } 
 import { moneyRowToDraft, taskRowToDraft, learningRowToDraft, noteRowToDraft } from '@/lib/entry-to-draft'
 import { UndoProvider } from '@/components/undo-provider'
 import { GlobalSearch } from '@/components/global-search'
+import { TodayNudge } from '@/components/today-nudge'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { runCategoryDedupeOnce } from '@/lib/dedupe-categories-migration'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
@@ -771,6 +772,8 @@ function AppPageInner() {
               onDismiss={dismissQuery}
             />
           )}
+
+          <TodayNudge userId={user.id} onGoToTasks={() => setTab('tasks')} />
 
           {/* Desktop tab bar — appears in document flow above the tab content */}
           <div className="hidden md:block">
