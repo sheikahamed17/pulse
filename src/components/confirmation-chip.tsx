@@ -12,6 +12,7 @@ import { addTag } from '@/lib/task-org'
 import { cn } from '@/lib/utils'
 import { currencySymbol } from '@/lib/currency'
 import { formatLocalDateTime } from '@/lib/format'
+import { parseAmountInput } from '@/lib/parse-amount'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 import type { TaskPayload } from '@/lib/op-schemas/task'
@@ -67,7 +68,7 @@ function ConfirmationChipMoney({
   mode: 'create' | 'edit'
 }) {
   const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }>(draft)
-  const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category' | 'date'>(null)
+  const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category' | 'date'>(draft.amount === 0 ? 'amount' : null)
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
   const [intervalCount, setIntervalCount] = useState(1)
@@ -117,12 +118,10 @@ function ConfirmationChipMoney({
         <Input
           autoFocus
           inputMode="decimal"
-          defaultValue={major}
-          onBlur={(e) => {
-            const v = parseFloat(e.currentTarget.value)
-            if (!Number.isNaN(v) && v >= 0) setD(s => ({ ...s, amount: Math.round(v * 100) }))
-            setEditingField(null)
-          }}
+          defaultValue={d.amount === 0 ? '' : major}
+          placeholder="0"
+          onChange={(e) => setD(s => ({ ...s, amount: parseAmountInput(e.currentTarget.value) ?? 0 }))}
+          onBlur={() => setEditingField(null)}
           className="mb-3 font-mono text-3xl font-semibold"
         />
       ) : (
