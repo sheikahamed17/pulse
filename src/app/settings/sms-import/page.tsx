@@ -7,26 +7,28 @@ import { AuroraBackground } from '@/components/aurora-background'
 
 const APPS_SCRIPT = `/**
  * Pulse — email transaction auto-ingest.
- * Setup: Project Settings → Script properties → add ENDPOINT and TOKEN.
- * Create a Gmail label "Pulse" + a filter that applies it to your bank alerts.
- * Add a time-driven trigger on ingestPulseEmails() (every 10 minutes).
+ * Setup: Project Settings > Script properties > add ENDPOINT, TOKEN and SENDER.
+ *   SENDER = your bank's alert address(es), comma-separated (e.g. alerts@hdfcbank.bank.in).
+ * Then Triggers > add a time-driven trigger on ingestPulseEmails() every 10 minutes.
+ * No Gmail label or filter to create: the script finds emails by sender itself and
+ * marks each done with an auto-created "PulseDone" label so none is sent twice.
  */
-const PULSE_LABEL = 'Pulse'
-const PULSE_DONE_LABEL = 'Pulse/Done'
-const MAX_THREADS = 20
+const DONE_LABEL = 'PulseDone'
+const LOOKBACK = 'newer_than:2d'
+const MAX_THREADS = 25
 const MAX_BODY_CHARS = 4000
 
 function ingestPulseEmails() {
   const props = PropertiesService.getScriptProperties()
   const endpoint = props.getProperty('ENDPOINT')
   const token = props.getProperty('TOKEN')
-  if (!endpoint || !token) throw new Error('Set ENDPOINT and TOKEN in Script properties.')
+  const sender = props.getProperty('SENDER')
+  if (!endpoint || !token) throw new Error('Set ENDPOINT and TOKEN in Project Settings > Script properties.')
+  if (!sender) throw new Error('Set SENDER in Script properties (your bank alert address, e.g. alerts@hdfcbank.bank.in; comma-separate multiple).')
 
-  const label = GmailApp.getUserLabelByName(PULSE_LABEL)
-  if (!label) throw new Error('Create a Gmail label "' + PULSE_LABEL + '" and a filter that applies it to bank emails.')
-  const done = GmailApp.getUserLabelByName(PULSE_DONE_LABEL) || GmailApp.createLabel(PULSE_DONE_LABEL)
-
-  const threads = label.getThreads(0, MAX_THREADS)
+  const done = GmailApp.getUserLabelByName(DONE_LABEL) || GmailApp.createLabel(DONE_LABEL)
+  const fromQuery = sender.split(',').map(function (s) { return 'from:' + s.trim() }).join(' OR ')
+  const threads = GmailApp.search('(' + fromQuery + ') ' + LOOKBACK + ' -label:' + DONE_LABEL, 0, MAX_THREADS)
   for (const thread of threads) {
     let ok = true
     for (const msg of thread.getMessages()) {
@@ -44,7 +46,7 @@ function ingestPulseEmails() {
         if (code < 200 || code >= 300) { ok = false; console.error('POST failed', code, res.getContentText()) }
       } catch (e) { ok = false; console.error('POST error', e) }
     }
-    if (ok) { thread.addLabel(done); thread.removeLabel(label) }
+    if (ok) thread.addLabel(done)
   }
 }`
 
@@ -111,12 +113,11 @@ export default function AutoImportPage() {
         <section className="glass flex flex-col gap-2 rounded-2xl p-4 text-sm">
           <span className="text-xs uppercase tracking-wide text-muted-foreground">Method A · Email (recommended — fully hands-off)</span>
           <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-xs">
-            <li>In Gmail, create a <strong>filter</strong> that matches your bank&apos;s transaction alerts (e.g. from your bank&apos;s address) and <strong>applies a label named <code>Pulse</code></strong>.</li>
-            <li>Open <a className="underline" href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> → <strong>New project</strong> → paste the script below.</li>
-            <li><strong>Project Settings</strong> (gear) → <strong>Script properties</strong> → add <code>ENDPOINT</code> = the endpoint above, and <code>TOKEN</code> = your token.</li>
+            <li>Open <a className="underline" href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> → <strong>New project</strong> → paste the script below (replace the sample code).</li>
+            <li><strong>Project Settings</strong> (gear) → <strong>Script properties</strong> → add three: <code>ENDPOINT</code> = the endpoint above, <code>TOKEN</code> = your token, and <code>SENDER</code> = your bank&apos;s alert address (e.g. <code>alerts@hdfcbank.bank.in</code>; comma-separate multiple banks).</li>
             <li>Select <code>ingestPulseEmails</code> → <strong>Run</strong> once → authorize (it&apos;s your own script reading your own Gmail; on the &quot;unverified app&quot; screen tap <em>Advanced → Go to (unsafe)</em>).</li>
             <li><strong>Triggers</strong> (clock) → <strong>Add trigger</strong> → function <code>ingestPulseEmails</code>, event source <em>Time-driven</em>, <em>Minutes timer → every 10 minutes</em>.</li>
-            <li>Done. New bank emails become 📧 Email entries within ~10 minutes.</li>
+            <li>Done — <strong>no Gmail label or filter needed</strong>. New bank emails become 📧 Email entries within ~10 minutes.</li>
           </ol>
           <button type="button" onClick={() => copy(APPS_SCRIPT)} className="glass-soft max-h-48 overflow-auto whitespace-pre rounded-lg p-2 text-left font-mono text-[10px] focus-visible:ring-2 focus-visible:ring-accent-2 outline-none">
             {APPS_SCRIPT}
