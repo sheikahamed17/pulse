@@ -221,7 +221,7 @@ function ConfirmationChipMoney({
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
-        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy}>
+        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || d.amount === 0}>
           {isEdit ? 'Save changes' : `Confirm ${symbol}${major}`}
         </Button>
       </div>

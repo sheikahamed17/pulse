@@ -44,14 +44,6 @@ vi.mock('@/lib/materialize', () => ({ materializeRow: vi.fn(async () => {}) }))
 const sendPushMock = vi.fn(async (..._a: unknown[]) => ({ sent: 1, pruned: 0 }))
 vi.mock('@/lib/web-push', () => ({ sendPushToUser: (...a: unknown[]) => sendPushMock(...a) }))
 
-vi.mock('@/lib/ingest-notification', () => ({
-  ingestNotification: (p: any) => ({
-    title: `${p.description ?? 'Transaction'}`,
-    body: `${p.direction === 'out' ? '-' : '+'}${p.amount / 100} ${p.currency}`,
-    url: '/money?categorize=ingest-mock-id',
-  }),
-}))
-
 const { POST } = await import('@/app/api/ingest/sms/route')
 
 const U = 'user-1'
@@ -177,7 +169,7 @@ describe('POST /api/ingest/sms', () => {
     const res = await POST(reqS(goodToken, 'Rs.475 spent CRUNCHYROLL', 'email'))
     expect((await res.json() as { added: boolean }).added).toBe(true)
     expect(pushRows).toHaveLength(1)
-    expect(String(pushRows[0].url)).toContain('categorize=')
+    expect(String(pushRows[0].url)).toContain('/app?categorize=')
     expect(String(pushRows[0].title)).toContain('CRUNCHYROLL')
     expect(sendPushMock).toHaveBeenCalledTimes(1)
   })
