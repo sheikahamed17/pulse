@@ -8,6 +8,8 @@ import { parseIngestToken, hashSecret } from '@/lib/ingest-token'
 import { smsToMoneyPayload, smsEntityId, smsOpId } from '@/lib/sms-ingest'
 import { serverHlcFor } from '@/lib/server-hlc'
 import { materializeRow } from '@/lib/materialize'
+import { ingestNotification } from '@/lib/ingest-notification'
+import { sendPushToUser } from '@/lib/web-push'
 import type { Op } from '@/types/ops'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
   if (!parsed) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   const { env } = getCloudflareContext()
-  const cfEnv = env as { DB: D1Database; GROQ_API_KEY?: string }
+  const cfEnv = env as { DB: D1Database; GROQ_API_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_PUBLIC_KEY?: string }
   const db = createDb(cfEnv.DB)
 
   const prefs = await db.selectFrom('user_prefs').where('user_id', '=', parsed.userId).selectAll().executeTakeFirst()
@@ -78,6 +80,23 @@ export async function POST(req: Request) {
     payload: JSON.stringify(op.payload), schema_version: op.schema_version, applied_at: Date.now(),
   }).onConflict(oc => oc.column('id').doNothing()).execute()
   await materializeRow(db, op, userId)
+
+  // Per-entry categorize push (added:true path only — never dedup/non-txn/dryRun).
+  // Best-effort: a push failure must not fail the ingest, the entry already exists.
+  try {
+    const note = ingestNotification(
+      { amount: payload.amount, currency: payload.currency, direction: payload.direction, description: payload.description ?? null },
+      op.entity_id,
+    )
+    await db.insertInto('push_notifications').values({
+      id: `ingest-${op.id}`, user_id: userId,
+      title: note.title, body: note.body, url: note.url,
+      created_at: nowIso, read_at: null,
+    }).onConflict(oc => oc.column('id').doNothing()).execute()
+    await sendPushToUser(db, { VAPID_PRIVATE_KEY: cfEnv.VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY: cfEnv.VAPID_PUBLIC_KEY }, userId)
+  } catch (err) {
+    console.error('sms-ingest push failed', err)
+  }
 
   return NextResponse.json({ ok: true, added: true })
 }

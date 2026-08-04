@@ -5,6 +5,7 @@ import { hashSecret, makeIngestToken } from '@/lib/ingest-token'
 type Row = Record<string, unknown>
 let prefsRow: Row | null = null
 const opLog: Row[] = []
+const pushRows: Row[] = []
 
 function makeFakeDb() {
   return {
@@ -22,9 +23,9 @@ function makeFakeDb() {
       }
       return b
     },
-    insertInto: () => ({
+    insertInto: (table: string) => ({
       values: (v: Row) => {
-        const r: any = { execute: async () => { opLog.push(v) }, onConflict: () => r }
+        const r: any = { execute: async () => { (table === 'push_notifications' ? pushRows : opLog).push(v) }, onConflict: () => r }
         return r
       },
     }),
@@ -39,6 +40,9 @@ vi.mock('@/lib/db', () => ({ createDb: () => currentFakeDb }))
 vi.mock('@/lib/agents/llm-client', () => ({ makeGroqClient: () => ({}) }))
 vi.mock('@/lib/agents/sms-agent', () => ({ parseSms: (...a: unknown[]) => parseSmsMock(...a) }))
 vi.mock('@/lib/materialize', () => ({ materializeRow: vi.fn(async () => {}) }))
+
+const sendPushMock = vi.fn(async (..._a: unknown[]) => ({ sent: 1, pruned: 0 }))
+vi.mock('@/lib/web-push', () => ({ sendPushToUser: (...a: unknown[]) => sendPushMock(...a) }))
 
 const { POST } = await import('@/app/api/ingest/sms/route')
 
@@ -68,7 +72,9 @@ function storedPayload() {
 describe('POST /api/ingest/sms', () => {
   beforeEach(async () => {
     opLog.length = 0
+    pushRows.length = 0
     parseSmsMock.mockReset()
+    sendPushMock.mockClear()
     currentFakeDb = makeFakeDb()
     const { token, secret } = makeIngestToken(U)
     goodToken = token
@@ -156,5 +162,52 @@ describe('POST /api/ingest/sms', () => {
     expect(body.agentOut.amount).toBe(47500)
     expect(body.payload.source).toBe('email')
     expect(opLog).toHaveLength(0)
+  })
+
+  it('sends ONE categorize push on a new ingest (added:true)', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 47500, currency: 'INR', direction: 'out', merchant: 'CRUNCHYROLL' })
+    const res = await POST(reqS(goodToken, 'Rs.475 spent CRUNCHYROLL', 'email'))
+    expect((await res.json() as { added: boolean }).added).toBe(true)
+    expect(pushRows).toHaveLength(1)
+    expect(String(pushRows[0].url)).toContain('/app?categorize=')
+    expect(String(pushRows[0].title)).toContain('CRUNCHYROLL')
+    expect(sendPushMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT push for a non-transaction (added:false)', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: false })
+    await POST(reqS(goodToken, 'Your OTP is 1234', 'email'))
+    expect(pushRows).toHaveLength(0)
+    expect(sendPushMock).not.toHaveBeenCalled()
+  })
+
+  it('does NOT push on a dedup re-POST', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 47500, currency: 'INR', direction: 'out', merchant: 'CRUNCHYROLL' })
+    await POST(reqS(goodToken, 'Rs.475 spent CRUNCHYROLL dup', 'email'))
+    sendPushMock.mockClear(); pushRows.length = 0
+    const res2 = await POST(reqS(goodToken, 'Rs.475 spent CRUNCHYROLL dup', 'email'))
+    expect((await res2.json() as { added: boolean }).added).toBe(false)
+    expect(pushRows).toHaveLength(0)
+    expect(sendPushMock).not.toHaveBeenCalled()
+  })
+
+  it('does NOT push in dryRun', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 47500, currency: 'INR', direction: 'out', merchant: 'CRUNCHYROLL' })
+    const dry = new Request('http://x/api/ingest/sms', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${goodToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Rs.475 spent CRUNCHYROLL dry', source: 'email', dryRun: true }),
+    })
+    await POST(dry)
+    expect(pushRows).toHaveLength(0)
+    expect(sendPushMock).not.toHaveBeenCalled()
+  })
+
+  it('still returns added:true when the push send throws', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 47500, currency: 'INR', direction: 'out', merchant: 'CRUNCHYROLL' })
+    sendPushMock.mockRejectedValueOnce(new Error('push down'))
+    const res = await POST(reqS(goodToken, 'Rs.475 spent CRUNCHYROLL boom', 'email'))
+    expect((await res.json() as { added: boolean }).added).toBe(true)
+    expect(opLog).toHaveLength(1)
   })
 })

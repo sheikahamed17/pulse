@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Settings, Search } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { LockGate } from '@/components/lock-gate'
@@ -49,6 +49,7 @@ import { useTasks, type TaskFilter as TaskFilterValue } from '@/hooks/use-tasks'
 import { usePushSubscription } from '@/hooks/use-push-subscription'
 import { db, type MoneyEntryRow, type TaskRow, type LearningRow, type NoteRow } from '@/lib/dexie'
 import { moneyRowToDraft, taskRowToDraft, learningRowToDraft, noteRowToDraft } from '@/lib/entry-to-draft'
+import { blankDraftForKind } from '@/lib/blank-draft'
 import { UndoProvider } from '@/components/undo-provider'
 import { GlobalSearch } from '@/components/global-search'
 import { TodayNudge } from '@/components/today-nudge'
@@ -265,6 +266,8 @@ function AppPageInner() {
   const [querySource, setQuerySource] = useState<'voice' | 'text' | null>(null)
   const [parsing, setParsing] = useState(false)
   const [activeTab, setTab] = useTabState()
+  const { prefs } = useUserPrefs()
+  const searchParams = useSearchParams()
 
   // Global search "jump to row": after switching tabs, scroll the target row into
   // view + flash it. Retries because the destination list renders async (useLiveQuery).
@@ -298,6 +301,7 @@ function AppPageInner() {
   const [notesSearchQuery, setNotesSearchQuery] = useState('')
   const [notesSearchInputValue, setNotesSearchInputValue] = useState('')
   const notesSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftOpenRef = useRef(false)
   const { status: pushStatus, subscribe: pushSubscribe } = usePushSubscription()
   const [showPushNudge, setShowPushNudge] = useState(false)
 
@@ -311,6 +315,8 @@ function AppPageInner() {
       if (notesSearchDebounceRef.current) clearTimeout(notesSearchDebounceRef.current)
     }
   }, [notesSearchInputValue])
+
+  useEffect(() => { draftOpenRef.current = draft !== null }, [draft])
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -330,6 +336,26 @@ function AppPageInner() {
       .then(r => { if (r.ran && r.tombstoned > 0) pushPullOnce({ userId: user.id }).catch(console.error) })
       .catch(err => console.error('seed/dedupe', err))
   }, [user])
+
+  // Deep-link from an ingest push: /app?categorize=<id> → open that money entry's
+  // edit chip (category picker) on the Money tab, then strip the param. Runs once
+  // per id; never clobbers an already-open draft.
+  const categorizeHandledRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!user) return
+    const cid = searchParams.get('categorize')
+    if (!cid || categorizeHandledRef.current === cid) return
+    categorizeHandledRef.current = cid
+    let cancelled = false
+    ;(async () => {
+      const row = await db.money_entries.get(cid)
+      if (cancelled) return
+      setTab('money')
+      if (row && !draftOpenRef.current) { setEditId(cid); setDraft(moneyRowToDraft(row)) }
+      router.replace('/app?tab=money')
+    })()
+    return () => { cancelled = true }
+  }, [user, searchParams, router, setTab])
 
   useEffect(() => {
     if (!user) return
@@ -477,7 +503,7 @@ function AppPageInner() {
     switch (final.kind) {
       case 'money':
         entity_kind = 'money'
-        payload = { amount: final.amount, currency: final.currency, direction: final.direction, category_id: final.category_id ?? null, description: final.description ?? null }
+        payload = { amount: final.amount, currency: final.currency, direction: final.direction, category_id: final.category_id ?? null, description: final.description ?? null, occurred_at: final.occurred_at }
         break
       case 'task':
         entity_kind = 'task'
@@ -708,6 +734,19 @@ function AppPageInner() {
                   setDraft({ ...(payload as unknown as ChipDraft), receiptPreviewUrl: previewUrl } as ChipDraft)
                 }}
               />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-label="Add an entry manually"
+                disabled={draft !== null || parsing || queryPlan !== null}
+                onClick={() => {
+                  const tabKind = activeTab === 'tasks' ? 'task' : activeTab === 'notes' ? 'note' : activeTab === 'learning' ? 'learning' : 'money'
+                  setDraft(blankDraftForKind(tabKind, prefs.primary_currency ?? 'INR', new Date().toISOString()))
+                }}
+              >
+                + Add
+              </Button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); parseText() }} className="flex flex-1 gap-2 ml-2">
               <Input
