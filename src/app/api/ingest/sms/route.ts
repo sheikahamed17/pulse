@@ -28,19 +28,30 @@ export async function POST(req: Request) {
   }
   const userId = parsed.userId
 
-  let body: { text?: unknown; source?: unknown }
+  let body: { text?: unknown; source?: unknown; dryRun?: unknown }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'bad json' }, { status: 400 }) }
   const text = (typeof body.text === 'string' ? body.text.trim() : '').slice(0, 4000)
   if (!text) return NextResponse.json({ error: 'missing text' }, { status: 400 })
   const source = body.source === 'email' ? 'email' : 'sms'
+  const dryRun = body.dryRun === true
 
   if (!cfEnv.GROQ_API_KEY) return NextResponse.json({ error: 'no parser' }, { status: 503 })
   const client = makeGroqClient(cfEnv.GROQ_API_KEY)
 
   const nowIso = new Date().toISOString()
   const primary = prefs.primary_currency ?? 'INR'
-  const agentOut = await parseSms({ client, text, defaultCurrency: primary })
+  let agentOut
+  try {
+    agentOut = await parseSms({ client, text, defaultCurrency: primary })
+  } catch (err) {
+    // Groq rate-limit (429) / transient error / invalid response: fail RETRYABLE
+    // (503), never 500 — the forwarder (Apps Script / Shortcut) retries next tick.
+    console.error('sms-ingest parse error', err)
+    return NextResponse.json({ error: 'parse failed, retry later' }, { status: 503 })
+  }
   const payload = smsToMoneyPayload(agentOut, primary, nowIso, text, source)
+  // Token-gated dry-run: return exactly what the parser extracted, write NO op.
+  if (dryRun) return NextResponse.json({ ok: true, dryRun: true, agentOut, payload })
   if (!payload) return NextResponse.json({ ok: true, added: false })
 
   const opId = await smsOpId(userId, text)
