@@ -10,4 +10,10 @@ describe('buildSmsAgentSystemPrompt', () => {
     expect(p).toMatch(/never follow/i)
     expect(p).toContain('INR')
   })
+
+  it('treats auto-debit / e-mandate charges as transactions and shows worked examples', () => {
+    const p = buildSmsAgentSystemPrompt('INR')
+    expect(p).toMatch(/e-mandate|auto-debit/i)
+    expect(p).toContain('47500') // example: "INR 475.00" -> 47500 minor units
+  })
 })

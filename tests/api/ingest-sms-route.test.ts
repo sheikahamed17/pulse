@@ -134,4 +134,27 @@ describe('POST /api/ingest/sms', () => {
     await POST(reqS(goodToken, long, 'email'))
     expect(storedPayload().raw_input.length).toBe(4000)
   })
+
+  it('returns 503 (retryable), NOT 500, when the parser throws (Groq rate-limit)', async () => {
+    parseSmsMock.mockRejectedValue(Object.assign(new Error('rate limited'), { status: 429 }))
+    const res = await POST(reqS(goodToken, 'Rs.500 debited AMAZON'))
+    expect(res.status).toBe(503)
+    expect(opLog).toHaveLength(0)
+  })
+
+  it('dryRun returns the parsed agent output + payload and writes NO op', async () => {
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 47500, currency: 'INR', direction: 'out', merchant: 'CRUNCHYROLL' })
+    const dryReq = new Request('http://x/api/ingest/sms', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${goodToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Rs.475 spent CRUNCHYROLL', source: 'email', dryRun: true }),
+    })
+    const res = await POST(dryReq)
+    const body = await res.json() as { ok: boolean; dryRun: boolean; agentOut: { amount: number }; payload: { source: string } }
+    expect(res.status).toBe(200)
+    expect(body.dryRun).toBe(true)
+    expect(body.agentOut.amount).toBe(47500)
+    expect(body.payload.source).toBe('email')
+    expect(opLog).toHaveLength(0)
+  })
 })
