@@ -125,6 +125,16 @@ export function MoneyList({ userId, onEdit }: Props) {
                         📧 Email
                       </span>
                     )}
+                    {!e.category_id && (e.source === 'email' || e.source === 'sms') && onEdit && (
+                      <button
+                        type="button"
+                        onClick={(ev) => { ev.stopPropagation(); onEdit(e) }}
+                        aria-label={`Set category for ${e.description || formatAmount(e)}`}
+                        className="text-[10px] border border-amber-400/40 text-amber-400 rounded-full px-1.5 py-0.5 hover:bg-amber-400/10 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+                      >
+                        ⚠ Set category
+                      </button>
+                    )}
                   </div>
                 </div>
 
