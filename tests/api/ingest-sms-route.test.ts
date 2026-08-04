@@ -41,7 +41,7 @@ vi.mock('@/lib/agents/llm-client', () => ({ makeGroqClient: () => ({}) }))
 vi.mock('@/lib/agents/sms-agent', () => ({ parseSms: (...a: unknown[]) => parseSmsMock(...a) }))
 vi.mock('@/lib/materialize', () => ({ materializeRow: vi.fn(async () => {}) }))
 
-const sendPushMock = vi.fn(async () => ({ sent: 1, pruned: 0 }))
+const sendPushMock = vi.fn(async (..._a: unknown[]) => ({ sent: 1, pruned: 0 }))
 vi.mock('@/lib/web-push', () => ({ sendPushToUser: (...a: unknown[]) => sendPushMock(...a) }))
 
 vi.mock('@/lib/ingest-notification', () => ({
