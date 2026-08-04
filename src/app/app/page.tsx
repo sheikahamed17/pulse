@@ -477,7 +477,7 @@ function AppPageInner() {
     switch (final.kind) {
       case 'money':
         entity_kind = 'money'
-        payload = { amount: final.amount, currency: final.currency, direction: final.direction, category_id: final.category_id ?? null, description: final.description ?? null }
+        payload = { amount: final.amount, currency: final.currency, direction: final.direction, category_id: final.category_id ?? null, description: final.description ?? null, occurred_at: final.occurred_at }
         break
       case 'task':
         entity_kind = 'task'

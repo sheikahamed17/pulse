@@ -67,7 +67,7 @@ function ConfirmationChipMoney({
   mode: 'create' | 'edit'
 }) {
   const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }>(draft)
-  const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category'>(null)
+  const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category' | 'date'>(null)
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
   const [intervalCount, setIntervalCount] = useState(1)
@@ -160,6 +160,30 @@ function ConfirmationChipMoney({
             className="rounded-md border bg-muted px-2 py-0.5 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
           >
             {d.description || '+ description'}
+          </button>
+        )}
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {editingField === 'date' ? (
+          <Input
+            autoFocus
+            type="date"
+            defaultValue={d.occurred_at.slice(0, 10)}
+            onBlur={(e) => {
+              const v = e.currentTarget.value
+              if (v) setD(s => ({ ...s, occurred_at: new Date(v + 'T12:00:00').toISOString() }))
+              setEditingField(null)
+            }}
+            className="h-7 text-xs"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingField('date')}
+            className="rounded-md border bg-muted px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+          >
+            📅 {d.occurred_at.slice(0, 10)}
           </button>
         )}
       </div>
