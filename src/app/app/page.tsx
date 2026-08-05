@@ -259,6 +259,7 @@ function AppPageInner() {
   const [text, setText] = useState('')
   const [draft, setDraft] = useState<ChipDraft | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
+  const [categorizeId, setCategorizeId] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [focusId, setFocusId] = useState<string | null>(null)
   const [drainTick, setDrainTick] = useState(0)
@@ -301,7 +302,6 @@ function AppPageInner() {
   const [notesSearchQuery, setNotesSearchQuery] = useState('')
   const [notesSearchInputValue, setNotesSearchInputValue] = useState('')
   const notesSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const draftOpenRef = useRef(false)
   const { status: pushStatus, subscribe: pushSubscribe } = usePushSubscription()
   const [showPushNudge, setShowPushNudge] = useState(false)
 
@@ -315,8 +315,6 @@ function AppPageInner() {
       if (notesSearchDebounceRef.current) clearTimeout(notesSearchDebounceRef.current)
     }
   }, [notesSearchInputValue])
-
-  useEffect(() => { draftOpenRef.current = draft !== null }, [draft])
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -337,24 +335,17 @@ function AppPageInner() {
       .catch(err => console.error('seed/dedupe', err))
   }, [user])
 
-  // Deep-link from an ingest push: /app?categorize=<id> → open that money entry's
-  // edit chip (category picker) on the Money tab, then strip the param. Runs once
-  // per id; never clobbers an already-open draft.
+  // Deep-link from an ingest push: /app?categorize=<id> → open that row's inline
+  // category picker on the Money tab, then strip the param. Runs once per id.
   const categorizeHandledRef = useRef<string | null>(null)
   useEffect(() => {
     if (!user) return
     const cid = searchParams.get('categorize')
     if (!cid || categorizeHandledRef.current === cid) return
     categorizeHandledRef.current = cid
-    let cancelled = false
-    ;(async () => {
-      const row = await db.money_entries.get(cid)
-      if (cancelled) return
-      setTab('money')
-      if (row && !draftOpenRef.current) { setEditId(cid); setDraft(moneyRowToDraft(row)) }
-      router.replace('/app?tab=money')
-    })()
-    return () => { cancelled = true }
+    setTab('money')
+    setCategorizeId(cid)
+    router.replace('/app?tab=money')
   }, [user, searchParams, router, setTab])
 
   useEffect(() => {
@@ -857,7 +848,7 @@ function AppPageInner() {
               <div className="md:hidden">
                 <MoneyCard userId={user.id} />
               </div>
-              <MoneyList userId={user.id} onEdit={editMoney} />
+              <MoneyList userId={user.id} onEdit={editMoney} categorizeId={categorizeId} />
             </div>
           )}
           {activeTab === 'tasks' && (
