@@ -95,7 +95,7 @@ export function MoneyList({ userId, onEdit, categorizeId }: Props) {
               <SwipeRow
                 isOpen={openId === e.id}
                 onOpenChange={o => setOpenId(o ? e.id : null)}
-                onLongPress={() => setMenuFor(e.id)}
+                onLongPress={() => { setPickingId(null); setMenuFor(e.id) }}
                 onDelete={() => deleteEntry(e)}
                 deleteLabel={`Delete entry: ${e.description || formatAmount(e)}`}
                 className="glass-soft flex items-start justify-between gap-3 rounded-2xl p-3 text-sm transition-colors hover:bg-white/8"
@@ -153,7 +153,7 @@ export function MoneyList({ userId, onEdit, categorizeId }: Props) {
                     {!e.category_id && (e.source === 'email' || e.source === 'sms') && (
                       <button
                         type="button"
-                        onClick={(ev) => { ev.stopPropagation(); setPickingId(pickingId === e.id ? null : e.id) }}
+                        onClick={(ev) => { ev.stopPropagation(); setMenuFor(null); setPickingId(pickingId === e.id ? null : e.id) }}
                         aria-label={`Set category for ${e.description || formatAmount(e)}`}
                         className="text-[10px] border border-amber-400/40 text-amber-400 rounded-full px-1.5 py-0.5 hover:bg-amber-400/10 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                       >
