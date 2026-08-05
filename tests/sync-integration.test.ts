@@ -66,7 +66,9 @@ function resetMockDb() {
 class MockQueryBuilder {
   private tableName: string
   private whereConditions: Array<[string, string, unknown]> = []
-  private selectAllMode = false
+  private orderCol: string | null = null
+  private orderDir: 'asc' | 'desc' = 'asc'
+  private limitN: number | null = null
 
   constructor(tableName: string) {
     this.tableName = tableName
@@ -82,8 +84,22 @@ class MockQueryBuilder {
     return this
   }
 
+  select(_cols: string | string[]) {
+    return this
+  }
+
   selectAll() {
-    this.selectAllMode = true
+    return this
+  }
+
+  orderBy(col: string, dir: 'asc' | 'desc' = 'asc') {
+    this.orderCol = col
+    this.orderDir = dir
+    return this
+  }
+
+  limit(n: number) {
+    this.limitN = n
     return this
   }
 
@@ -94,16 +110,25 @@ class MockQueryBuilder {
     for (const [col, op, val] of this.whereConditions) {
       filtered = filtered.filter(row => {
         if (op === '=') return row[col] === val
+        if (op === '>') return String(row[col]) > String(val)
+        if (op === 'in') return (val as unknown[]).includes(row[col])
         return true
       })
     }
+
+    if (this.orderCol) {
+      const c = this.orderCol
+      filtered.sort((a, b) => String(a[c]) < String(b[c]) ? -1 : String(a[c]) > String(b[c]) ? 1 : 0)
+      if (this.orderDir === 'desc') filtered.reverse()
+    }
+
+    if (this.limitN != null) filtered = filtered.slice(0, this.limitN)
 
     return filtered
   }
 
   async executeTakeFirst() {
-    const results = await this.execute()
-    return results[0] || null
+    return (await this.execute())[0] || null
   }
 }
 
@@ -121,6 +146,17 @@ class MockDb {
             const oc = {
               column: (_col: string) => {
                 return {
+                  doNothing: () => ({
+                    async execute() {
+                      // Insert only if id doesn't exist (doNothing on conflict)
+                      const table = mockDbInstance[name] || []
+                      const idx = table.findIndex(r => r.id === row.id)
+                      if (idx < 0) {
+                        table.push(row)
+                      }
+                      mockDbInstance[name] = table
+                    }
+                  }),
                   doUpdateSet: (updates: Record<string, unknown>) => {
                     return {
                       async execute() {
@@ -598,6 +634,32 @@ describe('/api/sync — Notes domain', () => {
       // Verify other fields are unchanged
       expect(rows[0].body).toBe('Had a great standup meeting today')
       expect(rows[0].title).toBe('Note about meetings')
+    })
+  })
+})
+
+describe('/api/sync — incremental (bounded)', () => {
+  it('only returns ops newer than the client cursor, and dedups a re-pushed op', async () => {
+    await withTestUser(async ({ userId, callSync }) => {
+      const mk = (id: string, hlc: string) => ({
+        id, hlc, device_id: 'd1', user_id: userId, entity_kind: 'money', entity_id: id,
+        op_type: 'create' as const,
+        payload: { amount: 100, currency: 'INR', direction: 'out' as const, occurred_at: '2026-08-01T00:00:00Z', source: 'manual' as const },
+        schema_version: 1,
+      })
+      await callSync({ device_id: 'd1', new_ops: [mk('op-1', '0000000000000001-000000-d1')] })
+      const push2 = await callSync({ device_id: 'd1', new_ops: [mk('op-2', '0000000000000002-000000-d1')] })
+      expect(push2.applied_ack).toEqual(['op-2'])
+
+      // Cursor after op-1 → pull returns only op-2 (not the whole log)
+      const pull = await callSync({ device_id: 'd2', last_synced_hlc: '0000000000000001-000000-d1', new_ops: [] })
+      expect(pull.new_ops_from_server.map((o: {id: string}) => o.id)).toEqual(['op-2'])
+
+      // Re-pushing op-1 (already known) creates no duplicate; op_log stays 2
+      await callSync({ device_id: 'd1', new_ops: [mk('op-1', '0000000000000001-000000-d1')] })
+      const all = await callSync({ device_id: 'd3', new_ops: [] })
+      expect(all.new_ops_from_server).toHaveLength(2)
+      expect(pull.server_hlc).toBe('0000000000000002-000000-d1')
     })
   })
 })

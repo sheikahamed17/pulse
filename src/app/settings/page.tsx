@@ -66,6 +66,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/rebuild">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Rebuild server data</CardTitle>
+              <CardDescription>Re-sync your history into the server tables (fixes stale budgets/insights). Safe to run anytime.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/app" className="text-sm text-muted-foreground hover:underline">← Back to Pulse</Link>
       </main>
     </>

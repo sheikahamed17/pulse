@@ -5,7 +5,7 @@ import type { D1Database } from '@cloudflare/workers-types'
 import { getSession } from '@/lib/auth'
 import { createDb } from '@/lib/db'
 import { OpSchema, type Op } from '@/types/ops'
-import { mergeOpsForUser } from '@/lib/sync-server'
+import { filterNewOps, orderOpsAfter } from '@/lib/sync-server'
 import { materializeRow } from '@/lib/materialize'
 
 const RequestSchema = z.object({
@@ -44,51 +44,56 @@ export async function POST(req: Request) {
   const d1 = (env as { DB: D1Database }).DB
   const db = createDb(d1)
 
-  // Pull all existing ops for this user (full table for Phase 0 — we'll add pagination + checkpointing in Phase 2)
-  const rows = await db
-    .selectFrom('op_log')
-    .where('user_id', '=', userId)
-    .selectAll()
-    .execute()
+  type OpLogRow = { id: string; hlc: string; device_id: string; user_id: string; entity_kind: string; entity_id: string; op_type: string; payload: string; schema_version: number }
 
-  const existingOps: Op[] = rows.map(row => ({
-    id: row.id,
-    hlc: row.hlc,
-    device_id: row.device_id,
-    user_id: row.user_id,
-    entity_kind: row.entity_kind as Op['entity_kind'],
-    entity_id: row.entity_id,
+  const rowToOp = (row: OpLogRow): Op => ({
+    id: row.id, hlc: row.hlc, device_id: row.device_id, user_id: row.user_id,
+    entity_kind: row.entity_kind as Op['entity_kind'], entity_id: row.entity_id,
     op_type: row.op_type as Op['op_type'],
     payload: JSON.parse(row.payload) as Record<string, unknown>,
     schema_version: row.schema_version,
-  }))
+  })
 
-  const { newOps, opsForClient } = mergeOpsForUser(existingOps, new_ops, last_synced_hlc)
-
-  // Persist new ops + materialize rows
-  for (const op of newOps) {
-    await db
-      .insertInto('op_log')
-      .values({
-        id: op.id,
-        user_id: op.user_id,
-        hlc: op.hlc,
-        device_id: op.device_id,
-        entity_kind: op.entity_kind,
-        entity_id: op.entity_id,
-        op_type: op.op_type,
-        payload: JSON.stringify(op.payload),
-        schema_version: op.schema_version,
-        applied_at: Date.now(),
-      })
+  // 1. Dedup incoming by id (bounded by |new_ops|).
+  let existingIncomingIds = new Set<string>()
+  if (new_ops.length > 0) {
+    const rows = await db.selectFrom('op_log')
+      .where('user_id', '=', userId)
+      .where('id', 'in', new_ops.map(o => o.id))
+      .select('id')
       .execute()
+    existingIncomingIds = new Set(rows.map(r => r.id))
+  }
+  const newOps = filterNewOps(new_ops, existingIncomingIds)
 
-    await materializeRow(db, op, userId)
+  // 2. Persist + materialize each genuinely-new op (bounded by |newOps|).
+  //    op_log is the source of truth; a materialize (projection) failure is
+  //    logged, not fatal — one bad op must never re-wedge sync.
+  for (const op of newOps) {
+    await db.insertInto('op_log').values({
+      id: op.id, user_id: op.user_id, hlc: op.hlc, device_id: op.device_id,
+      entity_kind: op.entity_kind, entity_id: op.entity_id, op_type: op.op_type,
+      payload: JSON.stringify(op.payload), schema_version: op.schema_version, applied_at: Date.now(),
+    }).onConflict(oc => oc.column('id').doNothing()).execute()
+    try {
+      await materializeRow(db, op, userId)
+    } catch (err) {
+      console.error('sync materialize failed', op.id, op.entity_kind, (err as Error).message)
+    }
   }
 
-  // Compute server HLC = max of all known op HLCs (lexicographic on serialized form works)
-  const allHlcs = [...existingOps, ...newOps].map(o => o.hlc)
-  const serverHlc = allHlcs.length > 0 ? allHlcs.sort()[allHlcs.length - 1] : '0000000000000000-000000-server'
+  // 3. Pull the delta the client is missing (bounded by delta; no cursor = one-time bootstrap).
+  let pull = db.selectFrom('op_log').where('user_id', '=', userId)
+  if (last_synced_hlc) pull = pull.where('hlc', '>', last_synced_hlc)
+  const deltaRows = await pull.orderBy('hlc', 'asc').selectAll().execute()
+  const opsForClient = orderOpsAfter(deltaRows.map(rowToOp), last_synced_hlc)
+
+  // 4. Cursor = max HLC (ORDER BY hlc DESC LIMIT 1 — index-backed, no aggregate).
+  const maxRow = await db.selectFrom('op_log')
+    .where('user_id', '=', userId)
+    .orderBy('hlc', 'desc').limit(1)
+    .select('hlc').executeTakeFirst()
+  const serverHlc = maxRow?.hlc ?? '0000000000000000-000000-server'
 
   return NextResponse.json({
     server_hlc: serverHlc,
