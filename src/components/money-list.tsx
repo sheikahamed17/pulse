@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SwipeRow } from '@/components/swipe-row'
+import { CategoryPicker } from '@/components/category-picker'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
@@ -17,15 +18,17 @@ import { convertViaRates } from '@/lib/fx'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import type { MoneyEntryRow } from '@/lib/dexie'
 
-type Props = { userId: string; onEdit?: (row: MoneyEntryRow) => void }
+type Props = { userId: string; onEdit?: (row: MoneyEntryRow) => void; categorizeId?: string | null }
 
-export function MoneyList({ userId, onEdit }: Props) {
+export function MoneyList({ userId, onEdit, categorizeId }: Props) {
   const entries = useMoneyEntries(userId)
   const categories = useCategories(userId)
   const undo = useUndo()
   const router = useRouter()
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [pickingId, setPickingId] = useState<string | null>(null)
+  const handledCategorizeRef = useRef<string | null>(null)
   const { prefs } = useUserPrefs()
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
   const [expandedFx, setExpandedFx] = useState<string | null>(null)
@@ -34,6 +37,17 @@ export function MoneyList({ userId, onEdit }: Props) {
     () => new Map(categories.map(c => [c.id, c])),
     [categories],
   )
+
+  // Push deep-link: open a specific row's inline category picker once + scroll to it.
+  useEffect(() => {
+    if (categorizeId && handledCategorizeRef.current !== categorizeId) {
+      handledCategorizeRef.current = categorizeId
+      setPickingId(categorizeId)
+      requestAnimationFrame(() => {
+        document.getElementById(`pulse-row-${categorizeId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      })
+    }
+  }, [categorizeId])
 
   async function deleteEntry(e: MoneyEntryRow) {
     const op = await generateOp({
@@ -58,6 +72,17 @@ export function MoneyList({ userId, onEdit }: Props) {
     )
   }
 
+  async function setCategory(e: MoneyEntryRow, categoryId: string) {
+    const op = await generateOp({
+      entity_kind: 'money', entity_id: e.id,
+      op_type: 'update', payload: { category_id: categoryId },
+      user_id: userId,
+    })
+    await applyLocalOp(op)
+    pushPullOnce({ userId }).catch(err => console.error('sync', err))
+    setPickingId(null)
+  }
+
   return (
     <ul className="flex flex-col gap-2">
         {entries.length === 0 && (
@@ -70,7 +95,7 @@ export function MoneyList({ userId, onEdit }: Props) {
               <SwipeRow
                 isOpen={openId === e.id}
                 onOpenChange={o => setOpenId(o ? e.id : null)}
-                onLongPress={() => setMenuFor(e.id)}
+                onLongPress={() => { setPickingId(null); setMenuFor(e.id) }}
                 onDelete={() => deleteEntry(e)}
                 deleteLabel={`Delete entry: ${e.description || formatAmount(e)}`}
                 className="glass-soft flex items-start justify-between gap-3 rounded-2xl p-3 text-sm transition-colors hover:bg-white/8"
@@ -125,10 +150,10 @@ export function MoneyList({ userId, onEdit }: Props) {
                         📧 Email
                       </span>
                     )}
-                    {!e.category_id && (e.source === 'email' || e.source === 'sms') && onEdit && (
+                    {!e.category_id && (e.source === 'email' || e.source === 'sms') && (
                       <button
                         type="button"
-                        onClick={(ev) => { ev.stopPropagation(); onEdit(e) }}
+                        onClick={(ev) => { ev.stopPropagation(); setMenuFor(null); setPickingId(pickingId === e.id ? null : e.id) }}
                         aria-label={`Set category for ${e.description || formatAmount(e)}`}
                         className="text-[10px] border border-amber-400/40 text-amber-400 rounded-full px-1.5 py-0.5 hover:bg-amber-400/10 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
                       >
@@ -155,6 +180,24 @@ export function MoneyList({ userId, onEdit }: Props) {
                   </Button>
                 </div>
               </SwipeRow>
+
+              {pickingId === e.id && (
+                <div className="glass-soft mt-1 rounded-2xl p-2">
+                  <CategoryPicker
+                    userId={userId}
+                    kind={e.direction === 'out' ? 'spend' : 'income'}
+                    selectedId={e.category_id ?? null}
+                    onSelect={(id) => setCategory(e, id)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPickingId(null)}
+                    className="mt-1 px-2 py-1 min-h-[44px] text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
 
               {menuFor === e.id && (
                 <div className="absolute right-2 top-full z-20 mt-1 flex flex-col rounded-md border bg-background shadow">
