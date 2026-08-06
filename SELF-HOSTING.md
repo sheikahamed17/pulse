@@ -45,7 +45,7 @@ wrangler d1 execute pulse --remote --file=migrations/0002_phase_1_money.sql
 node scripts/generate-vapid-keys.mjs
 ```
 
-Put the **public** key into `wrangler.toml` → `VAPID_PUBLIC_KEY`. Keep the **private** key for step 5.
+This prints a **public** and a **private** key. Both are set as secrets in step 5 — you don't edit `wrangler.toml` for these (keeping the file identical across forks so it never conflicts on sync). If you set up auto-deploy (see Notes), also add the public key as the GitHub Actions **variable** `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
 
 ## 5. Set your secrets
 
@@ -54,7 +54,8 @@ wrangler secret put BETTER_AUTH_SECRET   # any random string, 32+ chars
 wrangler secret put BETTER_AUTH_URL      # your instance URL, e.g. https://pulse.<you>.workers.dev
 wrangler secret put GROQ_API_KEY         # from console.groq.com
 wrangler secret put RESEND_API_KEY       # from resend.com
-wrangler secret put VAPID_PRIVATE_KEY    # from step 4
+wrangler secret put VAPID_PUBLIC_KEY     # public key from step 4
+wrangler secret put VAPID_PRIVATE_KEY    # private key from step 4
 wrangler secret put CRON_SECRET          # any random string
 ```
 

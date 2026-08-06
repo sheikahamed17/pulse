@@ -33,12 +33,13 @@ crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1"]
 # - `pnpm exec wrangler dev` uses --persist by default for D1 (file under .wrangler/)
 # - `pnpm exec wrangler d1 execute pulse --remote ...` writes to the cloud DB
 
-[vars]
-# VAPID_PUBLIC_KEY is the public ES256 key for Web Push. Generated once via:
-#   node scripts/generate-vapid-keys.mjs
-# The value is set by Sheik during push setup; see docs/runbooks/push-setup.md
-VAPID_PUBLIC_KEY = "BH5VGzzuOLA0Yd3wBR3lUC9m2dnioSRcXiqozaok46NF4r2WFnhetHYoNQTCE6iFiO9RA2xES-2ri45ZMufwUJw"
+# VAPID_PUBLIC_KEY is a Worker *secret* (NOT a var), so this file stays byte-identical
+# across self-hosted forks and never conflicts on `git sync`. Set it once per instance:
+#   node scripts/generate-vapid-keys.mjs        # prints VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY
+#   wrangler secret put VAPID_PUBLIC_KEY         # paste the public key
+# The Worker reads env.VAPID_PUBLIC_KEY the same way whether it's a var or a secret.
 
+[vars]
 # EMAIL_FROM is the sender for Better Auth magic-link emails (Resend).
 # On the free tier without a verified domain, use Resend's shared sender
 # `onboarding@resend.dev`, which can only deliver to the Resend account's
