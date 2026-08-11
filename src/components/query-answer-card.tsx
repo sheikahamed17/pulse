@@ -6,9 +6,11 @@ import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
 import { useCategories } from '@/hooks/use-categories'
+import { useAllCategories } from '@/hooks/use-all-categories'
 import { convertViaRates } from '@/lib/fx'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
+import { makeCategoryResolver } from '@/lib/category-resolve'
 import {
   computeMoneyBreakdown,
   computeMoneyDelta,
@@ -36,7 +38,16 @@ export function QueryAnswerCard({ userId, plan, onDismiss, onResult }: Props) {
   const entries = useMoneyEntries(userId, fetchRange)
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
   const categories = useCategories(userId)
+  const allCategories = useAllCategories(userId)
   const [showEntries, setShowEntries] = useState(false)
+
+  const resolve = useMemo(
+    () =>
+      makeCategoryResolver(
+        allCategories.map(c => ({ id: c.id, name: c.name, icon: c.icon, kind: c.kind })),
+      ),
+    [allCategories],
+  )
 
   useEffect(() => {
     const timer = setTimeout(onDismiss, AUTO_DISMISS_MS)
@@ -62,8 +73,8 @@ export function QueryAnswerCard({ userId, plan, onDismiss, onResult }: Props) {
   // Category name lookup function
   const categoryNameOf = useCallback((categoryId: string | null): string | null => {
     if (!categoryId) return null
-    return categories.find(c => c.id === categoryId)?.name ?? null
-  }, [categories])
+    return resolve(categoryId)?.name ?? null
+  }, [resolve])
 
   // Filter entries by direction, category, and current-period date bounds
   const filteredEntries = useMemo(() => {
