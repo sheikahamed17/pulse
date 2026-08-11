@@ -1,4 +1,4 @@
-import type { LearningRow, TaskRow } from '@/lib/dexie'
+import type { TaskRow } from '@/lib/dexie'
 
 export type DateSort = 'newest' | 'oldest'
 export type TaskSort = 'due' | 'created-desc' | 'created-asc' | 'priority'

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
-import { useCategories } from '@/hooks/use-categories'
 import { useAllCategories } from '@/hooks/use-all-categories'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'

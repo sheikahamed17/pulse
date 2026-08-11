@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sortByDate, sortTasks, type DateSort, type TaskSort } from './list-sort'
+import { sortByDate, sortTasks } from './list-sort'
 import type { LearningRow, TaskRow } from '@/lib/dexie'
 
 const learningRow = (o: Partial<LearningRow>): LearningRow => ({

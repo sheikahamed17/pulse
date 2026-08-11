@@ -44,7 +44,7 @@ export function filterSortMoney(
   resolve: (id: string | null) => { name: string; icon: string | null } | null,
 ): MoneyEntryRow[] {
   // Filter
-  let filtered = rows.filter(r => {
+  const filtered = rows.filter(r => {
     // Category filter
     if (filter.categoryName !== null) {
       const resolved = resolve(r.category_id)

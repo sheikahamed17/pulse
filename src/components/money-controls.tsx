@@ -22,9 +22,12 @@ export function MoneyControls({ userId, filter, sort, onFilter, onSort }: Props)
 
   const sources: Array<MoneyEntryRow['source'] | 'all'> = ['all', 'manual', 'voice', 'receipt', 'sms', 'email', 'recurring']
 
-  // Month bounds: current and previous month (computed fresh each render; cheap and always correct)
-  const currentMonthBounds = monthBounds(Date.now(), 0)
-  const previousMonthBounds = monthBounds(Date.now(), 1)
+  // Month bounds: current and previous month. Read the clock inside useMemo (not
+  // the render body) to satisfy react-hooks/purity; mount-stable is fine here
+  // (a session spanning a UTC month rollover is rare and only affects which
+  // date-range option shows as selected).
+  const currentMonthBounds = useMemo(() => monthBounds(new Date().getTime(), 0), [])
+  const previousMonthBounds = useMemo(() => monthBounds(new Date().getTime(), 1), [])
 
   const handleDateRangeChange = (range: 'this-month' | 'last-month' | 'all') => {
     if (range === 'this-month') {
