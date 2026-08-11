@@ -8,12 +8,13 @@ import { SwipeRow } from '@/components/swipe-row'
 import { useUndo } from '@/components/undo-provider'
 import { resurrectPayload } from '@/lib/undo-delete'
 import { EntryTimestamp } from '@/components/entry-timestamp'
+import { sortByDate, type DateSort } from '@/lib/list-sort'
 import type { LearningRow } from '@/lib/dexie'
 import { cn } from '@/lib/utils'
 
-type Props = { userId: string; selectedTag: string | null; onEdit?: (row: LearningRow) => void }
+type Props = { userId: string; selectedTag: string | null; sort?: DateSort; onEdit?: (row: LearningRow) => void }
 
-export function LearningList({ userId, selectedTag, onEdit }: Props) {
+export function LearningList({ userId, selectedTag, sort = 'newest', onEdit }: Props) {
   const learnings = useLearnings(userId)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -22,6 +23,7 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
   const filtered = selectedTag
     ? learnings.filter(e => e.tags.includes(selectedTag))
     : learnings
+  const sorted = sortByDate(filtered, sort)
 
   async function deleteLearning(e: LearningRow) {
     const op = await generateOp({
@@ -43,7 +45,7 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
     })
   }
 
-  if (filtered.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="glass-soft rounded-2xl p-4 text-center text-sm text-muted-foreground">
         {selectedTag ? `No learnings with tag "${selectedTag}".` : "No learnings yet — say 'I learned…'"}
@@ -53,7 +55,7 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
 
   return (
     <ul className="flex flex-col gap-2">
-      {filtered.map(e => (
+      {sorted.map(e => (
         <li key={e.id} id={`pulse-row-${e.id}`} className="relative">
           <SwipeRow
             isOpen={openId === e.id}

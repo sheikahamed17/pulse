@@ -30,6 +30,8 @@ import { MoneyList } from '@/components/money-list'
 import { MoneyControls } from '@/components/money-controls'
 import { DigestCard } from '@/components/digest-card'
 import { EMPTY_MONEY_FILTER, type MoneyFilter, type MoneySort } from '@/lib/money-filter-sort'
+import { SortControl } from '@/components/sort-control'
+import { type DateSort, type TaskSort } from '@/lib/list-sort'
 import { BudgetSection } from '@/components/budget-section'
 import { VoiceRecorder } from '@/components/voice-recorder'
 import { ReceiptButton } from '@/components/receipt-button'
@@ -299,8 +301,11 @@ function AppPageInner() {
   const [taskFilter, setTaskFilter] = useState<TaskFilterValue>('open')
   const [taskProjectId, setTaskProjectId] = useState<string | null>(null)
   const [taskTag, setTaskTag] = useState<string | null>(null)
+  const [taskSort, setTaskSort] = useState<TaskSort>('due')
   const [selectedLearningTag, setSelectedLearningTag] = useState<string | null>(null)
+  const [learningSort, setLearningSort] = useState<DateSort>('newest')
   const [selectedNotesTag, setSelectedNotesTag] = useState<string | null>(null)
+  const [notesSort, setNotesSort] = useState<DateSort>('newest')
   const [notesSearchQuery, setNotesSearchQuery] = useState('')
   const [notesSearchInputValue, setNotesSearchInputValue] = useState('')
   const notesSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -860,14 +865,38 @@ function AppPageInner() {
             <div className="flex flex-col gap-3">
               <TaskFilter active={taskFilter} onChange={setTaskFilter} />
               <ProjectPicker userId={user.id} selectedId={taskProjectId} onSelect={setTaskProjectId} noneLabel="All projects" />
-              <TaskTagFilter userId={user.id} selectedTag={taskTag} onChange={setTaskTag} />
-              <TaskList userId={user.id} filter={taskFilter} projectId={taskProjectId} tag={taskTag} onEdit={editTask} />
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <TaskTagFilter userId={user.id} selectedTag={taskTag} onChange={setTaskTag} />
+                <SortControl
+                  options={[
+                    { value: 'due', label: 'Due date' },
+                    { value: 'created-desc', label: 'Created (newest)' },
+                    { value: 'created-asc', label: 'Created (oldest)' },
+                    { value: 'priority', label: 'Priority' },
+                  ]}
+                  value={taskSort}
+                  onChange={setTaskSort}
+                  label="Sort:"
+                />
+              </div>
+              <TaskList userId={user.id} filter={taskFilter} projectId={taskProjectId} tag={taskTag} sort={taskSort} onEdit={editTask} />
             </div>
           )}
           {activeTab === 'learning' && (
             <div className="flex flex-col gap-3">
-              <LearningTagFilter userId={user.id} selectedTag={selectedLearningTag} onChange={setSelectedLearningTag} />
-              <LearningList userId={user.id} selectedTag={selectedLearningTag} onEdit={editLearning} />
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <LearningTagFilter userId={user.id} selectedTag={selectedLearningTag} onChange={setSelectedLearningTag} />
+                <SortControl
+                  options={[
+                    { value: 'newest', label: 'Newest' },
+                    { value: 'oldest', label: 'Oldest' },
+                  ]}
+                  value={learningSort}
+                  onChange={setLearningSort}
+                  label="Sort:"
+                />
+              </div>
+              <LearningList userId={user.id} selectedTag={selectedLearningTag} sort={learningSort} onEdit={editLearning} />
             </div>
           )}
           {activeTab === 'notes' && (
@@ -879,11 +908,23 @@ function AppPageInner() {
                 placeholder="Search notes…"
                 className="min-h-[44px] bg-white/5 border border-white/10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 focus-visible:ring-offset-0"
               />
-              <NotesTagFilter userId={user.id} selectedTag={selectedNotesTag} onChange={setSelectedNotesTag} />
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <NotesTagFilter userId={user.id} selectedTag={selectedNotesTag} onChange={setSelectedNotesTag} />
+                <SortControl
+                  options={[
+                    { value: 'newest', label: 'Newest' },
+                    { value: 'oldest', label: 'Oldest' },
+                  ]}
+                  value={notesSort}
+                  onChange={setNotesSort}
+                  label="Sort:"
+                />
+              </div>
               <NotesList
                 userId={user.id}
                 selectedTag={selectedNotesTag}
                 searchQuery={notesSearchQuery}
+                sort={notesSort}
                 onEdit={editNote}
               />
             </div>
