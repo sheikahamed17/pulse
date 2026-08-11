@@ -7,8 +7,7 @@ import { useLearnings } from '@/hooks/use-learnings'
 import { SwipeRow } from '@/components/swipe-row'
 import { useUndo } from '@/components/undo-provider'
 import { resurrectPayload } from '@/lib/undo-delete'
-import { formatLocalDateTime } from '@/lib/format'
-import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { EntryTimestamp } from '@/components/entry-timestamp'
 import type { LearningRow } from '@/lib/dexie'
 import { cn } from '@/lib/utils'
 
@@ -18,7 +17,6 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
   const learnings = useLearnings(userId)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
-  const { prefs } = useUserPrefs()
   const undo = useUndo()
 
   const filtered = selectedTag
@@ -89,9 +87,7 @@ export function LearningList({ userId, selectedTag, onEdit }: Props) {
                   <span className="truncate">— {e.attribution}</span>
                 )}
               </div>
-              <span className="font-mono tabular-nums flex-shrink-0">
-                {formatLocalDateTime(e.occurred_at, prefs.tz)}
-              </span>
+              <EntryTimestamp occurredAt={e.occurred_at} />
             </div>
           </SwipeRow>
 

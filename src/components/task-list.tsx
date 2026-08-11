@@ -12,6 +12,7 @@ import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { EntryTimestamp } from '@/components/entry-timestamp'
 import { db, type TaskRow } from '@/lib/dexie'
 
 type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null; onEdit?: (row: TaskRow) => void }
@@ -171,6 +172,7 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
                     {isOverdue && ' · overdue'}
                   </span>
                 )}
+                <EntryTimestamp occurredAt={t.created_at} className="ml-2 font-mono tabular-nums" />
                 {isOverdue && t.nudge_muted_at && (
                   <span className="ml-1 inline-flex items-center align-middle" aria-label="Reminders muted">
                     <BellOff className="h-3 w-3" />

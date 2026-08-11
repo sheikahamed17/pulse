@@ -16,6 +16,7 @@ import { useFxRates } from '@/hooks/use-fx-rates'
 import { currencySymbol } from '@/lib/currency'
 import { convertViaRates } from '@/lib/fx'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
+import { EntryTimestamp } from '@/components/entry-timestamp'
 import type { MoneyEntryRow } from '@/lib/dexie'
 
 type Props = { userId: string; onEdit?: (row: MoneyEntryRow) => void; categorizeId?: string | null }
@@ -114,6 +115,7 @@ export function MoneyList({ userId, onEdit, categorizeId }: Props) {
                     <span className="text-xs text-muted-foreground">{cat.name}</span>
                   )}
                   <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <EntryTimestamp occurredAt={e.occurred_at} />
                     {e.currency !== prefs.primary_currency && (
                       <button
                         type="button"

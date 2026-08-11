@@ -8,8 +8,7 @@ import { SwipeRow } from '@/components/swipe-row'
 import { useUndo } from '@/components/undo-provider'
 import { resurrectPayload } from '@/lib/undo-delete'
 import { searchNotes } from '@/lib/search-notes'
-import { formatLocalDateTime } from '@/lib/format'
-import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { EntryTimestamp } from '@/components/entry-timestamp'
 import type { NoteRow } from '@/lib/dexie'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +23,6 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
   const notes = useNotes(userId)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
-  const { prefs } = useUserPrefs()
   const undo = useUndo()
 
   const searched = searchNotes(notes, searchQuery)
@@ -94,9 +92,7 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
               </div>
             )}
             <div className="flex items-center justify-end text-xs text-muted-foreground">
-              <span className="font-mono tabular-nums">
-                {formatLocalDateTime(e.occurred_at, prefs.tz)}
-              </span>
+              <EntryTimestamp occurredAt={e.occurred_at} />
             </div>
           </SwipeRow>
 
