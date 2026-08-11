@@ -116,6 +116,28 @@ describe('computeMoneyBreakdown', () => {
     expect(result[0].categoryName).toBeNull()
     expect(result[0].amount).toBe(1000)
   })
+
+  it('merges buckets that resolve to the same name (dupe/tombstoned ids)', () => {
+    const entries: MoneyEntryRow[] = [
+      { id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out', category_id: 'cat-food', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+      { id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out', category_id: 'cat-food-old', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+    ]
+    const nameOf = (id: string | null) => (id === 'cat-food' || id === 'cat-food-old' ? 'Food' : null)
+    const result = computeMoneyBreakdown(entries, { direction: 'out', categoryNameOf: nameOf }, toPrimary)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({ categoryName: 'Food', amount: 1500 })
+  })
+
+  it('keeps a single Uncategorized bucket for null/unresolved ids', () => {
+    const entries: MoneyEntryRow[] = [
+      { id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out', category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+      { id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out', category_id: 'ghost', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+    ]
+    const nameOf = () => null
+    const result = computeMoneyBreakdown(entries, { direction: 'out', categoryNameOf: nameOf }, toPrimary)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({ categoryName: null, amount: 1500 })
+  })
 })
 
 describe('computeMoneyDelta', () => {
