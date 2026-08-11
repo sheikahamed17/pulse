@@ -54,11 +54,16 @@ export function computeMoneyBreakdown(
     totals.set(key, (totals.get(key) ?? 0) + amount)
   }
 
-  return Array.from(totals.entries())
-    .map(([categoryId, amount]) => ({
-      categoryName: categoryNameOf(categoryId),
-      amount,
-    }))
+  // Group raw by category_id (unchanged), then MERGE by resolved name so an old
+  // tombstoned id and the canonical id — or same-named dupes — collapse into one
+  // row instead of splitting into a real row + a phantom "Uncategorized".
+  const byName = new Map<string | null, number>()   // key: resolved name (null = uncategorized)
+  for (const [categoryId, amount] of totals.entries()) {
+    const name = categoryNameOf(categoryId)
+    byName.set(name, (byName.get(name) ?? 0) + amount)
+  }
+  return Array.from(byName.entries())
+    .map(([categoryName, amount]) => ({ categoryName, amount }))
     .sort((a, b) => b.amount - a.amount)
 }
 

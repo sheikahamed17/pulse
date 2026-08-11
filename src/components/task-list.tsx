@@ -12,17 +12,25 @@ import { useTasks, type TaskFilter } from '@/hooks/use-tasks'
 import { useProjects } from '@/hooks/use-projects'
 import { formatLocalDateTime } from '@/lib/format'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { EntryTimestamp } from '@/components/entry-timestamp'
+import { sortTasks, type TaskSort } from '@/lib/list-sort'
 import { db, type TaskRow } from '@/lib/dexie'
 
-type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null; onEdit?: (row: TaskRow) => void }
+type Props = { userId: string; filter: TaskFilter; projectId?: string | null; tag?: string | null; sort?: TaskSort; onEdit?: (row: TaskRow) => void }
 
-export function TaskList({ userId, filter, projectId = null, tag = null, onEdit }: Props) {
+export function TaskList({ userId, filter, projectId = null, tag = null, sort = 'due', onEdit }: Props) {
   // Group from the FULL set so progress counts include completed children even in
   // the "open" view; visibleNodes then filters at the PARENT level.
   const tasks = useTasks(userId, 'all')
   const projects = useProjects(userId, true)
   const projectById = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects])
-  const nodes = useMemo(() => visibleNodes(groupTasks(tasks), filter, projectId, tag), [tasks, filter, projectId, tag])
+  const unsortedNodes = useMemo(() => visibleNodes(groupTasks(tasks), filter, projectId, tag), [tasks, filter, projectId, tag])
+  const nodes = useMemo(() => {
+    // Sort only the top-level nodes; keep children in stable order
+    // TaskNode extends TaskRow, so we can pass it to sortTasks
+    const sortedTopLevel = sortTasks(unsortedNodes as TaskRow[], sort) as TaskNode[]
+    return sortedTopLevel
+  }, [unsortedNodes, sort])
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const { prefs } = useUserPrefs()
@@ -171,6 +179,7 @@ export function TaskList({ userId, filter, projectId = null, tag = null, onEdit 
                     {isOverdue && ' · overdue'}
                   </span>
                 )}
+                <EntryTimestamp occurredAt={t.created_at} className="ml-2 font-mono tabular-nums" />
                 {isOverdue && t.nudge_muted_at && (
                   <span className="ml-1 inline-flex items-center align-middle" aria-label="Reminders muted">
                     <BellOff className="h-3 w-3" />

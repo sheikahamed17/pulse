@@ -8,29 +8,29 @@ import { SwipeRow } from '@/components/swipe-row'
 import { useUndo } from '@/components/undo-provider'
 import { resurrectPayload } from '@/lib/undo-delete'
 import { searchNotes } from '@/lib/search-notes'
-import { formatLocalDateTime } from '@/lib/format'
-import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { EntryTimestamp } from '@/components/entry-timestamp'
+import { sortByDate, type DateSort } from '@/lib/list-sort'
 import type { NoteRow } from '@/lib/dexie'
 import { cn } from '@/lib/utils'
 
-type Props = { userId: string; selectedTag: string | null; searchQuery?: string; onEdit?: (row: NoteRow) => void }
+type Props = { userId: string; selectedTag: string | null; searchQuery?: string; sort?: DateSort; onEdit?: (row: NoteRow) => void }
 
 function truncatePreview(text: string, maxChars: number = 100): string {
   if (text.length <= maxChars) return text
   return text.slice(0, maxChars) + '…'
 }
 
-export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Props) {
+export function NotesList({ userId, selectedTag, searchQuery = '', sort = 'newest', onEdit }: Props) {
   const notes = useNotes(userId)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
-  const { prefs } = useUserPrefs()
   const undo = useUndo()
 
   const searched = searchNotes(notes, searchQuery)
   const filtered = selectedTag
     ? searched.filter(e => e.tags.includes(selectedTag))
     : searched
+  const sorted = sortByDate(filtered, sort)
 
   async function deleteNote(e: NoteRow) {
     const op = await generateOp({
@@ -52,7 +52,7 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
     })
   }
 
-  if (filtered.length === 0) {
+  if (sorted.length === 0) {
     return (
       <div className="glass-soft rounded-2xl p-4 text-center text-sm text-muted-foreground">
         {selectedTag ? `No notes with tag "${selectedTag}".` : "No notes yet — say 'note that…'"}
@@ -62,7 +62,7 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
 
   return (
     <ul className="flex flex-col gap-2">
-      {filtered.map(e => (
+      {sorted.map(e => (
         <li key={e.id} id={`pulse-row-${e.id}`} className="relative">
           <SwipeRow
             isOpen={openId === e.id}
@@ -94,9 +94,7 @@ export function NotesList({ userId, selectedTag, searchQuery = '', onEdit }: Pro
               </div>
             )}
             <div className="flex items-center justify-end text-xs text-muted-foreground">
-              <span className="font-mono tabular-nums">
-                {formatLocalDateTime(e.occurred_at, prefs.tz)}
-              </span>
+              <EntryTimestamp occurredAt={e.occurred_at} />
             </div>
           </SwipeRow>
 
