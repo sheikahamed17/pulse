@@ -27,7 +27,9 @@ import { formatLocalDateTime } from '@/lib/format'
 import { Circle, CheckCircle2 } from 'lucide-react'
 import { MoneyCard } from '@/components/money-card'
 import { MoneyList } from '@/components/money-list'
+import { MoneyControls } from '@/components/money-controls'
 import { DigestCard } from '@/components/digest-card'
+import { EMPTY_MONEY_FILTER, type MoneyFilter, type MoneySort } from '@/lib/money-filter-sort'
 import { BudgetSection } from '@/components/budget-section'
 import { VoiceRecorder } from '@/components/voice-recorder'
 import { ReceiptButton } from '@/components/receipt-button'
@@ -304,6 +306,8 @@ function AppPageInner() {
   const notesSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { status: pushStatus, subscribe: pushSubscribe } = usePushSubscription()
   const [showPushNudge, setShowPushNudge] = useState(false)
+  const [moneyFilter, setMoneyFilter] = useState<MoneyFilter>(EMPTY_MONEY_FILTER)
+  const [moneySort, setMoneySort] = useState<MoneySort>('date-desc')
 
   // Debounce notes search input (~150ms)
   useEffect(() => {
@@ -846,9 +850,10 @@ function AppPageInner() {
               <DigestCard userId={user.id} />
               <BudgetSection userId={user.id} />
               <div className="md:hidden">
-                <MoneyCard userId={user.id} />
+                <MoneyCard userId={user.id} onSelectCategory={(name) => setMoneyFilter(f => ({ ...f, categoryName: name }))} />
               </div>
-              <MoneyList userId={user.id} onEdit={editMoney} categorizeId={categorizeId} />
+              <MoneyControls userId={user.id} filter={moneyFilter} sort={moneySort} onFilter={setMoneyFilter} onSort={setMoneySort} />
+              <MoneyList userId={user.id} onEdit={editMoney} categorizeId={categorizeId} filter={moneyFilter} sort={moneySort} />
             </div>
           )}
           {activeTab === 'tasks' && (
@@ -888,7 +893,7 @@ function AppPageInner() {
         {/* Desktop-only sticky sidebar (right column) */}
         <aside className="hidden md:block">
           <div className="sticky top-6 flex flex-col gap-4">
-            {activeTab === 'money' && <MoneyCard userId={user.id} />}
+            {activeTab === 'money' && <MoneyCard userId={user.id} onSelectCategory={(name) => setMoneyFilter(f => ({ ...f, categoryName: name }))} />}
             {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
             {activeTab === 'learning' && <LearningSummary userId={user.id} />}
             {activeTab === 'notes' && <NotesSummary userId={user.id} />}

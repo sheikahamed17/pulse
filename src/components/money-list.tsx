@@ -9,6 +9,7 @@ import { CategoryPicker } from '@/components/category-picker'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
+import { useAllCategories } from '@/hooks/use-all-categories'
 import { useUndo } from '@/components/undo-provider'
 import { resurrectPayload } from '@/lib/undo-delete'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
@@ -17,13 +18,17 @@ import { currencySymbol } from '@/lib/currency'
 import { convertViaRates } from '@/lib/fx'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { EntryTimestamp } from '@/components/entry-timestamp'
+import { filterSortMoney } from '@/lib/money-filter-sort'
+import { makeCategoryResolver } from '@/lib/category-resolve'
 import type { MoneyEntryRow } from '@/lib/dexie'
+import type { MoneyFilter, MoneySort } from '@/lib/money-filter-sort'
 
-type Props = { userId: string; onEdit?: (row: MoneyEntryRow) => void; categorizeId?: string | null }
+type Props = { userId: string; onEdit?: (row: MoneyEntryRow) => void; categorizeId?: string | null; filter?: MoneyFilter; sort?: MoneySort }
 
-export function MoneyList({ userId, onEdit, categorizeId }: Props) {
+export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props) {
   const entries = useMoneyEntries(userId)
   const categories = useCategories(userId)
+  const allCats = useAllCategories(userId)
   const undo = useUndo()
   const router = useRouter()
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -38,6 +43,16 @@ export function MoneyList({ userId, onEdit, categorizeId }: Props) {
     () => new Map(categories.map(c => [c.id, c])),
     [categories],
   )
+
+  const resolve = useMemo(
+    () => makeCategoryResolver(allCats.map(c => ({ id: c.id, name: c.name, icon: c.icon, kind: c.kind }))),
+    [allCats],
+  )
+
+  const shown = useMemo(() => {
+    if (!filter || !sort) return entries
+    return filterSortMoney(entries, filter, sort, resolve)
+  }, [entries, filter, sort, resolve])
 
   // Push deep-link: open a specific row's inline category picker once + scroll to it.
   useEffect(() => {
@@ -86,10 +101,14 @@ export function MoneyList({ userId, onEdit, categorizeId }: Props) {
 
   return (
     <ul className="flex flex-col gap-2">
-        {entries.length === 0 && (
-          <li className="p-4 text-sm text-muted-foreground">No entries yet. Tap the mic above (Phase 1.3) or type below.</li>
+        {shown.length === 0 && (
+          <li className="p-4 text-sm text-muted-foreground">
+            {filter && (filter.categoryName || filter.source || filter.direction || filter.from || filter.to)
+              ? 'No entries match this filter.'
+              : 'No entries yet. Tap the mic above (Phase 1.3) or type below.'}
+          </li>
         )}
-        {entries.map(e => {
+        {shown.map(e => {
           const cat = e.category_id ? categoryById.get(e.category_id) : undefined
           return (
             <li key={e.id} id={`pulse-row-${e.id}`} className="relative">
