@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { useCategories } from '@/hooks/use-categories'
 import type { MoneyEntryRow } from '@/lib/dexie'
 import type { MoneyFilter, MoneySort } from '@/lib/money-filter-sort'
+import { monthBounds } from '@/lib/money-filter-sort'
 
 type Props = {
   userId: string
@@ -21,22 +22,9 @@ export function MoneyControls({ userId, filter, sort, onFilter, onSort }: Props)
 
   const sources: Array<MoneyEntryRow['source'] | 'all'> = ['all', 'manual', 'voice', 'receipt', 'sms', 'email', 'recurring']
 
-  // Month bounds: current and previous month (same UTC logic as money-card)
-  const currentMonthBounds = useMemo(() => {
-    const now = new Date()
-    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()
-    const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString()
-    return { from, to }
-  }, [])
-
-  const previousMonthBounds = useMemo(() => {
-    const from = new Date(Date.UTC(
-      currentMonthBounds.from.split('T')[0].split('-')[0] as any,
-      parseInt(currentMonthBounds.from.split('T')[0].split('-')[1]) - 1,
-      1,
-    )).toISOString()
-    return { from, to: currentMonthBounds.from }
-  }, [currentMonthBounds])
+  // Month bounds: current and previous month (computed fresh each render; cheap and always correct)
+  const currentMonthBounds = monthBounds(Date.now(), 0)
+  const previousMonthBounds = monthBounds(Date.now(), 1)
 
   const handleDateRangeChange = (range: 'this-month' | 'last-month' | 'all') => {
     if (range === 'this-month') {

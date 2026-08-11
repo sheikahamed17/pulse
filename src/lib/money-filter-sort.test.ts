@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterSortMoney, EMPTY_MONEY_FILTER } from './money-filter-sort'
+import { filterSortMoney, EMPTY_MONEY_FILTER, monthBounds } from './money-filter-sort'
 import type { MoneyEntryRow } from '@/lib/dexie'
 
 const row = (o: Partial<MoneyEntryRow>): MoneyEntryRow => ({
@@ -110,5 +110,47 @@ describe('filterSortMoney', () => {
     const original = [...rows]
     filterSortMoney(rows, EMPTY_MONEY_FILTER, 'amount-desc', resolve)
     expect(rows).toEqual(original)
+  })
+})
+
+describe('monthBounds', () => {
+  it('computes current month bounds (monthsAgo=0)', () => {
+    // 2026-08-15 10:30:00 UTC
+    const nowMs = new Date('2026-08-15T10:30:00Z').getTime()
+    const { from, to } = monthBounds(nowMs, 0)
+    expect(from).toBe('2026-08-01T00:00:00.000Z')
+    expect(to).toBe('2026-09-01T00:00:00.000Z')
+  })
+
+  it('computes last month bounds (monthsAgo=1)', () => {
+    // 2026-08-15 10:30:00 UTC
+    const nowMs = new Date('2026-08-15T10:30:00Z').getTime()
+    const { from, to } = monthBounds(nowMs, 1)
+    expect(from).toBe('2026-07-01T00:00:00.000Z')
+    expect(to).toBe('2026-08-01T00:00:00.000Z')
+  })
+
+  it('handles year boundary: January current month', () => {
+    // 2026-01-15 10:30:00 UTC
+    const nowMs = new Date('2026-01-15T10:30:00Z').getTime()
+    const { from, to } = monthBounds(nowMs, 0)
+    expect(from).toBe('2026-01-01T00:00:00.000Z')
+    expect(to).toBe('2026-02-01T00:00:00.000Z')
+  })
+
+  it('handles year boundary: January last month (December of previous year)', () => {
+    // 2026-01-15 10:30:00 UTC - last month should be 2025-12
+    const nowMs = new Date('2026-01-15T10:30:00Z').getTime()
+    const { from, to } = monthBounds(nowMs, 1)
+    expect(from).toBe('2025-12-01T00:00:00.000Z')
+    expect(to).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('handles month before January edge case (monthsAgo=2 in January)', () => {
+    // 2026-01-15 10:30:00 UTC - 2 months ago = 2025-11
+    const nowMs = new Date('2026-01-15T10:30:00Z').getTime()
+    const { from, to } = monthBounds(nowMs, 2)
+    expect(from).toBe('2025-11-01T00:00:00.000Z')
+    expect(to).toBe('2025-12-01T00:00:00.000Z')
   })
 })

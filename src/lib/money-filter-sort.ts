@@ -2,6 +2,18 @@ import type { MoneyEntryRow } from '@/lib/dexie'
 
 export type MoneySort = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
 
+/** Compute month bounds using UTC date math.
+ *  monthsAgo=0 → current month; monthsAgo=1 → last month; etc.
+ *  Returns { from, to } ISO strings for the 1st day of each boundary month at 00:00:00 UTC.
+ *  Handles year underflow correctly via Date.UTC (negative months roll back years).
+ */
+export function monthBounds(nowMs: number, monthsAgo: number): { from: string; to: string } {
+  const d = new Date(nowMs)
+  const from = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - monthsAgo, 1)).toISOString()
+  const to = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - monthsAgo + 1, 1)).toISOString()
+  return { from, to }
+}
+
 export type MoneyFilter = {
   categoryName: string | null
   source: MoneyEntryRow['source'] | null
