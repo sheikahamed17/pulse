@@ -73,7 +73,7 @@ export function MoversBars({ movers, symbol, jpy, limit = 8 }: MoversBarsProps) 
                   <td className="py-2 px-2 text-right font-mono text-foreground">{formatSigned(m.delta)}</td>
                   <td
                     className="py-2 px-2 text-right font-mono"
-                    style={{ color: m.deltaPct === null ? '#999' : m.delta > 0 ? DIVERGING.negative : DIVERGING.positive }}
+                    style={{ color: m.deltaPct === null ? DIVERGING.neutral : m.delta > 0 ? DIVERGING.negative : DIVERGING.positive }}
                   >
                     {m.deltaPct === null ? '−' : `${m.delta > 0 ? '+' : ''}${m.deltaPct.toFixed(1)}%`}
                   </td>
@@ -141,7 +141,7 @@ export function MoversBars({ movers, symbol, jpy, limit = 8 }: MoversBarsProps) 
                   y={y}
                   textAnchor="start"
                   className="text-xs font-mono"
-                  style={{ fill: m.deltaPct === null ? '#999' : 'inherit' }}
+                  style={{ fill: m.deltaPct === null ? DIVERGING.neutral : 'inherit' }}
                   dy="0.3em"
                 >
                   ({m.deltaPct === null ? '−' : `${m.delta > 0 ? '+' : ''}${m.deltaPct.toFixed(1)}%`})

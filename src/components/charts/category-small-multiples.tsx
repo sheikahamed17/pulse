@@ -142,7 +142,7 @@ export function CategorySmallMultiples({ series, periods, symbol, jpy }: Categor
                           y={barY}
                           width={barWidth}
                           height={barHeight}
-                          rx="2"
+                          rx="4"
                           fill={color}
                           opacity="0.85"
                         >
