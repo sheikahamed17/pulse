@@ -7,6 +7,12 @@ const money = (o: Partial<MoneyEntryRow>): MoneyEntryRow => ({
   description: null, occurred_at: '', source: 'manual', receipt_key: null, raw_input: null,
   recurring_rule_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...o,
 })
+const recurring = (o: Partial<RecurringRuleRow>): RecurringRuleRow => ({
+  id: 'r', user_id: 'u', amount: 100, currency: 'INR', direction: 'out', category_id: null,
+  description: null, period: 'monthly', interval_count: 1, anchor_at: '', next_due_at: '',
+  end_condition_kind: 'never', end_until: null, end_count: null, occurrences_so_far: 0, is_active: 1,
+  field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...o,
+})
 const budget = (o: Partial<BudgetRow>): BudgetRow => ({
   id: 'b', user_id: 'u', category_id: 'b', amount: 0, currency: 'INR',
   field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...o,
@@ -21,6 +27,14 @@ describe('planCategoryMerge', () => {
     const moneyOps = ops.filter(o => o.entity_kind === 'money')
     expect(moneyOps.map(o => o.entity_id).sort()).toEqual(['m1', 'm3'])
     expect(moneyOps.every(o => o.op_type === 'update' && o.entity_kind === 'money' && o.payload.category_id === 'tgt')).toBe(true)
+  })
+  it('remaps recurring rules from source to target', () => {
+    const ops = planCategoryMerge('src', 'tgt', { ...EMPTY, recurring: [
+      recurring({ id: 'r1', category_id: 'src' }), recurring({ id: 'r2', category_id: 'other' }), recurring({ id: 'r3', category_id: 'src' }),
+    ]})
+    const recurOps = ops.filter(o => o.entity_kind === 'recurring')
+    expect(recurOps.map(o => o.entity_id).sort()).toEqual(['r1', 'r3'])
+    expect(recurOps.every(o => o.op_type === 'update' && o.entity_kind === 'recurring' && o.payload.category_id === 'tgt')).toBe(true)
   })
   it('folds budgets keeping the higher cap and tombstones the source budget', () => {
     // source budget 500, target budget 300 → target ends at 500, source deleted
