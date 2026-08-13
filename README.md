@@ -30,6 +30,7 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 - 🔐 **Passkey (Face ID) sign-in** — plus a local PIN lock and a durable session; magic-link fallback.
 - 📈 **Weekly AI digests** — a browsable history of auto-generated summaries of your week.
 - 🏦 **Bank-transaction auto-import** — forward your bank's alert emails and they land as categorized entries, hands-free.
+- 📊 **Spending trends** — a dedicated analytics view: spend / income / net over time, top movers, and per-category small multiples.
 - 📲 **Installable PWA** — add to home screen; push notifications for budget alerts and follow-ups.
 
 ## Features
@@ -52,6 +53,11 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 - **Manual add** on any tab, with back-dating for money entries.
 - **Categorize-on-ingest.** Auto-imported transactions arrive with a one-tap category picker and a push notification.
 - **Email auto-ingest.** A Gmail filter + a tiny Google Apps Script forwards bank alerts to your instance — the only truly hands-off path on iOS.
+
+### Organize & analyze
+- **Category management.** Rename, set icons, archive/restore, and **merge duplicates** (reassigning their entries) in Settings → Categories.
+- **Filter, sort & timestamps.** Every list filters and sorts (money by category / source / direction / date range, or by amount); every entry shows when it's from.
+- **Analytics** (`/analytics`). Spend trend, income vs spend + net, top movers, and per-category small multiples over the last weeks/months — inline SVG on a colorblind-validated palette.
 
 ## How it works
 
@@ -87,7 +93,12 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 
 Pulse is **single-user by design** — you deploy your **own** copy (your data, your API keys, your free-tier quota, fully isolated). Everything you need has a free tier.
 
-👉 **[SELF-HOSTING.md](./SELF-HOSTING.md)** — clone → create D1 + R2 → apply migrations → set secrets → `wrangler deploy`. About 20 minutes.
+**Two ways to stand up your own instance:**
+
+- **A · Let Claude Code do it.** Open this repo in [Claude Code](https://claude.com/claude-code) and ask it to *"set up this project for me."* It reads [`CLAUDE.md`](./CLAUDE.md) — the project's instructions for AI agents — and walks you through creating your Cloudflare / Groq / Resend resources, applying migrations, setting secrets, and deploying.
+- **B · Do it by hand.** Follow **[SELF-HOSTING.md](./SELF-HOSTING.md)**: clone → create D1 + R2 → apply migrations → set secrets → `wrangler deploy`. ~20 minutes.
+
+Either way you sign in with your **Resend-account email** (the free sandbox sender only mails you) — no custom domain needed.
 
 ### Install it
 
@@ -111,7 +122,7 @@ pnpm cf:preview   # build + run the Worker locally
 
 ```
 src/
-  app/            # Next App Router — routes, API handlers, pages (/app, /insights, /settings/*)
+  app/            # Next App Router — routes, API handlers, pages (/app, /analytics, /insights, /settings/*)
   lib/            # sync engine, agents, ingest, auth/email, pure helpers (unit-tested)
   components/     # UI: capture chips, domain lists, answer cards, charts
 migrations/       # D1 schema, applied in order 0001 → 0014
