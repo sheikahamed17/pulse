@@ -4,6 +4,15 @@ import { useMemo, useState } from 'react'
 import type { CategorySeries, Period } from '@/lib/analytics'
 import { CATEGORICAL, DIVERGING } from '@/lib/chart-palette'
 
+// Color follows the ENTITY, not its rank: hash the (stable) category name to a
+// fixed CATEGORICAL slot so a category keeps its hue when its rank changes
+// (e.g. on the week/month toggle). "Other" is always the neutral gray.
+function categoricalColor(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0
+  return CATEGORICAL[Math.abs(h) % CATEGORICAL.length]
+}
+
 interface CategorySmallMultiplesProps {
   series: CategorySeries[]
   periods: Period[]
@@ -103,8 +112,8 @@ export function CategorySmallMultiples({ series, periods, symbol, jpy }: Categor
       ) : (
         <div className="overflow-x-auto">
           <div className="grid gap-4 min-w-min" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(140px, 1fr))` }}>
-            {series.map((s, seriesIdx) => {
-              const color = s.name === 'Other' ? DIVERGING.neutral : CATEGORICAL[seriesIdx % CATEGORICAL.length]
+            {series.map((s) => {
+              const color = s.name === 'Other' ? DIVERGING.neutral : categoricalColor(s.name)
               const seriesTotal = s.points.reduce((sum, p) => sum + p, 0)
 
               return (
