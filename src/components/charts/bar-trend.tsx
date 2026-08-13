@@ -102,7 +102,7 @@ export function BarTrend({ data, symbol, jpy, label }: BarTrendProps) {
                   y={y}
                   width={barWidth}
                   height={barHeight}
-                  rx="2"
+                  rx="4"
                   fill={SEQUENTIAL_HUE}
                   opacity={isLatest ? 1 : 0.75}
                   className="transition-opacity"

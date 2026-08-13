@@ -14,6 +14,10 @@ export const DIVERGING = {
   neutral: '#383835', // gray midpoint
 }
 
+/** Series colors for dual-series charts (not in CATEGORICAL, reserved for small multiples) */
+export const SPEND_COLOR = '#e66767' // critical red, matches DIVERGING.negative
+export const INCOME_COLOR = '#34dcef' // cyan, distinct from spend and CATEGORICAL hues
+
 /**
  * Categorical colors (fixed order, CVD-safe adjacent pairs).
  * Used in fixed index order for identity consistency.

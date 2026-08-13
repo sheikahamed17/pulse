@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { DIVERGING, CATEGORICAL } from '@/lib/chart-palette'
+import { DIVERGING, SPEND_COLOR, INCOME_COLOR } from '@/lib/chart-palette'
 
 interface DualSeriesTrendProps {
   spend: { label: string; amount: number }[]
@@ -62,9 +62,6 @@ export function DualSeriesTrend({ spend, income, symbol, jpy }: DualSeriesTrendP
     )
   }
 
-  const spendColor = CATEGORICAL[1] // orange
-  const incomeColor = CATEGORICAL[3] // yellow (use distinct hue, not categorical cycling)
-
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
@@ -80,11 +77,11 @@ export function DualSeriesTrend({ spend, income, symbol, jpy }: DualSeriesTrendP
       {/* Legend */}
       <div className="flex gap-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: spendColor }} />
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: SPEND_COLOR }} />
           <span className="text-muted-foreground">Spend</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: incomeColor }} />
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: INCOME_COLOR }} />
           <span className="text-muted-foreground">Income</span>
         </div>
       </div>
@@ -174,8 +171,8 @@ export function DualSeriesTrend({ spend, income, symbol, jpy }: DualSeriesTrendP
                   y={spendY}
                   width={barWidth}
                   height={spendHeight}
-                  rx="2"
-                  fill={spendColor}
+                  rx="4"
+                  fill={SPEND_COLOR}
                   opacity="0.9"
                 >
                   <title>{`${p.label} Spend: ${formatAmount(p.spend)}`}</title>
@@ -187,8 +184,8 @@ export function DualSeriesTrend({ spend, income, symbol, jpy }: DualSeriesTrendP
                   y={incomeY}
                   width={barWidth}
                   height={incomeHeight}
-                  rx="2"
-                  fill={incomeColor}
+                  rx="4"
+                  fill={INCOME_COLOR}
                   opacity="0.9"
                 >
                   <title>{`${p.label} Income: ${formatAmount(p.income)}`}</title>
@@ -212,7 +209,7 @@ export function DualSeriesTrend({ spend, income, symbol, jpy }: DualSeriesTrendP
                     className="text-xs font-mono fill-muted-foreground"
                     dy="0.3em"
                   >
-                    {netSign}{(net / (jpy ? 1 : 100)).toLocaleString('en-US', { maximumFractionDigits: jpy ? 0 : 0 })}
+                    {netSign}{(net / (jpy ? 1 : 100)).toLocaleString('en-US', { maximumFractionDigits: jpy ? 0 : 2 })}
                   </text>
                 </g>
 
