@@ -22,6 +22,7 @@ export default function CategoriesPage() {
   const [mergingId, setMergingId] = useState<string | null>(null)
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null)
   const [mergeResult, setMergeResult] = useState<{ targetName: string; movedCount: number } | null>(null)
+  const [isMerging, setIsMerging] = useState(false)
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -37,6 +38,7 @@ export default function CategoriesPage() {
 
   async function doMerge(sourceId: string, targetId: string) {
     if (!userId) return
+    setIsMerging(true)
     try {
       const [m, r, b] = await Promise.all([
         db.money_entries.where('user_id').equals(userId).toArray(),
@@ -61,6 +63,8 @@ export default function CategoriesPage() {
       setTimeout(() => setMergeResult(null), 3000)
     } catch (err) {
       console.error('merge', err)
+    } finally {
+      setIsMerging(false)
     }
   }
 
@@ -149,6 +153,7 @@ export default function CategoriesPage() {
           onMergeChange={setMergingId}
           onMergeTargetChange={setMergeTargetId}
           onMergeConfirm={doMerge}
+          isMerging={isMerging}
         />
         <CategorySection
           title="Income"
@@ -161,6 +166,7 @@ export default function CategoriesPage() {
           onMergeChange={setMergingId}
           onMergeTargetChange={setMergeTargetId}
           onMergeConfirm={doMerge}
+          isMerging={isMerging}
         />
 
         {archived.length > 0 && (
@@ -182,6 +188,7 @@ function CategorySection({
   onMergeChange,
   onMergeTargetChange,
   onMergeConfirm,
+  isMerging,
 }: {
   title: string
   categories: ReturnType<typeof useCategories>
@@ -193,6 +200,7 @@ function CategorySection({
   onMergeChange: (id: string | null) => void
   onMergeTargetChange: (id: string | null) => void
   onMergeConfirm: (sourceId: string, targetId: string) => void
+  isMerging: boolean
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
@@ -284,8 +292,7 @@ function CategorySection({
                       .filter(cat => cat.id !== c.id)
                       .map(cat => (
                         <option key={cat.id} value={cat.id}>
-                          {cat.icon && <span>{cat.icon} </span>}
-                          {cat.name}
+                          {cat.icon ? `${cat.icon} ${cat.name}` : cat.name}
                         </option>
                       ))}
                   </select>
@@ -293,10 +300,10 @@ function CategorySection({
                     <Button
                       size="sm"
                       onClick={() => onMergeConfirm(c.id, mergeTargetId ?? '')}
-                      disabled={!mergeTargetId}
+                      disabled={!mergeTargetId || isMerging}
                       className="flex-1"
                     >
-                      Confirm
+                      {isMerging ? 'Merging…' : 'Confirm'}
                     </Button>
                     <Button
                       size="sm"
