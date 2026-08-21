@@ -84,6 +84,10 @@ export function AccountsWidget({ userId }: Props) {
   const fmt = (amt: number) =>
     (amt / (prefs.primary_currency === 'JPY' ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })
   const symbol = currencySymbol(prefs.primary_currency)
+  // Per-account rows are in each account's OWN currency (netWorth keeps them
+  // unconverted); format with that account's symbol/divisor, not the primary's.
+  const fmtIn = (amt: number, cur: string) =>
+    `${currencySymbol(cur)}${(amt / (cur === 'JPY' ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,8 +112,7 @@ export function AccountsWidget({ userId }: Props) {
                 <span>{acct.name}</span>
               </div>
               <span className="font-mono">
-                {symbol}
-                {fmt(nw.perAccount.find(a => a.id === acct.id)?.balance ?? 0)}
+                {fmtIn(acct.balance, acct.currency)}
               </span>
             </div>
           ))}
@@ -129,8 +132,7 @@ export function AccountsWidget({ userId }: Props) {
                     <span>{acct.name}</span>
                   </div>
                   <span className="font-mono">
-                    {symbol}
-                    {fmt(nw.perAccount.find(a => a.id === acct.id)?.balance ?? 0)}
+                    {fmtIn(acct.balance, acct.currency)}
                   </span>
                 </div>
               ))}

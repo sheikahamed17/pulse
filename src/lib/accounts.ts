@@ -19,6 +19,7 @@ export type NetWorth = {
     type: 'asset' | 'liability'
     icon: string | null
     balance: number
+    currency: string
   }[]
 }
 
@@ -119,10 +120,8 @@ export function netWorth(
 
   const net = assets - liabilities
 
-  return {
-    net,
-    assets,
-    liabilities,
-    perAccount: perAccount.map(({ currency: _currency, ...rest }) => rest),
-  }
+  // perAccount balances stay in each account's OWN currency (the widget formats
+  // each row with that account's symbol/divisor); only the assets/liabilities/net
+  // totals are converted to the primary currency above.
+  return { net, assets, liabilities, perAccount }
 }
