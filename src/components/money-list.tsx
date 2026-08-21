@@ -10,6 +10,7 @@ import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useCategories } from '@/hooks/use-categories'
 import { useAllCategories } from '@/hooks/use-all-categories'
+import { useAllAccounts } from '@/hooks/use-all-accounts'
 import { useUndo } from '@/components/undo-provider'
 import { resurrectPayload } from '@/lib/undo-delete'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
@@ -30,6 +31,7 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
   const entries = useMoneyEntries(userId)
   const categories = useCategories(userId)
   const allCats = useAllCategories(userId)
+  const allAccounts = useAllAccounts(userId)
   const undo = useUndo()
   const router = useRouter()
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -43,6 +45,11 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
   const categoryById = useMemo(
     () => new Map(categories.map(c => [c.id, c])),
     [categories],
+  )
+
+  const accountById = useMemo(
+    () => new Map(allAccounts.map(a => [a.id, a])),
+    [allAccounts],
   )
 
   const resolve = useMemo(
@@ -111,6 +118,8 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
         )}
         {shown.map(e => {
           const cat = e.category_id ? categoryById.get(e.category_id) : undefined
+          const acc = e.account_id ? accountById.get(e.account_id) : undefined
+          const accName = acc ? (acc.icon ? `${acc.icon} ${acc.name}` : acc.name) : (e.account_id ? 'Unknown account' : null)
           return (
             <li key={e.id} id={`pulse-row-${e.id}`} className="relative">
               <SwipeRow
@@ -122,12 +131,19 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
                 className="glass-soft flex items-start justify-between gap-3 rounded-2xl p-3 text-sm transition-colors hover:bg-white/8"
               >
                 <div className="flex flex-col flex-1 min-w-0">
-                  {cat && (
-                    <div className="mb-1.5 inline-flex w-fit items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs">
-                      <span>{cat.icon ?? ''}</span>
-                      <span className="text-muted-foreground">{cat.name}</span>
-                    </div>
-                  )}
+                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5 w-fit">
+                    {cat && (
+                      <div className="inline-flex items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs">
+                        <span>{cat.icon ?? ''}</span>
+                        <span className="text-muted-foreground">{cat.name}</span>
+                      </div>
+                    )}
+                    {accName && (
+                      <div className="inline-flex items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs">
+                        <span className="text-muted-foreground">{accName}</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="text-sm md:text-base font-medium text-foreground">
                     {e.description || e.merchant || (cat ? cat.name : 'Uncategorized')}
                   </div>

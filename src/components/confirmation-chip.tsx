@@ -14,6 +14,7 @@ import { currencySymbol } from '@/lib/currency'
 import { formatLocalDateTime } from '@/lib/format'
 import { parseAmountInput } from '@/lib/parse-amount'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
+import { useAccounts } from '@/hooks/use-accounts'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 import type { TaskPayload } from '@/lib/op-schemas/task'
 import type { LearningPayload } from '@/lib/op-schemas/learning'
@@ -21,7 +22,7 @@ import type { NotePayload } from '@/lib/op-schemas/note'
 import type { CategoryRow } from '@/lib/dexie'
 
 export type ChipDraft =
-  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; draftId?: string; merchant?: string | null; tags?: string[] })
+  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; draftId?: string; merchant?: string | null; tags?: string[]; account_id?: string | null })
   | (TaskPayload & { kind: 'task' })
   | (LearningPayload & { kind: 'learning' })
   | (NotePayload & { kind: 'note' })
@@ -61,13 +62,14 @@ function ConfirmationChipMoney({
   mode,
 }: {
   userId: string
-  draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[] }
+  draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[]; account_id?: string | null }
   categoryById: Map<string, CategoryRow>
   onConfirm: Props['onConfirm']
   onCancel: () => void
   mode: 'create' | 'edit'
 }) {
-  const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[] }>(draft)
+  const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[]; account_id?: string | null }>(draft)
+  const accounts = useAccounts(userId)
   const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category' | 'date' | 'merchant'>(draft.amount === 0 ? 'amount' : null)
   const [newTag, setNewTag] = useState('')
   const [makeRecurring, setMakeRecurring] = useState(false)
@@ -202,6 +204,22 @@ function ConfirmationChipMoney({
         <Input value={newTag} onChange={e => setNewTag(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const trimmed = newTag.trim(); if (trimmed && !(d.tags ?? []).includes(trimmed) && (d.tags ?? []).length < 20) { setD(s => ({ ...s, tags: [...(s.tags ?? []), trimmed] })); setNewTag('') } } }}
           placeholder="add tag…" aria-label="Add money tag" className="h-7 text-xs max-w-[100px]" />
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <select
+          value={d.account_id ?? ''}
+          onChange={(e) => setD(s => ({ ...s, account_id: e.target.value || null }))}
+          className="rounded-md border bg-muted px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+          aria-label="Account"
+        >
+          <option value="">No account</option>
+          {accounts.map(acc => (
+            <option key={acc.id} value={acc.id}>
+              {acc.icon ? `${acc.icon} ${acc.name}` : acc.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
