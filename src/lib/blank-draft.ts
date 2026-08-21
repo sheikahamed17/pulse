@@ -16,6 +16,6 @@ export function blankDraftForKind(
       return { kind: 'note', body: '', title: null, tags: [], occurred_at: nowIso, source: 'manual' }
     case 'money':
     default:
-      return { kind: 'money', amount: 0, currency: primaryCurrency as Currency, direction: 'out', category_id: null, description: null, occurred_at: nowIso, source: 'manual', raw_input: null, merchant: null, tags: [] }
+      return { kind: 'money', amount: 0, currency: primaryCurrency as Currency, direction: 'out', category_id: null, description: null, occurred_at: nowIso, source: 'manual', raw_input: null, merchant: null, tags: [], account_id: null }
   }
 }

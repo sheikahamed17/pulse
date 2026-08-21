@@ -8,7 +8,7 @@ const payload = (over: Partial<MoneyPayload> = {}): MoneyPayload => ({
   amount: 45000, currency: 'INR', direction: 'out',
   category_id: null, description: 'Starbucks',
   occurred_at: '2026-07-21T10:00:00.000Z', source: 'receipt',
-  receipt_key: 'u1/abc.jpg', raw_input: '<receipt> Starbucks', ...over,
+  receipt_key: 'u1/abc.jpg', raw_input: '<receipt> Starbucks', account_id: null, ...over,
 })
 
 const row = (id: string, created_at: string, over: Partial<MoneyPayload> = {}): ReceiptDraftRow => ({

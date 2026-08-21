@@ -9,7 +9,7 @@ const budget = (over: Partial<BudgetRow> = {}): BudgetRow => ({
 const money = (over: Partial<MoneyEntryRow> = {}): MoneyEntryRow => ({
   id: crypto.randomUUID(), user_id: 'u1', amount: 10000, currency: 'INR', direction: 'out',
   category_id: 'cat-1', description: null, occurred_at: '2026-07-10T06:00:00.000Z',
-  source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
+  source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], account_id: null,
   field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
   ...over,
 } as MoneyEntryRow)

@@ -522,7 +522,7 @@ function AppPageInner() {
     switch (final.kind) {
       case 'money':
         entity_kind = 'money'
-        payload = { amount: final.amount, currency: final.currency, direction: final.direction, category_id: final.category_id ?? null, description: final.description ?? null, merchant: final.merchant ?? null, tags: final.tags ?? [], occurred_at: final.occurred_at }
+        payload = { amount: final.amount, currency: final.currency, direction: final.direction, category_id: final.category_id ?? null, description: final.description ?? null, merchant: final.merchant ?? null, tags: final.tags ?? [], occurred_at: final.occurred_at, account_id: final.account_id ?? null }
         break
       case 'task':
         entity_kind = 'task'
@@ -685,6 +685,7 @@ function AppPageInner() {
         raw_input: final.raw_input ?? null,
         recurring_rule_id: ruleId,
         receipt_key: final.receipt_key ?? null,
+        account_id: final.account_id ?? null,
       },
       user_id: user.id,
     })

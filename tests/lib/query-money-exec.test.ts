@@ -40,14 +40,14 @@ describe('computeMoneyBreakdown', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: 'cat-food', description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 5000, currency: 'USD', direction: 'in',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -62,21 +62,21 @@ describe('computeMoneyBreakdown', () => {
         id: '1', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out',
         category_id: 'cat-food', description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: 'cat-transport', description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '3', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: 'cat-food', description: null, occurred_at: '2026-01-02T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -92,14 +92,14 @@ describe('computeMoneyBreakdown', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: 'cat-food', description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out',
         category_id: 'cat-food', description: null, occurred_at: '2026-01-02T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -115,7 +115,7 @@ describe('computeMoneyBreakdown', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -127,8 +127,8 @@ describe('computeMoneyBreakdown', () => {
 
   it('merges buckets that resolve to the same name (dupe/tombstoned ids)', () => {
     const entries: MoneyEntryRow[] = [
-      { id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out', category_id: 'cat-food', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
-      { id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out', category_id: 'cat-food-old', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+      { id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out', category_id: 'cat-food', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], account_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+      { id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out', category_id: 'cat-food-old', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], account_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
     ]
     const nameOf = (id: string | null) => (id === 'cat-food' || id === 'cat-food-old' ? 'Food' : null)
     const result = computeMoneyBreakdown(entries, { direction: 'out', categoryNameOf: nameOf }, toPrimary)
@@ -138,8 +138,8 @@ describe('computeMoneyBreakdown', () => {
 
   it('keeps a single Uncategorized bucket for null/unresolved ids', () => {
     const entries: MoneyEntryRow[] = [
-      { id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out', category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
-      { id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out', category_id: 'ghost', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+      { id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out', category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], account_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
+      { id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out', category_id: 'ghost', description: null, occurred_at: '2026-01-01T00:00:00Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [], account_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '' },
     ]
     const nameOf = () => null
     const result = computeMoneyBreakdown(entries, { direction: 'out', categoryNameOf: nameOf }, toPrimary)
@@ -160,7 +160,7 @@ describe('computeMoneyDelta', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -176,7 +176,7 @@ describe('computeMoneyDelta', () => {
         id: '1', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -185,7 +185,7 @@ describe('computeMoneyDelta', () => {
         id: '2', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2025-12-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -201,7 +201,7 @@ describe('computeMoneyDelta', () => {
         id: '1', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -210,7 +210,7 @@ describe('computeMoneyDelta', () => {
         id: '2', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2025-12-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -226,14 +226,14 @@ describe('computeMoneyDelta', () => {
         id: '1', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '3', user_id: 'user1', amount: 5000, currency: 'USD', direction: 'in',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -242,7 +242,7 @@ describe('computeMoneyDelta', () => {
         id: '2', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2025-12-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -266,21 +266,21 @@ describe('computeMoneySeries', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T10:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 500, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T15:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '3', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-02T10:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -299,14 +299,14 @@ describe('computeMoneySeries', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-08T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -323,14 +323,14 @@ describe('computeMoneySeries', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-15T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-02-15T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -348,14 +348,14 @@ describe('computeMoneySeries', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 5000, currency: 'USD', direction: 'in',
         category_id: null, description: null, occurred_at: '2026-01-01T00:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -370,14 +370,14 @@ describe('computeMoneySeries', () => {
         id: '1', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2025-12-31T23:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
       {
         id: '2', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-01-02T01:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -445,7 +445,7 @@ describe('deltaFetchRange with computeMoneyDelta integration', () => {
         id: '1', user_id: 'user1', amount: 2000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-08-15T10:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]
@@ -454,7 +454,7 @@ describe('deltaFetchRange with computeMoneyDelta integration', () => {
         id: '2', user_id: 'user1', amount: 1000, currency: 'USD', direction: 'out',
         category_id: null, description: null, occurred_at: '2026-07-15T10:00:00Z',
         source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null,
-        merchant: null, tags: [],
+        merchant: null, tags: [], account_id: null,
         field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '',
       },
     ]

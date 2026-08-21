@@ -108,6 +108,7 @@ export type MoneyEntryRow = {
   recurring_rule_id: string | null
   merchant: string | null
   tags: string[]
+  account_id: string | null
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string
@@ -175,6 +176,21 @@ export type BudgetRow = {
   updated_at: string
 }
 
+export type AccountRow = {
+  id: string
+  user_id: string
+  name: string
+  type: 'asset' | 'liability'
+  opening_balance: number         // minor units, account currency
+  currency: string
+  icon: string | null
+  is_archived: number
+  field_hlcs: Record<string, string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ProjectRow = {
   id: string
   user_id: string
@@ -209,6 +225,7 @@ class PulseDb extends Dexie {
   learning_entries!: EntityTable<LearningRow, 'id'>
   note_entries!: EntityTable<NoteRow, 'id'>
   budgets!: EntityTable<BudgetRow, 'id'>
+  accounts!: EntityTable<AccountRow, 'id'>
   receipt_drafts!: EntityTable<ReceiptDraftRow, 'id'>
   projects!: EntityTable<ProjectRow, 'id'>
   fx_rates!: Table<FxRateRow>
@@ -249,6 +266,9 @@ class PulseDb extends Dexie {
     this.version(9).stores({
       projects: 'id, user_id',
     })
+    this.version(10).stores({
+      accounts: 'id, user_id, [user_id+type]',
+    })
   }
 }
 
@@ -268,6 +288,7 @@ export async function resetDb() {
   await db.learning_entries.clear()
   await db.note_entries.clear()
   await db.budgets.clear()
+  await db.accounts.clear()
   await db.projects.clear()
   await db.receipt_drafts.clear()
   await db.fx_rates.clear()

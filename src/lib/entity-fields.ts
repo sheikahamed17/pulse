@@ -1,7 +1,7 @@
 export const MONEY_FIELDS = [
   'amount', 'currency', 'direction', 'category_id', 'description',
   'occurred_at', 'source', 'receipt_key', 'raw_input', 'recurring_rule_id',
-  'merchant', 'tags',
+  'merchant', 'tags', 'account_id',
 ] as const
 
 export const RECURRING_FIELDS = [
@@ -31,6 +31,10 @@ export const NOTE_FIELDS = [
 
 export const INSIGHT_FIELDS = [
   'period', 'starts_at', 'ends_at', 'summary', 'metrics',
+] as const
+
+export const ACCOUNT_FIELDS = [
+  'name', 'type', 'opening_balance', 'currency', 'icon', 'is_archived',
 ] as const
 
 export const BUDGET_FIELDS = [

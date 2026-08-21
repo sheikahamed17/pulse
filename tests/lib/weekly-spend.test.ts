@@ -7,7 +7,7 @@ const NOW = '2026-07-23T12:00:00.000Z'
 const e = (over: Partial<MoneyEntryRow>): MoneyEntryRow => ({
   id: 'x', user_id: 'u', amount: 0, currency: 'INR', direction: 'out', category_id: null,
   description: null, occurred_at: NOW, source: 'manual', receipt_key: null, raw_input: null,
-  recurring_rule_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...over,
+  recurring_rule_id: null, merchant: null, tags: [], account_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...over,
 } as any)
 
 function bars(entries: MoneyEntryRow[]) {
