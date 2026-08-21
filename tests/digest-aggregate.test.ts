@@ -17,12 +17,14 @@ function makeFakeDb(rowsByTable: Record<string, unknown[]>): Kysely<DB> {
         },
         selectAll: () => ({
           execute: async () => {
-            return data.filter((row: any) => {
+            return data.filter((row) => {
+              const r = row as Record<string, unknown>
               for (const { col, op, val } of filters) {
-                if (op === '>=' && (row as Record<string, unknown>)[col] < val) return false
-                if (op === '<' && (row as Record<string, unknown>)[col] >= val) return false
-                if (op === 'is' && val === null && (row as Record<string, unknown>)[col] !== null) return false
-                if (op === '=' && (row as Record<string, unknown>)[col] !== val) return false
+                const cell = r[col]
+                if (op === '>=' && (cell as string) < (val as string)) return false
+                if (op === '<' && (cell as string) >= (val as string)) return false
+                if (op === 'is' && val === null && cell !== null) return false
+                if (op === '=' && cell !== val) return false
               }
               return true
             })

@@ -11,7 +11,7 @@ vi.mock('@/lib/materialize', () => ({ materializeRow }))
 
 const opInserts: any[] = []
 const fakeDb = {
-  insertInto: () => ({ values: (v: any) => ({ execute: async () => { opInserts.push(v) } }) }),
+  insertInto: () => ({ values: (v: any) => ({ onConflict: () => ({ execute: async () => { opInserts.push(v) } }), execute: async () => { opInserts.push(v) } }) }),
   selectFrom: () => ({ where: function () { return this }, selectAll: function () { return this }, select: function () { return this }, executeTakeFirst: async () => ({ id: 'insight-u1-2026-07-19', summary: 'S', metrics: '{}' }) }),
 } as any
 
