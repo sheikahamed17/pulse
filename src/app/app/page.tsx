@@ -57,6 +57,7 @@ import { blankDraftForKind } from '@/lib/blank-draft'
 import { UndoProvider } from '@/components/undo-provider'
 import { GlobalSearch } from '@/components/global-search'
 import { TodayNudge } from '@/components/today-nudge'
+import { HelpCard } from '@/components/help-card'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { runCategoryDedupeOnce } from '@/lib/dedupe-categories-migration'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
@@ -270,6 +271,7 @@ function AppPageInner() {
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null)
   const [querySource, setQuerySource] = useState<'voice' | 'text' | null>(null)
   const [parsing, setParsing] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [activeTab, setTab] = useTabState()
   const { prefs } = useUserPrefs()
   const searchParams = useSearchParams()
@@ -462,6 +464,12 @@ function AppPageInner() {
       })
       if (!res.ok) throw new Error(`/api/agent ${res.status}`)
       const data = await res.json() as { intent: string; payload: ChipDraft | QueryPlan | null }
+
+      if (data.intent === 'chat') {
+        setShowHelp(true)
+        setText('')
+        return
+      }
 
       if (!data.payload) {
         setText('')
@@ -712,8 +720,10 @@ function AppPageInner() {
             <div className="flex items-center gap-2">
               <VoiceRecorder
                 disabled={draft !== null || parsing || queryPlan !== null}
-                onParsed={(payload, transcript) => {
-                  if (!payload) {
+                onParsed={(payload, transcript, intent) => {
+                  if (intent === 'chat') {
+                    setShowHelp(true)
+                  } else if (!payload) {
                     setDraft({
                       kind: 'money',
                       amount: 0, currency: 'INR', direction: 'out',
@@ -746,6 +756,16 @@ function AppPageInner() {
                 }}
               >
                 + Add
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-label="What can I do?"
+                disabled={draft !== null || parsing || queryPlan !== null}
+                onClick={() => setShowHelp(true)}
+              >
+                ?
               </Button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); parseText() }} className="flex flex-1 gap-2 ml-2">
@@ -810,6 +830,16 @@ function AppPageInner() {
               plan={queryPlan}
               onResult={handleAnswerResult}
               onDismiss={dismissQuery}
+            />
+          )}
+
+          {showHelp && !draft && !queryPlan && (
+            <HelpCard
+              onPick={(p) => {
+                setShowHelp(false)
+                setText(p)
+              }}
+              onDismiss={() => setShowHelp(false)}
             />
           )}
 

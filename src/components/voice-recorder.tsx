@@ -7,7 +7,7 @@ import { enqueueVoice } from '@/lib/voice-queue'
 import { pickAudioMime } from '@/lib/audio-format'
 
 type Props = {
-  onParsed: (payload: unknown, transcript: string) => void
+  onParsed: (payload: unknown, transcript: string, intent?: string) => void
   disabled?: boolean
 }
 
@@ -83,7 +83,7 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
     })
 
     if (final) {
-      onParsed(final.payload, final.transcript)
+      onParsed(final.payload, final.transcript, final.intent)
       setState('idle')
       setTranscript(null)
       return
