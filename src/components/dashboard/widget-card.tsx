@@ -5,6 +5,7 @@ import { BudgetSection } from '@/components/budget-section'
 import { TodayTasksWidget } from '@/components/dashboard/today-tasks-widget'
 import { SpendTrendWidget } from '@/components/dashboard/spend-trend-widget'
 import { RecentActivityWidget } from '@/components/dashboard/recent-activity-widget'
+import { AccountsWidget } from '@/components/dashboard/accounts-widget'
 import type { WidgetType } from '@/lib/widgets'
 
 type Props = {
@@ -55,6 +56,14 @@ export function WidgetCard({ type, userId }: Props) {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent Activity</h3>
         </div>
         <RecentActivityWidget userId={userId} />
+      </section>
+    )
+  }
+
+  if (type === 'accounts') {
+    return (
+      <section className="glass flex flex-col gap-4 rounded-2xl p-4">
+        <AccountsWidget userId={userId} />
       </section>
     )
   }
