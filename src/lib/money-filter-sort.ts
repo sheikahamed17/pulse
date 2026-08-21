@@ -61,7 +61,7 @@ export function filterSortMoney(
     if (filter.direction !== null && r.direction !== filter.direction) return false
 
     // Tag filter
-    if (filter.tag !== null && !r.tags.includes(filter.tag)) return false
+    if (filter.tag !== null && !(r.tags ?? []).includes(filter.tag)) return false
 
     // Date range filter: from <= occurred_at < to
     if (filter.from !== null && r.occurred_at < filter.from) return false

@@ -28,6 +28,15 @@ const resolve = (id: string | null) =>
   id === 'rent' || id === 'rent-old' ? { name: 'Rent', icon: '🏠' } : id === 'shop' ? { name: 'Shopping', icon: '🛍️' } : null
 
 describe('filterSortMoney', () => {
+  it('does not crash on legacy rows whose tags field is undefined', () => {
+    // Rows created before the merchant+tags migration have no `tags` field.
+    const legacy = row({ id: 'legacy', tags: undefined as unknown as string[] })
+    // No filter: legacy row passes through untouched.
+    expect(filterSortMoney([legacy], EMPTY_MONEY_FILTER, 'date-desc', resolve).map(r => r.id)).toEqual(['legacy'])
+    // Tag filter: legacy row (no tags) is excluded, without throwing.
+    expect(filterSortMoney([legacy], { ...EMPTY_MONEY_FILTER, tag: 'fun' }, 'date-desc', resolve)).toEqual([])
+  })
+
   it('empty filter returns all in date-desc', () => {
     const rows = [
       row({ id: '1', occurred_at: '2026-08-01T00:00:00Z' }),

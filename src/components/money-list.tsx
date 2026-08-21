@@ -139,9 +139,9 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
                       <span className="text-xs text-muted-foreground">· {e.merchant}</span>
                     )}
                   </div>
-                  {e.tags.length > 0 && (
+                  {(e.tags?.length ?? 0) > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {e.tags.map(tag => (
+                      {(e.tags ?? []).map(tag => (
                         <span
                           key={tag}
                           className={cn(

@@ -25,7 +25,7 @@ export function MoneyControls({ userId, filter, sort, onFilter, onSort }: Props)
   const distinctTags = useMemo(() => {
     const tags = new Set<string>()
     entries.forEach(e => {
-      e.tags.forEach(tag => tags.add(tag))
+      ;(e.tags ?? []).forEach(tag => tags.add(tag))
     })
     return Array.from(tags).sort()
   }, [entries])
