@@ -239,6 +239,9 @@ vi.mock('@/lib/digest-aggregate', () => ({
       tasks_overdue: 0,
       skipped_currencies: [],
       entry_count: moneyEntriesTable.length + tasksTable.length,
+      learnings_added: 0,
+      notes_added: 0,
+      top_learning_tags: [],
     }
   }),
 }))

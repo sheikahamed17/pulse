@@ -24,7 +24,8 @@ export async function generateInsight(args: GenerateInsightArgs): Promise<{ skip
   const { db, groq, userId, bounds, primaryCurrency, fx_overrides, nowIso, opId, opType } = args
 
   const metrics = await aggregateWeek(db, userId, bounds, primaryCurrency, fx_overrides)
-  if (metrics.entry_count === 0 && metrics.tasks_created === 0 && metrics.tasks_completed === 0) {
+  if (metrics.entry_count === 0 && metrics.tasks_created === 0 && metrics.tasks_completed === 0
+    && metrics.learnings_added === 0 && metrics.notes_added === 0) {
     return { skipped: true, insight: null }
   }
 

@@ -12,6 +12,9 @@ export type DigestMetrics = {
   tasks_overdue: number
   skipped_currencies: string[]
   entry_count: number
+  learnings_added: number
+  notes_added: number
+  top_learning_tags: string[]
 }
 
 export async function aggregateWeek(
@@ -103,6 +106,39 @@ export async function aggregateWeek(
     t => t.completed_at === null && t.due_at && t.due_at < bounds.endsAt,
   ).length
 
+  // Learning entries in window
+  const learnings = await db
+    .selectFrom('learning_entries')
+    .where('user_id', '=', userId)
+    .where('occurred_at', '>=', bounds.startsAt)
+    .where('occurred_at', '<', bounds.endsAt)
+    .where('deleted_at', 'is', null)
+    .selectAll()
+    .execute()
+
+  // Note entries in window
+  const notes = await db
+    .selectFrom('note_entries')
+    .where('user_id', '=', userId)
+    .where('occurred_at', '>=', bounds.startsAt)
+    .where('occurred_at', '<', bounds.endsAt)
+    .where('deleted_at', 'is', null)
+    .selectAll()
+    .execute()
+
+  // Top learning tags (tags is a string[] column, stored as JSON)
+  const tagCounts = new Map<string, number>()
+  for (const l of learnings) {
+    const tags = l.tags ? (typeof l.tags === 'string' ? JSON.parse(l.tags) : l.tags) : []
+    for (const t of (tags as string[])) {
+      tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1)
+    }
+  }
+  const top_learning_tags = Array.from(tagCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([t]) => t)
+
   return {
     currency: primaryCurrency,
     spend_total: spendTotal,
@@ -113,5 +149,8 @@ export async function aggregateWeek(
     tasks_overdue: tasksOverdue,
     skipped_currencies: Array.from(skippedCurrencies),
     entry_count: entries.length,
+    learnings_added: learnings.length,
+    notes_added: notes.length,
+    top_learning_tags,
   }
 }
