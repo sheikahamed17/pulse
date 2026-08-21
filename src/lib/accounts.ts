@@ -23,6 +23,11 @@ export type NetWorth = {
   }[]
 }
 
+export type NetWorthPoint = {
+  label: string
+  net: number
+}
+
 /**
  * Compute the current balance of a single account.
  *
@@ -124,4 +129,55 @@ export function netWorth(
   // each row with that account's symbol/divisor); only the assets/liabilities/net
   // totals are converted to the primary currency above.
   return { net, assets, liabilities, perAccount }
+}
+
+/**
+ * Compute net worth series over a sequence of periods.
+ *
+ * For each period P, net worth at the END of that period is calculated as:
+ * net = currentNet − rollback(P.to)
+ *
+ * where rollback(t) = Σ over entries e of (net-worth effect), where:
+ * - e.account_id must exist and be in activeAccountIds
+ * - e.deleted_at must be null
+ * - e.occurred_at >= t (entries at or after the period end)
+ * - net-worth effect = e.direction === 'in' ? +toPrimary(e) : −toPrimary(e)
+ *
+ * Returns one point per period, in the periods' order. Pure; no mutation.
+ *
+ * @param currentNet - The current net worth (known now)
+ * @param entries - All money entries
+ * @param activeAccountIds - Set of account IDs to include
+ * @param periods - Chronological array of { from, to, label } periods
+ * @param toPrimary - Function to convert entry amount to primary currency
+ * @returns Array of NetWorthPoint, one per period, same order
+ */
+export function netWorthSeries(
+  currentNet: number,
+  entries: MoneyEntryRow[],
+  activeAccountIds: Set<string>,
+  periods: { from: string; to: string; label: string }[],
+  toPrimary: (e: MoneyEntryRow) => number
+): NetWorthPoint[] {
+  return periods.map(period => {
+    // Calculate rollback: sum of net-worth effects of entries at or after period.to
+    let rollback = 0
+    for (const entry of entries) {
+      // Guard: entry must have an account_id in activeAccountIds
+      if (!entry.account_id || !activeAccountIds.has(entry.account_id)) continue
+      // Skip deleted entries
+      if (entry.deleted_at) continue
+      // Only count entries at or after period.to
+      if (entry.occurred_at < period.to) continue
+
+      const amountInPrimary = toPrimary(entry)
+      const sign = entry.direction === 'in' ? 1 : -1
+      rollback += sign * amountInPrimary
+    }
+
+    // Net at end of period = currentNet − rollback
+    const net = currentNet - rollback
+
+    return { label: period.label, net }
+  })
 }
