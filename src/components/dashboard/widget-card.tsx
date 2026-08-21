@@ -1,0 +1,68 @@
+'use client'
+
+import { MoneyCard } from '@/components/money-card'
+import { BudgetSection } from '@/components/budget-section'
+import { TodayTasksWidget } from '@/components/dashboard/today-tasks-widget'
+import { SpendTrendWidget } from '@/components/dashboard/spend-trend-widget'
+import { RecentActivityWidget } from '@/components/dashboard/recent-activity-widget'
+import type { WidgetType } from '@/lib/widgets'
+
+type Props = {
+  type: WidgetType | null | undefined
+  userId: string
+}
+
+export function WidgetCard({ type, userId }: Props) {
+  if (type === 'spent') {
+    return (
+      <section className="glass flex flex-col gap-4 rounded-2xl p-4">
+        <MoneyCard userId={userId} />
+      </section>
+    )
+  }
+
+  if (type === 'budgets') {
+    return (
+      <section className="glass flex flex-col gap-4 rounded-2xl p-4">
+        <BudgetSection userId={userId} />
+      </section>
+    )
+  }
+
+  if (type === 'today-tasks') {
+    return (
+      <section className="glass flex flex-col gap-4 rounded-2xl p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today&apos;s Tasks</h3>
+        </div>
+        <TodayTasksWidget userId={userId} />
+      </section>
+    )
+  }
+
+  if (type === 'spend-trend') {
+    return (
+      <section className="glass flex flex-col gap-4 rounded-2xl p-4">
+        <SpendTrendWidget userId={userId} />
+      </section>
+    )
+  }
+
+  if (type === 'recent-activity') {
+    return (
+      <section className="glass flex flex-col gap-4 rounded-2xl p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent Activity</h3>
+        </div>
+        <RecentActivityWidget userId={userId} />
+      </section>
+    )
+  }
+
+  // Unknown or null type — show a fallback
+  return (
+    <section className="glass flex flex-col gap-4 rounded-2xl p-4">
+      <div className="text-center text-sm text-muted-foreground">Unknown widget</div>
+    </section>
+  )
+}
