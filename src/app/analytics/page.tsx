@@ -9,8 +9,10 @@ import { BarTrend } from '@/components/charts/bar-trend'
 import { DualSeriesTrend } from '@/components/charts/dual-series-trend'
 import { MoversBars } from '@/components/charts/movers-bars'
 import { CategorySmallMultiples } from '@/components/charts/category-small-multiples'
+import { NetWorthLine } from '@/components/charts/net-worth-line'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useAllCategories } from '@/hooks/use-all-categories'
+import { useAccounts } from '@/hooks/use-accounts'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
 import { makeCategoryResolver } from '@/lib/category-resolve'
@@ -18,6 +20,7 @@ import { convertViaRates } from '@/lib/fx'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { analyticsPeriods, computeTopMovers, computeCategorySeries } from '@/lib/analytics'
+import { netWorth, netWorthSeries, type AccountLike } from '@/lib/accounts'
 
 export default function AnalyticsPage() {
   const router = useRouter()
@@ -34,6 +37,7 @@ export default function AnalyticsPage() {
   const count = bucket === 'week' ? 12 : 6
   const entries = useMoneyEntries(userId ?? undefined)
   const allCats = useAllCategories(userId ?? undefined)
+  const accts = useAccounts(userId ?? undefined)
   const { prefs } = useUserPrefs()
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
 
@@ -47,6 +51,51 @@ export default function AnalyticsPage() {
     [allCats],
   )
 
+  const activeAccountIds = useMemo(() => new Set(accts.map(a => a.id)), [accts])
+
+  // Convert entry amount to its account's currency (for net worth computation)
+  const toAcct = useMemo(
+    () => (entry: typeof entries[0], acct: AccountLike) => {
+      if (entry.currency === acct.currency) {
+        return entry.amount
+      }
+      return (
+        convertViaRates(
+          entry.amount,
+          entry.currency,
+          acct.currency,
+          entry.occurred_at,
+          rates,
+          prefs.fx_overrides ?? {},
+        )?.amount ?? 0
+      )
+    },
+    [rates, prefs.fx_overrides],
+  )
+
+  // Convert account balance (in account currency) to primary currency
+  const toPrimaryForNet = useMemo(
+    () => (balance: number, acctCurrency: string) => {
+      if (acctCurrency === prefs.primary_currency) {
+        return balance
+      }
+      const now = new Date().toISOString()
+      return convertViaRates(balance, acctCurrency, prefs.primary_currency, now, rates, prefs.fx_overrides ?? {})?.amount ?? 0
+    },
+    [prefs.primary_currency, rates, prefs.fx_overrides],
+  )
+
+  // Wrapper to convert entry amount to its account's currency for net worth series
+  const toAcctForNet = useMemo(
+    () => (entry: typeof entries[0]) => {
+      if (!entry.account_id) return 0
+      const acct = accts.find(a => a.id === entry.account_id)
+      if (!acct) return 0
+      return toAcct(entry, acct)
+    },
+    [accts, toAcct],
+  )
+
   const toPrimary = useMemo(
     () => (e: typeof entries[0]) =>
       e.currency === prefs.primary_currency
@@ -56,6 +105,27 @@ export default function AnalyticsPage() {
   )
 
   const periods = useMemo(() => analyticsPeriods(nowMs, bucket, count), [nowMs, bucket, count])
+
+  // Current net worth (for net worth series computation)
+  const currentNet = useMemo(
+    () => netWorth(accts, entries, toAcctForNet, toPrimaryForNet).net,
+    [accts, entries, toAcctForNet, toPrimaryForNet],
+  )
+
+  // Entry to primary currency (for net worth series)
+  const toPrimaryEntry = useMemo(
+    () => (e: typeof entries[0]) =>
+      e.currency === prefs.primary_currency
+        ? e.amount
+        : convertViaRates(e.amount, e.currency, prefs.primary_currency, e.occurred_at, rates, prefs.fx_overrides ?? {})?.amount ?? 0,
+    [prefs.primary_currency, rates, prefs.fx_overrides],
+  )
+
+  // Net worth series over time
+  const netWorthSeriesData = useMemo(
+    () => netWorthSeries(currentNet, entries, activeAccountIds, analyticsPeriods(nowMs, 'month', 6), toPrimaryEntry),
+    [currentNet, entries, activeAccountIds, nowMs, toPrimaryEntry],
+  )
 
   // Compute spend and income series aligned 1:1 to periods
   const spendSeries = useMemo(() => {
@@ -120,6 +190,20 @@ export default function AnalyticsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Net worth */}
+        <div className="glass rounded-2xl p-4">
+          {accts.length === 0 ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Net worth</p>
+              <p className="text-xs text-muted-foreground">
+                Add accounts (<Link href="/settings/accounts" className="text-blue-500 hover:underline">Settings → Accounts</Link>) to see net worth over time
+              </p>
+            </div>
+          ) : (
+            <NetWorthLine data={netWorthSeriesData} symbol={symbol} jpy={jpy} />
+          )}
         </div>
 
         {/* Spend per period */}
