@@ -26,6 +26,9 @@ describe('digest-agent', () => {
         tasks_overdue: 1,
         skipped_currencies: [],
         entry_count: 10,
+        learnings_added: 0,
+        notes_added: 0,
+        top_learning_tags: [],
       }
       const summary = fallbackSummary(metrics)
       expect(summary).toContain('Food')
@@ -45,10 +48,91 @@ describe('digest-agent', () => {
         tasks_overdue: 0,
         skipped_currencies: [],
         entry_count: 5,
+        learnings_added: 0,
+        notes_added: 0,
+        top_learning_tags: [],
       }
       const summary = fallbackSummary(metrics)
       expect(summary).toContain('Transport')
       expect(summary).toMatch(/[24]/) // either tasks completed or created
+    })
+
+    it('includes learning sentence when learnings_added > 0', () => {
+      const metrics: DigestMetrics = {
+        currency: 'INR',
+        spend_total: 80000,
+        income_total: 100000,
+        top_categories: [{ name: 'Food', amount: 50000 }],
+        tasks_completed: 5,
+        tasks_created: 3,
+        tasks_overdue: 1,
+        skipped_currencies: [],
+        entry_count: 10,
+        learnings_added: 2,
+        notes_added: 0,
+        top_learning_tags: ['react', 'typescript'],
+      }
+      const summary = fallbackSummary(metrics)
+      expect(summary).toContain('You logged 2 learnings on react, typescript')
+    })
+
+    it('includes notes sentence when notes_added > 0', () => {
+      const metrics: DigestMetrics = {
+        currency: 'INR',
+        spend_total: 80000,
+        income_total: 100000,
+        top_categories: [{ name: 'Food', amount: 50000 }],
+        tasks_completed: 5,
+        tasks_created: 3,
+        tasks_overdue: 1,
+        skipped_currencies: [],
+        entry_count: 10,
+        learnings_added: 0,
+        notes_added: 1,
+        top_learning_tags: [],
+      }
+      const summary = fallbackSummary(metrics)
+      expect(summary).toContain('You captured 1 note')
+    })
+
+    it('includes both learning and notes sentences when both > 0', () => {
+      const metrics: DigestMetrics = {
+        currency: 'INR',
+        spend_total: 80000,
+        income_total: 100000,
+        top_categories: [{ name: 'Food', amount: 50000 }],
+        tasks_completed: 5,
+        tasks_created: 3,
+        tasks_overdue: 1,
+        skipped_currencies: [],
+        entry_count: 10,
+        learnings_added: 1,
+        notes_added: 3,
+        top_learning_tags: ['javascript'],
+      }
+      const summary = fallbackSummary(metrics)
+      expect(summary).toContain('You logged 1 learning on javascript')
+      expect(summary).toContain('You captured 3 notes')
+    })
+
+    it('omits learning/notes sentence when both are 0', () => {
+      const metrics: DigestMetrics = {
+        currency: 'INR',
+        spend_total: 80000,
+        income_total: 100000,
+        top_categories: [{ name: 'Food', amount: 50000 }],
+        tasks_completed: 5,
+        tasks_created: 3,
+        tasks_overdue: 1,
+        skipped_currencies: [],
+        entry_count: 10,
+        learnings_added: 0,
+        notes_added: 0,
+        top_learning_tags: [],
+      }
+      const summary = fallbackSummary(metrics)
+      expect(summary).not.toContain('You logged')
+      expect(summary).not.toContain('You captured')
     })
   })
 
@@ -63,6 +147,9 @@ describe('digest-agent', () => {
       tasks_overdue: 1,
       skipped_currencies: [],
       entry_count: 10,
+      learnings_added: 0,
+      notes_added: 0,
+      top_learning_tags: [],
     }
 
     beforeEach(() => {

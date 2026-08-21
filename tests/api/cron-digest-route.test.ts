@@ -198,9 +198,22 @@ const fakeDb = {
         if (table === 'insights') insightsTable.push(values)
         if (table === 'push_notifications') pushNotificationsTable.push(values)
       }
+      const executeInsertWithConflict = async () => {
+        const v = values as Record<string, unknown>
+        // For op_log, onConflict doNothing means skip if id exists
+        if (table === 'op_log') {
+          const existing = opLogTable.find((op: any) => op.id === v.id)
+          if (existing) return // onConflict doNothing: skip
+          opLogTable.push(values)
+        } else {
+          // For other tables, just insert
+          if (table === 'insights') insightsTable.push(values)
+          if (table === 'push_notifications') pushNotificationsTable.push(values)
+        }
+      }
       return {
         onConflict: (_oc: unknown) => ({
-          execute: executeInsert,
+          execute: executeInsertWithConflict,
         }),
         execute: executeInsert,
       }
@@ -226,11 +239,31 @@ vi.mock('@/lib/digest-aggregate', () => ({
       tasks_overdue: 0,
       skipped_currencies: [],
       entry_count: moneyEntriesTable.length + tasksTable.length,
+      learnings_added: 0,
+      notes_added: 0,
+      top_learning_tags: [],
     }
   }),
 }))
 vi.mock('@/lib/agents/digest-agent', () => ({ writeDigestNarrative: vi.fn().mockResolvedValue('Test summary'), fallbackSummary: vi.fn(() => 'Fallback summary') }))
-vi.mock('@/lib/materialize', () => ({ materializeRow: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/materialize', () => ({
+  materializeRow: vi.fn(async (db, op: any, userId) => {
+    // Mock materializeRow to actually insert into insightsTable for insights ops
+    if (op.entity_kind === 'insight') {
+      insightsTable.push({
+        id: op.entity_id,
+        user_id: userId,
+        summary: 'Test summary',
+        metrics: op.payload?.metrics ?? '{}',
+        period: op.payload?.period ?? 'weekly',
+        starts_at: op.payload?.starts_at ?? '2026-06-22T00:00:00.000Z',
+        ends_at: op.payload?.ends_at ?? '2026-06-29T00:00:00.000Z',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+    }
+  }),
+}))
 
 const { POST } = await import('@/app/api/cron/digest/route')
 const { sendPushToUser } = await import('@/lib/web-push')
@@ -341,5 +374,86 @@ describe('/api/cron/digest', () => {
     const body = await res.json() as { digests_created: number }
     expect(body.digests_created).toBeGreaterThan(0)
     expect(vi.mocked(sendPushToUser)).toHaveBeenCalled()
+  })
+
+  it('skips when the insights projection already exists', async () => {
+    // Pre-populate the insights table with a row for user-1
+    // weekStart = bounds.startsAt.slice(0, 10) = '2026-06-21' (UTC date)
+    const existingInsight = {
+      id: 'insight-user-1-2026-06-21',
+      user_id: 'user-1',
+      summary: 'Existing summary',
+      metrics: '{}',
+      period: 'weekly',
+      starts_at: '2026-06-21T18:30:00.000Z',
+      ends_at: '2026-06-28T18:30:00.000Z',
+      created_at: '2026-06-28T00:00:00.000Z',
+      updated_at: '2026-06-28T00:00:00.000Z',
+    }
+    insightsTable.push(existingInsight)
+
+    // Also populate for user-2 to ensure it doesn't generate a new one
+    insightsTable.push({
+      id: 'insight-user-2-2026-06-21',
+      user_id: 'user-2',
+      summary: 'Existing summary for user 2',
+      metrics: '{}',
+      period: 'weekly',
+      starts_at: '2026-06-21T18:30:00.000Z',
+      ends_at: '2026-06-28T18:30:00.000Z',
+      created_at: '2026-06-28T00:00:00.000Z',
+      updated_at: '2026-06-28T00:00:00.000Z',
+    })
+
+    const res = await POST(cronReq())
+    expect(res.status).toBe(200)
+    const body = await res.json() as { digests_created: number }
+    // Should not create any new digests since insights rows already exist for both users
+    expect(body.digests_created).toBe(0)
+    expect(opLogTable.filter((op: any) => op.entity_kind === 'insight')).toHaveLength(0)
+  })
+
+  it('recovers when op_log exists but insights row is missing (crash recovery)', async () => {
+    // Simulate a partial failure: op_log was created but materialize never ran
+    // weekStart = '2026-06-21' (UTC date from bounds.startsAt.slice(0, 10))
+    const partialOp = {
+      id: 'insight-weekly-user-1-2026-06-21',
+      user_id: 'user-1',
+      hlc: '2026-06-28T01:00:00.000Z-0',
+      device_id: 'cron',
+      entity_kind: 'insight',
+      entity_id: 'insight-user-1-2026-06-21',
+      op_type: 'create',
+      payload: '{"period":"weekly"}',
+      schema_version: 1,
+      applied_at: 1234567890,
+    }
+    opLogTable.push(partialOp)
+    // Note: NO corresponding insights row — that's the crash condition
+
+    // For user-2, ensure it has an insights row so it's skipped
+    insightsTable.push({
+      id: 'insight-user-2-2026-06-21',
+      user_id: 'user-2',
+      summary: 'Existing',
+      metrics: '{}',
+      period: 'weekly',
+      starts_at: '2026-06-21T18:30:00.000Z',
+      ends_at: '2026-06-28T18:30:00.000Z',
+      created_at: '2026-06-28T00:00:00.000Z',
+      updated_at: '2026-06-28T00:00:00.000Z',
+    })
+
+    const res = await POST(cronReq())
+    expect(res.status).toBe(200)
+    const body = await res.json() as { digests_created: number }
+    // The cron SHOULD generate and materialize the insight for user-1, NOT skip
+    // Since the op_log already has that id and we have onConflict-doNothing,
+    // the op insert will be a safe no-op, but materialize runs and creates the projection
+    // user-2 has an existing insights row so it's skipped
+    expect(body.digests_created).toBe(1) // only user-1 creates
+    // The insights row should now be created by materializeRow
+    const newInsight = insightsTable.find((i: any) => i.id === 'insight-user-1-2026-06-21')
+    expect(newInsight).toBeDefined()
   })
 })

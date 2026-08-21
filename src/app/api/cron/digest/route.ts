@@ -49,10 +49,15 @@ export async function POST(req: Request) {
     // Compute prior week bounds
     const bounds = priorWeekBounds(now, tz)
 
-    // Idempotency check (unchanged)
-    const opId = `insight-weekly-${user.id}-${bounds.startsAt.slice(0, 10)}`
-    const existingOp = await db.selectFrom('op_log').where('id', '=', opId).select('id').executeTakeFirst()
-    if (existingOp) continue
+    // Idempotent on the DELIVERABLE, not the op-log id: only skip once the insight
+    // projection actually exists. A prior run that logged the op but crashed before
+    // materialize left no insights row → we (re)generate and complete it (the op
+    // insert is now onConflict-doNothing, so re-inserting the same opId is safe).
+    const weekStart = bounds.startsAt.slice(0, 10)
+    const entityId = `insight-${user.id}-${weekStart}`
+    const opId = `insight-weekly-${user.id}-${weekStart}`
+    const existingInsight = await db.selectFrom('insights').where('id', '=', entityId).select('id').executeTakeFirst()
+    if (existingInsight) continue
 
     const { skipped, insight } = await generateInsight({
       db, groq, userId: user.id, bounds, primaryCurrency, fx_overrides: parseFxOverrides(prefs?.fx_overrides), nowIso: now,

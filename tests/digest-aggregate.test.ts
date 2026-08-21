@@ -3,6 +3,39 @@ import { aggregateWeek } from '@/lib/digest-aggregate'
 import type { Kysely } from 'kysely'
 import type { DB } from '@/lib/db'
 
+// Chainable mock that handles any number of .where() calls
+function makeFakeDb(rowsByTable: Record<string, unknown[]>): Kysely<DB> {
+  return {
+    selectFrom: (table: string) => {
+      const data = rowsByTable[table] ?? []
+      let filters: Array<{ col: string; op: string; val: unknown }> = []
+
+      const chain = {
+        where: (col: string, op: string, val: unknown) => {
+          filters = [...filters, { col, op, val }]
+          return chain
+        },
+        selectAll: () => ({
+          execute: async () => {
+            return data.filter((row) => {
+              const r = row as Record<string, unknown>
+              for (const { col, op, val } of filters) {
+                const cell = r[col]
+                if (op === '>=' && (cell as string) < (val as string)) return false
+                if (op === '<' && (cell as string) >= (val as string)) return false
+                if (op === 'is' && val === null && cell !== null) return false
+                if (op === '=' && cell !== val) return false
+              }
+              return true
+            })
+          },
+        }),
+      }
+      return chain
+    },
+  } as unknown as Kysely<DB>
+}
+
 describe('aggregateWeek', () => {
   let fakeDb: Kysely<DB>
   const userId = 'user-123'
@@ -10,18 +43,6 @@ describe('aggregateWeek', () => {
   const bounds = { startsAt: '2026-06-21T18:30:00.000Z', endsAt: '2026-06-28T18:30:00.000Z' }
 
   beforeEach(() => {
-    // Chainable mock that handles any number of .where() calls
-    function makeFakeDb(rowsByTable: Record<string, unknown[]>): Kysely<DB> {
-      const chainFor = (table: string) => {
-        const chain: Record<string, unknown> = {
-          where: () => chain,                                   // any number of .where() calls
-          selectAll: () => ({ execute: async () => rowsByTable[table] ?? [] }),
-        }
-        return chain
-      }
-      return { selectFrom: (t: string) => chainFor(t) } as unknown as Kysely<DB>
-    }
-
     fakeDb = makeFakeDb({
       money_entries: [
         {
@@ -110,6 +131,49 @@ describe('aggregateWeek', () => {
         { id: 'cat-food', user_id: userId, name: 'Food', kind: 'spend' },
         { id: 'cat-salary', user_id: userId, name: 'Salary', kind: 'income' },
       ],
+      learning_entries: [
+        {
+          id: 'l1',
+          user_id: userId,
+          text: 'Learned about React hooks',
+          tags: JSON.stringify(['react', 'javascript']),
+          attribution: null,
+          source: 'voice',
+          occurred_at: '2026-06-25T14:00:00.000Z',
+          field_hlcs: '{}',
+          deleted_at: null,
+          created_at: '2026-06-25T14:00:00.000Z',
+          updated_at: '2026-06-25T14:00:00.000Z',
+        },
+        {
+          id: 'l2',
+          user_id: userId,
+          text: 'Learned about TypeScript generics',
+          tags: JSON.stringify(['typescript', 'react']),
+          attribution: null,
+          source: 'manual',
+          occurred_at: '2026-06-26T16:00:00.000Z',
+          field_hlcs: '{}',
+          deleted_at: null,
+          created_at: '2026-06-26T16:00:00.000Z',
+          updated_at: '2026-06-26T16:00:00.000Z',
+        },
+      ],
+      note_entries: [
+        {
+          id: 'n1',
+          user_id: userId,
+          title: 'Project ideas',
+          body: 'Build a dashboard for team insights',
+          tags: JSON.stringify(['projects']),
+          source: 'voice',
+          occurred_at: '2026-06-27T10:00:00.000Z',
+          field_hlcs: '{}',
+          deleted_at: null,
+          created_at: '2026-06-27T10:00:00.000Z',
+          updated_at: '2026-06-27T10:00:00.000Z',
+        },
+      ],
     })
   })
 
@@ -149,5 +213,86 @@ describe('aggregateWeek', () => {
   it('returns empty skipped_currencies when all entries can convert', async () => {
     const metrics = await aggregateWeek(fakeDb, userId, bounds, primaryCurrency)
     expect(metrics.skipped_currencies).toEqual([])
+  })
+
+  it('counts learning entries in window', async () => {
+    const metrics = await aggregateWeek(fakeDb, userId, bounds, primaryCurrency)
+    expect(metrics.learnings_added).toBe(2)
+  })
+
+  it('counts note entries in window', async () => {
+    const metrics = await aggregateWeek(fakeDb, userId, bounds, primaryCurrency)
+    expect(metrics.notes_added).toBe(1)
+  })
+
+  it('returns top learning tags in frequency order (max 5)', async () => {
+    const metrics = await aggregateWeek(fakeDb, userId, bounds, primaryCurrency)
+    expect(metrics.top_learning_tags).toEqual(['react', 'javascript', 'typescript'])
+  })
+
+  it('excludes deleted learning/note entries from count', async () => {
+    const dbWithDeleted = makeFakeDb({
+      money_entries: [],
+      tasks: [],
+      categories: [],
+      learning_entries: [
+        {
+          id: 'l1',
+          user_id: userId,
+          text: 'Active learning',
+          tags: JSON.stringify(['tag1']),
+          attribution: null,
+          source: 'voice',
+          occurred_at: '2026-06-25T14:00:00.000Z',
+          field_hlcs: '{}',
+          deleted_at: null,
+          created_at: '2026-06-25T14:00:00.000Z',
+          updated_at: '2026-06-25T14:00:00.000Z',
+        },
+        {
+          id: 'l2',
+          user_id: userId,
+          text: 'Deleted learning',
+          tags: JSON.stringify(['tag1']),
+          attribution: null,
+          source: 'voice',
+          occurred_at: '2026-06-26T14:00:00.000Z',
+          field_hlcs: '{}',
+          deleted_at: '2026-06-26T14:00:00.000Z',
+          created_at: '2026-06-26T14:00:00.000Z',
+          updated_at: '2026-06-26T14:00:00.000Z',
+        },
+      ],
+      note_entries: [],
+    })
+    const metrics = await aggregateWeek(dbWithDeleted, userId, bounds, primaryCurrency)
+    expect(metrics.learnings_added).toBe(1)
+  })
+
+  it('excludes learning entries outside the time window', async () => {
+    const dbOutOfWindow = makeFakeDb({
+      money_entries: [],
+      tasks: [],
+      categories: [],
+      learning_entries: [
+        {
+          id: 'l1',
+          user_id: userId,
+          text: 'Before window',
+          tags: JSON.stringify(['early']),
+          attribution: null,
+          source: 'voice',
+          occurred_at: '2026-06-20T14:00:00.000Z', // before startsAt
+          field_hlcs: '{}',
+          deleted_at: null,
+          created_at: '2026-06-20T14:00:00.000Z',
+          updated_at: '2026-06-20T14:00:00.000Z',
+        },
+      ],
+      note_entries: [],
+    })
+    const metrics = await aggregateWeek(dbOutOfWindow, userId, bounds, primaryCurrency)
+    expect(metrics.learnings_added).toBe(0)
+    expect(metrics.top_learning_tags).toEqual([])
   })
 })
