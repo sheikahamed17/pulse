@@ -7,10 +7,10 @@ export type Resurrectable = 'money' | 'task' | 'learning' | 'note'
  */
 export function resurrectPayload(
   kind: Resurrectable,
-  row: { description?: string | null; title?: string | null; text?: string; body?: string },
+  row: { description?: string | null; merchant?: string | null; tags?: string[]; title?: string | null; text?: string; body?: string },
 ): Record<string, unknown> {
   switch (kind) {
-    case 'money': return { description: row.description ?? null }
+    case 'money': return { description: row.description ?? null, merchant: row.merchant ?? null, tags: row.tags ?? [] }
     case 'task': return { title: row.title }
     case 'learning': return { text: row.text }
     case 'note': return { body: row.body }

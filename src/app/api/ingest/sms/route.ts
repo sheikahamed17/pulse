@@ -85,7 +85,7 @@ export async function POST(req: Request) {
   // Best-effort: a push failure must not fail the ingest, the entry already exists.
   try {
     const note = ingestNotification(
-      { amount: payload.amount, currency: payload.currency, direction: payload.direction, description: payload.description ?? null },
+      { amount: payload.amount, currency: payload.currency, direction: payload.direction, merchant: payload.merchant ?? null },
       op.entity_id,
     )
     await db.insertInto('push_notifications').values({

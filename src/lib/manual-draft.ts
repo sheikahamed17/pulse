@@ -31,7 +31,7 @@ export function manualDraftFromText(
 
   switch (kind) {
     case 'money': {
-      const moneyBlank = blank as MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }
+      const moneyBlank = blank as MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[] }
       return {
         ...moneyBlank,
         description: trimmed,

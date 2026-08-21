@@ -21,7 +21,7 @@ import type { NotePayload } from '@/lib/op-schemas/note'
 import type { CategoryRow } from '@/lib/dexie'
 
 export type ChipDraft =
-  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; draftId?: string })
+  | (MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; draftId?: string; merchant?: string | null; tags?: string[] })
   | (TaskPayload & { kind: 'task' })
   | (LearningPayload & { kind: 'learning' })
   | (NotePayload & { kind: 'note' })
@@ -61,14 +61,15 @@ function ConfirmationChipMoney({
   mode,
 }: {
   userId: string
-  draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }
+  draft: MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[] }
   categoryById: Map<string, CategoryRow>
   onConfirm: Props['onConfirm']
   onCancel: () => void
   mode: 'create' | 'edit'
 }) {
-  const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string }>(draft)
-  const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category' | 'date'>(draft.amount === 0 ? 'amount' : null)
+  const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[] }>(draft)
+  const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category' | 'date' | 'merchant'>(draft.amount === 0 ? 'amount' : null)
+  const [newTag, setNewTag] = useState('')
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
   const [intervalCount, setIntervalCount] = useState(1)
@@ -161,6 +162,45 @@ function ConfirmationChipMoney({
             {d.description || '+ description'}
           </button>
         )}
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {editingField === 'merchant' ? (
+          <Input
+            autoFocus
+            maxLength={120}
+            defaultValue={d.merchant ?? ''}
+            onBlur={(e) => {
+              setD(s => ({ ...s, merchant: e.currentTarget.value || null }))
+              setEditingField(null)
+            }}
+            className="h-7 max-w-[200px] text-xs"
+            placeholder="Merchant / payee"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingField('merchant')}
+            className="rounded-md border bg-muted px-2 py-0.5 text-xs text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+          >
+            {d.merchant || '+ merchant'}
+          </button>
+        )}
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-1.5 items-start" role="group" aria-label="Tags">
+        {(d.tags ?? []).map(tag => (
+          <div key={tag} className="flex items-center gap-1 rounded-md border bg-muted px-2 py-0.5 text-xs">
+            <span>{tag}</span>
+            <button type="button" onClick={() => setD(s => ({ ...s, tags: (s.tags ?? []).filter(t => t !== tag) }))}
+              aria-label={`Remove tag "${tag}"`} className="ml-1 text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        <Input value={newTag} onChange={e => setNewTag(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const trimmed = newTag.trim(); if (trimmed && !(d.tags ?? []).includes(trimmed) && (d.tags ?? []).length < 20) { setD(s => ({ ...s, tags: [...(s.tags ?? []), trimmed] })); setNewTag('') } } }}
+          placeholder="add tag…" aria-label="Add money tag" className="h-7 text-xs max-w-[100px]" />
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">

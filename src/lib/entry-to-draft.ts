@@ -15,6 +15,8 @@ export function moneyRowToDraft(r: MoneyEntryRow): Extract<ChipDraft, { kind: 'm
     receipt_key: r.receipt_key,
     raw_input: r.raw_input,
     recurring_rule_id: r.recurring_rule_id,
+    merchant: r.merchant,
+    tags: r.tags,
   }
 }
 
