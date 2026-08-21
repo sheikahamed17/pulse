@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { accountBalance, netWorth } from './accounts'
+import { accountBalance, netWorth, netWorthSeries } from './accounts'
 import type { MoneyEntryRow } from '@/lib/dexie'
 import type { AccountLike } from './accounts'
 
@@ -251,5 +251,211 @@ describe('netWorth', () => {
     netWorth(accounts, entries, toAcct, toPrimary)
     expect(accounts).toEqual(originalAccounts)
     expect(entries).toEqual(originalEntries)
+  })
+})
+
+describe('netWorthSeries', () => {
+  it('rollback example: currentNet=100000, out 20000 in current month, in 50000 in last month', () => {
+    const currentNet = 100000
+    const activeAccountIds = new Set(['a'])
+    const entries = [
+      row({
+        id: '1',
+        account_id: 'a',
+        amount: 20000,
+        direction: 'out',
+        occurred_at: '2026-08-15T00:00:00Z',
+      }),
+      row({
+        id: '2',
+        account_id: 'a',
+        amount: 50000,
+        direction: 'in',
+        occurred_at: '2026-07-15T00:00:00Z',
+      }),
+    ]
+    const periods = [
+      { from: '2026-07-01T00:00:00Z', to: '2026-07-31T23:59:59Z', label: 'Jul' },
+      { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
+    ]
+    const toPrimary = (e: MoneyEntryRow) => e.amount
+
+    const result = netWorthSeries(currentNet, entries, activeAccountIds, periods, toPrimary)
+
+    expect(result).toHaveLength(2)
+    // Jul: rollback includes Aug 20000 out => rollback = -20000 => net = 100000 - (-20000) = 120000
+    expect(result[0]).toEqual({ label: 'Jul', net: 120000 })
+    // Aug: rollback includes nothing after Aug end => rollback = 0 => net = 100000 - 0 = 100000
+    expect(result[1]).toEqual({ label: 'Aug', net: 100000 })
+  })
+
+  it('ignores entries on inactive accounts', () => {
+    const currentNet = 100000
+    const activeAccountIds = new Set(['a'])
+    const entries = [
+      row({
+        id: '1',
+        account_id: 'a',
+        amount: 20000,
+        direction: 'out',
+        occurred_at: '2026-08-15T00:00:00Z',
+      }),
+      row({
+        id: '2',
+        account_id: 'b', // inactive
+        amount: 50000,
+        direction: 'in',
+        occurred_at: '2026-07-15T00:00:00Z',
+      }),
+    ]
+    const periods = [
+      { from: '2026-07-01T00:00:00Z', to: '2026-07-31T23:59:59Z', label: 'Jul' },
+      { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
+    ]
+    const toPrimary = (e: MoneyEntryRow) => e.amount
+
+    const result = netWorthSeries(currentNet, entries, activeAccountIds, periods, toPrimary)
+
+    expect(result).toHaveLength(2)
+    // Jul: only the 20000 out from Aug counts => rollback = -20000 => net = 120000
+    expect(result[0]).toEqual({ label: 'Jul', net: 120000 })
+    // Aug: nothing after Aug end => net = 100000
+    expect(result[1]).toEqual({ label: 'Aug', net: 100000 })
+  })
+
+  it('ignores entries with null account_id', () => {
+    const currentNet = 100000
+    const activeAccountIds = new Set(['a'])
+    const entries = [
+      row({
+        id: '1',
+        account_id: 'a',
+        amount: 20000,
+        direction: 'out',
+        occurred_at: '2026-08-15T00:00:00Z',
+      }),
+      row({
+        id: '2',
+        account_id: null,
+        amount: 50000,
+        direction: 'in',
+        occurred_at: '2026-07-15T00:00:00Z',
+      }),
+    ]
+    const periods = [
+      { from: '2026-07-01T00:00:00Z', to: '2026-07-31T23:59:59Z', label: 'Jul' },
+      { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
+    ]
+    const toPrimary = (e: MoneyEntryRow) => e.amount
+
+    const result = netWorthSeries(currentNet, entries, activeAccountIds, periods, toPrimary)
+
+    expect(result).toHaveLength(2)
+    // Jul: only the 20000 out from Aug counts => rollback = -20000 => net = 120000
+    expect(result[0]).toEqual({ label: 'Jul', net: 120000 })
+    // Aug: net = 100000
+    expect(result[1]).toEqual({ label: 'Aug', net: 100000 })
+  })
+
+  it('last period point equals currentNet', () => {
+    const currentNet = 100000
+    const activeAccountIds = new Set(['a'])
+    const entries = [
+      row({
+        id: '1',
+        account_id: 'a',
+        amount: 20000,
+        direction: 'out',
+        occurred_at: '2026-08-15T00:00:00Z',
+      }),
+    ]
+    const periods = [
+      { from: '2026-07-01T00:00:00Z', to: '2026-07-31T23:59:59Z', label: 'Jul' },
+      { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
+    ]
+    const toPrimary = (e: MoneyEntryRow) => e.amount
+
+    const result = netWorthSeries(currentNet, entries, activeAccountIds, periods, toPrimary)
+
+    expect(result[result.length - 1].net).toBe(currentNet)
+  })
+
+  it('empty entries => flat line at currentNet', () => {
+    const currentNet = 100000
+    const activeAccountIds = new Set(['a'])
+    const entries: MoneyEntryRow[] = []
+    const periods = [
+      { from: '2026-06-01T00:00:00Z', to: '2026-06-30T23:59:59Z', label: 'Jun' },
+      { from: '2026-07-01T00:00:00Z', to: '2026-07-31T23:59:59Z', label: 'Jul' },
+      { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
+    ]
+    const toPrimary = (e: MoneyEntryRow) => e.amount
+
+    const result = netWorthSeries(currentNet, entries, activeAccountIds, periods, toPrimary)
+
+    expect(result).toHaveLength(3)
+    expect(result.every(p => p.net === currentNet)).toBe(true)
+  })
+
+  it('ignores deleted entries', () => {
+    const currentNet = 100000
+    const activeAccountIds = new Set(['a'])
+    const entries = [
+      row({
+        id: '1',
+        account_id: 'a',
+        amount: 20000,
+        direction: 'out',
+        occurred_at: '2026-08-15T00:00:00Z',
+        deleted_at: '2026-08-20T00:00:00Z',
+      }),
+      row({
+        id: '2',
+        account_id: 'a',
+        amount: 50000,
+        direction: 'in',
+        occurred_at: '2026-08-10T00:00:00Z',
+        deleted_at: null,
+      }),
+    ]
+    const periods = [
+      { from: '2026-07-01T00:00:00Z', to: '2026-07-31T23:59:59Z', label: 'Jul' },
+      { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
+    ]
+    const toPrimary = (e: MoneyEntryRow) => e.amount
+
+    const result = netWorthSeries(currentNet, entries, activeAccountIds, periods, toPrimary)
+
+    expect(result).toHaveLength(2)
+    // Jul: both entries occur in Aug (at or after Jul end), but the 20000 out is deleted, so only 50000 in counts => rollback = +50000 => net = 100000 - 50000 = 50000
+    expect(result[0]).toEqual({ label: 'Jul', net: 50000 })
+    // Aug: net = 100000
+    expect(result[1]).toEqual({ label: 'Aug', net: 100000 })
+  })
+
+  it('does not mutate inputs', () => {
+    const currentNet = 100000
+    const activeAccountIds = new Set(['a'])
+    const entries = [
+      row({
+        id: '1',
+        account_id: 'a',
+        amount: 20000,
+        direction: 'out',
+        occurred_at: '2026-08-15T00:00:00Z',
+      }),
+    ]
+    const periods = [
+      { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
+    ]
+    const toPrimary = (e: MoneyEntryRow) => e.amount
+
+    const originalEntries = JSON.parse(JSON.stringify(entries))
+    const originalPeriods = JSON.parse(JSON.stringify(periods))
+
+    netWorthSeries(currentNet, entries, activeAccountIds, periods, toPrimary)
+
+    expect(entries).toEqual(originalEntries)
+    expect(periods).toEqual(originalPeriods)
   })
 })
