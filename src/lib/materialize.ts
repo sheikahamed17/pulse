@@ -87,8 +87,8 @@ async function materializeRow_LWW(
   // an op that never touched a field must not clobber it.
   for (const f of fields) {
     if (merged[f] !== undefined) {
-      // For learning_entries and note_entries, tags are stored as JSON strings in the DB
-      if ((tableName === 'learning_entries' || tableName === 'note_entries' || tableName === 'tasks') && f === 'tags') {
+      // For learning_entries, note_entries, tasks, and money_entries, tags are stored as JSON strings in the DB
+      if ((tableName === 'money_entries' || tableName === 'learning_entries' || tableName === 'note_entries' || tableName === 'tasks') && f === 'tags') {
         row[f] = JSON.stringify(merged[f])
       } else {
         row[f] = merged[f]
@@ -103,8 +103,8 @@ async function materializeRow_LWW(
   }
   for (const f of fields) {
     if (merged[f] !== undefined) {
-      // For learning_entries and note_entries, tags are stored as JSON strings in the DB
-      if ((tableName === 'learning_entries' || tableName === 'note_entries' || tableName === 'tasks') && f === 'tags') {
+      // For learning_entries, note_entries, tasks, and money_entries, tags are stored as JSON strings in the DB
+      if ((tableName === 'money_entries' || tableName === 'learning_entries' || tableName === 'note_entries' || tableName === 'tasks') && f === 'tags') {
         updates[f] = JSON.stringify(merged[f])
       } else {
         updates[f] = merged[f]

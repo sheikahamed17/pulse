@@ -14,6 +14,8 @@ export const MoneyPayloadSchema = z.object({
   receipt_key: z.string().min(1).nullable().optional(),
   raw_input: z.string().nullable().optional(),
   recurring_rule_id: z.string().min(1).nullable().optional(),
+  merchant: z.string().max(120).nullable().optional(),
+  tags: z.array(z.string().max(40)).max(20).optional(),
 })
 
 export type MoneyPayload = z.infer<typeof MoneyPayloadSchema>

@@ -104,6 +104,8 @@ export type MoneyEntryRow = {
   receipt_key: string | null
   raw_input: string | null
   recurring_rule_id: string | null
+  merchant: string | null
+  tags: string[]
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string
