@@ -26,6 +26,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/goals">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Goals</CardTitle>
+              <CardDescription>Set savings targets and track progress toward your goals.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/settings/projects">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>
