@@ -356,6 +356,39 @@ describe('/api/sync — Phase 1 entity kinds', () => {
     })
   })
 
+  it('persists a widget entry with type and sort_order', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const op = {
+        id: 'op-w1',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'widget' as const,
+        entity_id: 'widget-spent',
+        op_type: 'create' as const,
+        payload: { type: 'spent', sort_order: 2, label: null },
+        schema_version: 1,
+      }
+      const push = await callSync({ device_id: 'd1', new_ops: [op] })
+      expect(push.applied_ack).toEqual(['op-w1'])
+
+      // Verify server-side materialization
+      const rows = await testDb.selectFrom('widgets').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].type).toBe('spent')
+      expect(rows[0].sort_order).toBe(2)
+      expect(rows[0].label).toBeNull()
+
+      // Verify client-side round-trip: op is included in next pull (generic applyOp propagates type/sort_order)
+      const pull = await callSync({ device_id: 'd2', new_ops: [] })
+      expect(pull.new_ops_from_server).toHaveLength(1)
+      const pulledOp = pull.new_ops_from_server[0]
+      expect(pulledOp.entity_kind).toBe('widget')
+      expect(pulledOp.payload.type).toBe('spent')
+      expect(pulledOp.payload.sort_order).toBe(2)
+    })
+  })
+
   it('persists a recurring rule', async () => {
     await withTestUser(async ({ userId, callSync, testDb }) => {
       const op = {

@@ -27,6 +27,8 @@ describe('db types', () => {
       id: 'w1',
       user_id: 'u1',
       label: 'A',
+      type: 'spent',
+      sort_order: 0,
       field_hlcs: '{}',
       deleted_at: null,
       created_at: new Date().toISOString(),

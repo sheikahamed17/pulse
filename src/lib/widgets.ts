@@ -1,0 +1,47 @@
+export type WidgetType = 'spent' | 'budgets' | 'today-tasks' | 'spend-trend' | 'recent-activity'
+
+export const WIDGET_CATALOG: Array<{ type: WidgetType; label: string; description: string }> = [
+  { type: 'spent', label: 'Spent', description: 'Total spending overview' },
+  { type: 'budgets', label: 'Budgets', description: 'Budget categories' },
+  { type: 'today-tasks', label: 'Today\'s Tasks', description: 'Due today and overdue tasks' },
+  { type: 'spend-trend', label: 'Spend Trend', description: 'Last 6 months spending trend' },
+  { type: 'recent-activity', label: 'Recent Activity', description: 'Recent entries across domains' },
+]
+
+export const DEFAULT_WIDGET_TYPES: WidgetType[] = [
+  'spent',
+  'budgets',
+  'today-tasks',
+  'spend-trend',
+  'recent-activity',
+]
+
+export function widgetId(userId: string, type: WidgetType): string {
+  return `widget-${userId}-${type}`
+}
+
+export function reorder(
+  items: Array<{ id: string; sort_order: number }>,
+  id: string,
+  dir: 'up' | 'down',
+): Array<{ id: string; sort_order: number }> {
+  // Find the item's index in sort_order ascending order
+  const sorted = [...items].sort((a, b) => a.sort_order - b.sort_order)
+  const idx = sorted.findIndex(item => item.id === id)
+
+  // If not found, boundary, or can't move in that direction, return empty
+  if (idx < 0) return []
+  if (dir === 'up' && idx === 0) return []
+  if (dir === 'down' && idx === sorted.length - 1) return []
+
+  // Swap with neighbor
+  const neighbor = dir === 'up' ? sorted[idx - 1] : sorted[idx + 1]
+  const item = sorted[idx]
+
+  // Swap sort_order values
+  const temp = item.sort_order
+  item.sort_order = neighbor.sort_order
+  neighbor.sort_order = temp
+
+  return [item, neighbor]
+}

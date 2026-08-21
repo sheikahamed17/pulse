@@ -76,6 +76,8 @@ export interface WidgetTable {
   id: string
   user_id: string
   label: string | null
+  type: string | null
+  sort_order: number
   field_hlcs: string             // JSON-encoded
   deleted_at: string | null
   created_at: string

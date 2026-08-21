@@ -136,6 +136,8 @@ async function materializeWidget(db: Kysely<DB>, op: Op, userId: string) {
         created_at: existing.created_at,
         updated_at: existing.updated_at,
         label: existing.label,
+        type: existing.type,
+        sort_order: existing.sort_order,
       }
     : undefined
 
@@ -145,6 +147,8 @@ async function materializeWidget(db: Kysely<DB>, op: Op, userId: string) {
     id: op.entity_id,
     user_id: userId,
     label: (merged.label as string | null) ?? null,
+    type: (merged.type as string | null) ?? null,
+    sort_order: (merged.sort_order as number) ?? 0,
     field_hlcs: JSON.stringify(merged.field_hlcs),
     deleted_at: merged.deleted_at,
     created_at: merged.created_at,
@@ -157,6 +161,8 @@ async function materializeWidget(db: Kysely<DB>, op: Op, userId: string) {
     .values(row)
     .onConflict(oc => oc.column('id').doUpdateSet({
       label: row.label,
+      type: row.type,
+      sort_order: row.sort_order,
       field_hlcs: row.field_hlcs,
       deleted_at: row.deleted_at,
       updated_at: row.updated_at,
