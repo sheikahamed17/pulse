@@ -169,6 +169,7 @@ function ConfirmationChipMoney({
           <Input
             autoFocus
             maxLength={120}
+            aria-label="Merchant or payee"
             defaultValue={d.merchant ?? ''}
             onBlur={(e) => {
               setD(s => ({ ...s, merchant: e.currentTarget.value || null }))
