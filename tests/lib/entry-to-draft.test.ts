@@ -6,20 +6,27 @@ const base = { user_id: 'u1', field_hlcs: {}, deleted_at: null, created_at: '202
 
 describe('entry-to-draft mappers', () => {
   it('money: maps all domain fields + kind', () => {
-    const r: MoneyEntryRow = { ...base, id: 'm1', amount: 7500, currency: 'INR', direction: 'out', category_id: 'c1', description: 'rent', occurred_at: '2026-07-01T10:00:00.000Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null }
+    const r: MoneyEntryRow = { ...base, id: 'm1', amount: 7500, currency: 'INR', direction: 'out', category_id: 'c1', description: 'rent', occurred_at: '2026-07-01T10:00:00.000Z', source: 'manual', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [] }
     expect(moneyRowToDraft(r)).toEqual({
       kind: 'money', amount: 7500, currency: 'INR', direction: 'out', category_id: 'c1',
       description: 'rent', occurred_at: '2026-07-01T10:00:00.000Z', source: 'manual',
-      receipt_key: null, raw_input: null, recurring_rule_id: null,
+      receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: null, tags: [],
     })
   })
 
   it('money: null category/description survive', () => {
-    const r: MoneyEntryRow = { ...base, id: 'm2', amount: 100, currency: 'USD', direction: 'in', category_id: null, description: null, occurred_at: '2026-07-01T10:00:00.000Z', source: 'voice', receipt_key: null, raw_input: 'got 1', recurring_rule_id: null }
+    const r: MoneyEntryRow = { ...base, id: 'm2', amount: 100, currency: 'USD', direction: 'in', category_id: null, description: null, occurred_at: '2026-07-01T10:00:00.000Z', source: 'voice', receipt_key: null, raw_input: 'got 1', recurring_rule_id: null, merchant: null, tags: [] }
     const d = moneyRowToDraft(r)
     expect(d.category_id).toBeNull()
     expect(d.description).toBeNull()
     expect(d.direction).toBe('in')
+  })
+
+  it('money: merchant and tags are copied from row', () => {
+    const r: MoneyEntryRow = { ...base, id: 'm3', amount: 5000, currency: 'INR', direction: 'out', category_id: 'c2', description: null, occurred_at: '2026-07-01T10:00:00.000Z', source: 'sms', receipt_key: null, raw_input: null, recurring_rule_id: null, merchant: 'AMAZON', tags: ['subscription', 'shopping'] }
+    const d = moneyRowToDraft(r)
+    expect(d.merchant).toBe('AMAZON')
+    expect(d.tags).toEqual(['subscription', 'shopping'])
   })
 
   it('task: maps fields, defaults undefined tags to []', () => {

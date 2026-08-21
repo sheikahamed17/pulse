@@ -96,6 +96,82 @@ describe('applyLocalOp — Phase 1 entity kinds', () => {
     expect(row?.description).toBe('chai')
   })
 
+  it('materializes money_entries with merchant and tags', async () => {
+    await applyLocalOp({
+      id: 'op-m2',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'money', entity_id: 'm2',
+      op_type: 'create',
+      payload: {
+        amount: 15000, currency: 'INR', direction: 'out',
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual', description: null,
+        merchant: 'CRUNCHYROLL',
+        tags: ['subscription', 'fun'],
+      },
+      schema_version: 1,
+    })
+    const row = await db.money_entries.get('m2')
+    expect(row?.amount).toBe(15000)
+    expect(row?.merchant).toBe('CRUNCHYROLL')
+    expect(row?.tags).toEqual(['subscription', 'fun'])
+    expect(Array.isArray(row?.tags)).toBe(true)
+  })
+
+  it('stores money tags as a native array, not stringified', async () => {
+    await applyLocalOp({
+      id: 'op-m-tags-array',
+      hlc: '0000000000000003-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'money', entity_id: 'm-tags',
+      op_type: 'create',
+      payload: {
+        amount: 5000, currency: 'INR', direction: 'out',
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'sms',
+        merchant: 'UBER',
+        tags: ['travel', 'work'],
+      },
+      schema_version: 1,
+    })
+    const row = await db.money_entries.get('m-tags')
+    expect(Array.isArray(row?.tags)).toBe(true)
+    expect(row?.tags).toEqual(['travel', 'work'])
+  })
+
+  it('updates money entry via update op (LWW merge with tags)', async () => {
+    await applyLocalOp({
+      id: 'op-m-create',
+      hlc: '0000000000000004-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'money', entity_id: 'm-update',
+      op_type: 'create',
+      payload: {
+        amount: 1000, currency: 'INR', direction: 'out',
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+        merchant: 'OLD_MERCHANT',
+        tags: ['old'],
+      },
+      schema_version: 1,
+    })
+    await applyLocalOp({
+      id: 'op-m-update',
+      hlc: '0000000000000005-000000-d1',
+      device_id: 'd1', user_id: 'u1',
+      entity_kind: 'money', entity_id: 'm-update',
+      op_type: 'update',
+      payload: {
+        tags: ['new', 'updated'],
+      },
+      schema_version: 1,
+    })
+    const row = await db.money_entries.get('m-update')
+    expect(row?.merchant).toBe('OLD_MERCHANT')
+    expect(row?.tags).toEqual(['new', 'updated'])
+  })
+
   it('materializes a category create op', async () => {
     await applyLocalOp({
       id: 'op-c1',

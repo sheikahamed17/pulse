@@ -9,7 +9,7 @@ describe('smsToMoneyPayload', () => {
     )
     expect(p).toEqual({
       amount: 50000, currency: 'INR', direction: 'out', category_id: null,
-      description: 'AMAZON', occurred_at: '2026-07-23T10:00:00.000Z', source: 'sms',
+      description: null, merchant: 'AMAZON', tags: [], occurred_at: '2026-07-23T10:00:00.000Z', source: 'sms',
       raw_input: 'Rs.500 debited ... AMAZON',
     })
   })
@@ -19,6 +19,8 @@ describe('smsToMoneyPayload', () => {
     expect(p?.currency).toBe('USD')
     expect(p?.direction).toBe('out')
     expect(p?.description).toBeNull()
+    expect(p?.merchant).toBeNull()
+    expect(p?.tags).toEqual([])
   })
 
   it('returns null for a non-transaction or missing amount', () => {

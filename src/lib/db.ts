@@ -133,6 +133,8 @@ export interface MoneyEntryTable {
   receipt_key: string | null
   raw_input: string | null
   recurring_rule_id: string | null
+  merchant: string | null
+  tags: string | null             // JSON array
   field_hlcs: string
   deleted_at: string | null
   created_at: string

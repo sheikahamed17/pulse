@@ -163,6 +163,139 @@ describe('MoneyPayloadSchema receipt fields', () => {
   })
 })
 
+describe('MoneyPayloadSchema merchant + tags fields', () => {
+  it('accepts merchant and tags together', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      merchant: 'CRUNCHYROLL',
+      tags: ['subscription', 'fun'],
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts merchant alone', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      merchant: 'ACME Corp',
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts tags alone', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      tags: ['groceries', 'weekly'],
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts null merchant', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      merchant: null,
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects merchant exceeding max 120 chars', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      merchant: 'a'.repeat(121),
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts merchant at max 120 chars', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      merchant: 'a'.repeat(120),
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects tag exceeding max 40 chars', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      tags: ['valid', 'a'.repeat(41)],
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts tag at max 40 chars', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      tags: ['valid', 'a'.repeat(40)],
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects more than 20 tags', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      tags: Array.from({ length: 21 }, (_, i) => `tag${i}`),
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts exactly 20 tags', () => {
+    const payload = {
+      amount: 10000,
+      currency: 'INR',
+      direction: 'out',
+      source: 'voice',
+      occurred_at: '2026-06-28T12:00:00.000Z',
+      tags: Array.from({ length: 20 }, (_, i) => `tag${i}`),
+    }
+    const result = MoneyPayloadSchema.safeParse(payload)
+    expect(result.success).toBe(true)
+  })
+})
+
 describe('getPayloadSchemaForKind dispatcher', () => {
   it('returns the right schema per entity_kind', () => {
     expect(getPayloadSchemaForKind('money')).toBe(MoneyPayloadSchema)

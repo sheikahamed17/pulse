@@ -15,6 +15,8 @@ const row = (o: Partial<MoneyEntryRow>): MoneyEntryRow => ({
   receipt_key: null,
   raw_input: null,
   recurring_rule_id: null,
+  merchant: null,
+  tags: [],
   field_hlcs: {},
   deleted_at: null,
   created_at: '',
