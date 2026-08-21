@@ -34,14 +34,12 @@ export function reorder(
   if (dir === 'up' && idx === 0) return []
   if (dir === 'down' && idx === sorted.length - 1) return []
 
-  // Swap with neighbor
+  // Swap sort_order with the neighbor — return NEW records (never mutate input).
   const neighbor = dir === 'up' ? sorted[idx - 1] : sorted[idx + 1]
   const item = sorted[idx]
 
-  // Swap sort_order values
-  const temp = item.sort_order
-  item.sort_order = neighbor.sort_order
-  neighbor.sort_order = temp
-
-  return [item, neighbor]
+  return [
+    { id: item.id, sort_order: neighbor.sort_order },
+    { id: neighbor.id, sort_order: item.sort_order },
+  ]
 }
