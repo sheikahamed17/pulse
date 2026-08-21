@@ -63,7 +63,7 @@ export async function generateInsight(args: GenerateInsightArgs): Promise<{ skip
     id: op.id, user_id: op.user_id, hlc: op.hlc, device_id: op.device_id,
     entity_kind: op.entity_kind, entity_id: op.entity_id, op_type: op.op_type,
     payload: JSON.stringify(op.payload), schema_version: op.schema_version, applied_at: Date.now(),
-  }).execute()
+  }).onConflict(oc => oc.column('id').doNothing()).execute()
 
   await materializeRow(db, op, userId)
 
