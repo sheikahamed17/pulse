@@ -18,6 +18,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/accounts">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Accounts</CardTitle>
+              <CardDescription>Add, rename, archive bank accounts and credit cards.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/settings/projects">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>
