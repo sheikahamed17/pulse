@@ -2,32 +2,45 @@
 
 import { useMemo } from 'react'
 import { useTasks } from '@/hooks/use-tasks'
+import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { EntryTimestamp } from '@/components/entry-timestamp'
 
 type Props = { userId: string }
 
+// YYYY-MM-DD for a given instant in the user's timezone (en-CA yields ISO order).
+// Mirrors src/lib/format.ts's safe-fallback for a corrupt tz string.
+function localDay(ms: number, tz: string): string {
+  try { return new Date(ms).toLocaleDateString('en-CA', { timeZone: tz }) }
+  catch { return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'UTC' }) }
+}
+
 export function TodayTasksWidget({ userId }: Props) {
   const tasks = useTasks(userId, 'open')
+  const { prefs } = useUserPrefs()
+  const tz = prefs.tz
 
   const { overdue, dueTodayOrSoon } = useMemo(() => {
     const nowMs = new Date().getTime()
-    const now = new Date(nowMs).toISOString().split('T')[0] // YYYY-MM-DD in local tz
+    // Compare on the user's LOCAL calendar day, not UTC (a task due "today" for a
+    // user east/west of UTC must land under today, not yesterday/tomorrow).
+    const today = localDay(nowMs, tz)
+    const in7 = localDay(nowMs + 7 * 24 * 60 * 60 * 1000, tz)
 
     const overdue: typeof tasks = []
     const dueTodayOrSoon: typeof tasks = []
 
     for (const task of tasks) {
       if (!task.due_at) continue
-      const dueDate = task.due_at.split('T')[0]
-      if (dueDate < now) {
+      const dueDay = localDay(new Date(task.due_at).getTime(), tz)
+      if (dueDay < today) {
         overdue.push(task)
-      } else if (dueDate === now || dueDate < new Date(nowMs + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]) {
+      } else if (dueDay === today || dueDay < in7) {
         dueTodayOrSoon.push(task)
       }
     }
 
     return { overdue, dueTodayOrSoon }
-  }, [tasks])
+  }, [tasks, tz])
 
   const combinedTasks = [...overdue, ...dueTodayOrSoon].slice(0, 8)
 

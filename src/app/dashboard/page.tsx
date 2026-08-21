@@ -153,7 +153,7 @@ export default function DashboardPage() {
             <ul className="flex flex-col gap-3">
               {widgets.map((w, idx) => (
                 <li key={w.id} className="flex flex-col gap-2">
-                  <WidgetCard type={w.type as WidgetType} userId={userId!} />
+                  <WidgetCard type={w.type as WidgetType | null} userId={userId!} />
 
                   <div className="flex items-center justify-between gap-2 px-1">
                     <div className="flex gap-1">
