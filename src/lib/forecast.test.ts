@@ -224,6 +224,24 @@ describe('upcomingOccurrences', () => {
     })
   })
 
+  it('safety cap: a daily rule whose next_due is far in the past terminates bounded (never hangs)', () => {
+    // next_due ~2.5 years before the window → reaching it daily would take >900
+    // steps; the 500-iteration cap MUST break the loop so the call returns.
+    const rules = [
+      rule({
+        id: 'stale-daily',
+        amount: 100,
+        period: 'daily',
+        interval_count: 1,
+        anchor_at: '2024-01-01T00:00:00Z',
+        next_due_at: '2024-01-01T00:00:00Z',
+      }),
+    ]
+    const events = upcomingOccurrences(rules, '2026-08-01T00:00:00Z', '2026-08-31T00:00:00Z')
+    // Terminates (test doesn't hang) and never exceeds the per-rule cap.
+    expect(events.length).toBeLessThanOrEqual(500)
+  })
+
   it('multiple rules are returned in date order across all rules', () => {
     const rules = [
       rule({
