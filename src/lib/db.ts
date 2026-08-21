@@ -137,6 +137,7 @@ export interface MoneyEntryTable {
   recurring_rule_id: string | null
   merchant: string | null
   tags: string | null             // JSON array
+  account_id: string | null
   field_hlcs: string
   deleted_at: string | null
   created_at: string
@@ -198,6 +199,21 @@ export interface BudgetTable {
   category_id: string
   amount: number
   currency: string
+  field_hlcs: string          // JSON Record<string,string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AccountsTable {
+  id: string
+  user_id: string
+  name: string
+  type: 'asset' | 'liability'
+  opening_balance: number
+  currency: string
+  icon: string | null
+  is_archived: number
   field_hlcs: string          // JSON Record<string,string>
   deleted_at: string | null
   created_at: string
@@ -281,6 +297,7 @@ export interface DB {
   learning_entries: LearningEntryTable
   note_entries: NoteEntryTable
   budgets: BudgetTable
+  accounts: AccountsTable
   projects: ProjectTable
   fx_rates: FxRateTable
   insights: InsightTable

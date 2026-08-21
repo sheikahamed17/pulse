@@ -10,6 +10,7 @@ import {
   LEARNING_FIELDS,
   NOTE_FIELDS,
   INSIGHT_FIELDS,
+  ACCOUNT_FIELDS,
   BUDGET_FIELDS,
   PROJECT_FIELDS,
 } from '@/lib/entity-fields'
@@ -36,6 +37,8 @@ export async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
       return materializeRow_LWW(db, op, userId, 'note_entries', NOTE_FIELDS)
     case 'insight':
       return materializeRow_LWW(db, op, userId, 'insights', INSIGHT_FIELDS)
+    case 'account':
+      return materializeRow_LWW(db, op, userId, 'accounts', ACCOUNT_FIELDS)
     case 'budget':
       return materializeRow_LWW(db, op, userId, 'budgets', BUDGET_FIELDS)
     case 'project':
@@ -49,7 +52,7 @@ async function materializeRow_LWW(
   db: Kysely<DB>,
   op: Op,
   userId: string,
-  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'learning_entries' | 'note_entries' | 'insights' | 'budgets' | 'projects',
+  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'learning_entries' | 'note_entries' | 'insights' | 'accounts' | 'budgets' | 'projects',
   fields: readonly string[],
 ) {
   const existing = await db

@@ -5,7 +5,7 @@ import type { MoneyEntryRow, RecurringRuleRow, BudgetRow } from '@/lib/dexie'
 const money = (o: Partial<MoneyEntryRow>): MoneyEntryRow => ({
   id: 'm', user_id: 'u', amount: 100, currency: 'INR', direction: 'out', category_id: null,
   description: null, occurred_at: '', source: 'manual', receipt_key: null, raw_input: null,
-  recurring_rule_id: null, merchant: null, tags: [], field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...o,
+  recurring_rule_id: null, merchant: null, tags: [], account_id: null, field_hlcs: {}, deleted_at: null, created_at: '', updated_at: '', ...o,
 })
 const recurring = (o: Partial<RecurringRuleRow>): RecurringRuleRow => ({
   id: 'r', user_id: 'u', amount: 100, currency: 'INR', direction: 'out', category_id: null,

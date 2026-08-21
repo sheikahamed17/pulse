@@ -692,3 +692,88 @@ describe('applyLocalOp — budget entity', () => {
     expect(row!.currency).toBe('INR')
   })
 })
+
+describe('applyLocalOp — account entity', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('applyLocalOp materializes an account to Dexie (client step)', async () => {
+    const op = await generateOp({
+      entity_kind: 'account', entity_id: 'cash-1',
+      op_type: 'create',
+      payload: { name: 'Cash', type: 'asset', opening_balance: 500000, currency: 'INR', icon: '💰', is_archived: 0 },
+      user_id: 'u1',
+    })
+    await applyLocalOp(op)
+    const row = await db.accounts.get('cash-1')
+    expect(row).toBeTruthy()
+    expect(row!.name).toBe('Cash')
+    expect(row!.type).toBe('asset')
+    expect(row!.opening_balance).toBe(500000)
+    expect(row!.currency).toBe('INR')
+    expect(row!.icon).toBe('💰')
+    expect(row!.is_archived).toBe(0)
+  })
+
+  it('account update op (per-field LWW) leaves other fields unchanged', async () => {
+    // Create account
+    const createOp = await generateOp({
+      entity_kind: 'account', entity_id: 'card-1',
+      op_type: 'create',
+      payload: { name: 'Credit Card', type: 'liability', opening_balance: 200000, currency: 'INR' },
+      user_id: 'u1',
+    })
+    await applyLocalOp(createOp)
+
+    // Update only the name
+    const updateOp = await generateOp({
+      entity_kind: 'account', entity_id: 'card-1',
+      op_type: 'update',
+      payload: { name: 'AMEX Card' },
+      user_id: 'u1',
+    })
+    await applyLocalOp(updateOp)
+
+    const row = await db.accounts.get('card-1')
+    expect(row!.name).toBe('AMEX Card')
+    expect(row!.opening_balance).toBe(200000)  // unchanged
+    expect(row!.type).toBe('liability')         // unchanged
+  })
+})
+
+describe('applyLocalOp — money with account_id', () => {
+  beforeEach(async () => { await resetDb() })
+
+  it('money op with account_id rounds trips to Dexie', async () => {
+    const op = await generateOp({
+      entity_kind: 'money', entity_id: 'm-with-acct',
+      op_type: 'create',
+      payload: {
+        amount: 10000, currency: 'INR', direction: 'out',
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual', description: 'lunch',
+        account_id: 'cash-1',
+      },
+      user_id: 'u1',
+    })
+    await applyLocalOp(op)
+    const row = await db.money_entries.get('m-with-acct')
+    expect(row?.account_id).toBe('cash-1')
+    expect(row?.amount).toBe(10000)
+  })
+
+  it('legacy money row with no account_id is handled correctly', async () => {
+    const op = await generateOp({
+      entity_kind: 'money', entity_id: 'm-legacy',
+      op_type: 'create',
+      payload: {
+        amount: 5000, currency: 'INR', direction: 'in',
+        occurred_at: '2026-06-18T14:30:00Z',
+        source: 'manual',
+      },
+      user_id: 'u1',
+    })
+    await applyLocalOp(op)
+    const row = await db.money_entries.get('m-legacy')
+    expect(row?.account_id).toBeUndefined()
+  })
+})

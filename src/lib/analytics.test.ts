@@ -17,6 +17,7 @@ const row = (o: Partial<MoneyEntryRow>): MoneyEntryRow => ({
   recurring_rule_id: null,
   merchant: null,
   tags: [],
+  account_id: null,
   field_hlcs: {},
   deleted_at: null,
   created_at: '',
