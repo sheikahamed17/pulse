@@ -104,6 +104,17 @@ describe('filterSortMoney', () => {
     expect(out.map(r => r.id)).toEqual(['3', '1'])
   })
 
+  it('filters by tag', () => {
+    const rows = [
+      row({ id: '1', tags: ['food', 'groceries'], occurred_at: '2026-08-01T00:00:00Z' }),
+      row({ id: '2', tags: ['fuel'], occurred_at: '2026-08-02T00:00:00Z' }),
+      row({ id: '3', tags: ['food', 'delivery'], occurred_at: '2026-08-03T00:00:00Z' }),
+      row({ id: '4', tags: [], occurred_at: '2026-08-04T00:00:00Z' }),
+    ]
+    const out = filterSortMoney(rows, { ...EMPTY_MONEY_FILTER, tag: 'food' }, 'date-desc', resolve)
+    expect(out.map(r => r.id)).toEqual(['3', '1'])
+  })
+
   it('does not mutate input array', () => {
     const rows = [
       row({ id: '1', amount: 300 }),

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { useCategories } from '@/hooks/use-categories'
+import { useMoneyEntries } from '@/hooks/use-money-entries'
 import type { MoneyEntryRow } from '@/lib/dexie'
 import type { MoneyFilter, MoneySort } from '@/lib/money-filter-sort'
 import { monthBounds } from '@/lib/money-filter-sort'
@@ -16,9 +17,18 @@ type Props = {
 
 export function MoneyControls({ userId, filter, sort, onFilter, onSort }: Props) {
   const allCats = useCategories(userId)
+  const entries = useMoneyEntries(userId)
 
   const spendCats = useMemo(() => allCats.filter(c => c.kind === 'spend'), [allCats])
   const incomeCats = useMemo(() => allCats.filter(c => c.kind === 'income'), [allCats])
+
+  const distinctTags = useMemo(() => {
+    const tags = new Set<string>()
+    entries.forEach(e => {
+      e.tags.forEach(tag => tags.add(tag))
+    })
+    return Array.from(tags).sort()
+  }, [entries])
 
   const sources: Array<MoneyEntryRow['source'] | 'all'> = ['all', 'manual', 'voice', 'receipt', 'sms', 'email', 'recurring']
 
@@ -89,6 +99,19 @@ export function MoneyControls({ userId, filter, sort, onFilter, onSort }: Props)
             </option>
           )
         })}
+      </select>
+
+      <select
+        value={filter.tag ?? ''}
+        onChange={e => onFilter({ ...filter, tag: e.target.value === '' ? null : e.target.value })}
+        className="min-h-[44px] px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+      >
+        <option value="">All tags</option>
+        {distinctTags.map(tag => (
+          <option key={tag} value={tag}>
+            {tag}
+          </option>
+        ))}
       </select>
 
       <div className="flex gap-1">

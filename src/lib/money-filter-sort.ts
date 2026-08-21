@@ -20,6 +20,7 @@ export type MoneyFilter = {
   direction: 'out' | 'in' | null
   from: string | null
   to: string | null
+  tag: string | null
 }
 
 export const EMPTY_MONEY_FILTER: MoneyFilter = {
@@ -28,6 +29,7 @@ export const EMPTY_MONEY_FILTER: MoneyFilter = {
   direction: null,
   from: null,
   to: null,
+  tag: null,
 }
 
 /** Filter then sort money entries. Pure; does not mutate input.
@@ -57,6 +59,9 @@ export function filterSortMoney(
 
     // Direction filter
     if (filter.direction !== null && r.direction !== filter.direction) return false
+
+    // Tag filter
+    if (filter.tag !== null && !r.tags.includes(filter.tag)) return false
 
     // Date range filter: from <= occurred_at < to
     if (filter.from !== null && r.occurred_at < filter.from) return false

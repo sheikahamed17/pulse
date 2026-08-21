@@ -20,6 +20,7 @@ import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { EntryTimestamp } from '@/components/entry-timestamp'
 import { filterSortMoney } from '@/lib/money-filter-sort'
 import { makeCategoryResolver } from '@/lib/category-resolve'
+import { cn } from '@/lib/utils'
 import type { MoneyEntryRow } from '@/lib/dexie'
 import type { MoneyFilter, MoneySort } from '@/lib/money-filter-sort'
 
@@ -128,10 +129,30 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
                     </div>
                   )}
                   <div className="text-sm md:text-base font-medium text-foreground">
-                    {e.description ? e.description : (cat ? cat.name : 'Uncategorized')}
+                    {e.description || e.merchant || (cat ? cat.name : 'Uncategorized')}
                   </div>
-                  {e.description && cat && (
-                    <span className="text-xs text-muted-foreground">{cat.name}</span>
+                  <div className="flex items-center gap-2">
+                    {e.description && cat && (
+                      <span className="text-xs text-muted-foreground">{cat.name}</span>
+                    )}
+                    {e.merchant && e.merchant !== (e.description || cat?.name) && (
+                      <span className="text-xs text-muted-foreground">· {e.merchant}</span>
+                    )}
+                  </div>
+                  {e.tags.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {e.tags.map(tag => (
+                        <span
+                          key={tag}
+                          className={cn(
+                            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                            'bg-white/10 text-muted-foreground border border-white/20',
+                          )}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   )}
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <EntryTimestamp occurredAt={e.occurred_at} />
