@@ -54,6 +54,9 @@ import { usePushSubscription } from '@/hooks/use-push-subscription'
 import { db, type MoneyEntryRow, type TaskRow, type LearningRow, type NoteRow } from '@/lib/dexie'
 import { moneyRowToDraft, taskRowToDraft, learningRowToDraft, noteRowToDraft } from '@/lib/entry-to-draft'
 import { blankDraftForKind } from '@/lib/blank-draft'
+import { manualDraftFromText } from '@/lib/manual-draft'
+import { useOnline } from '@/hooks/use-online'
+import { useQueuedCount } from '@/hooks/use-queued-count'
 import { UndoProvider } from '@/components/undo-provider'
 import { GlobalSearch } from '@/components/global-search'
 import { TodayNudge } from '@/components/today-nudge'
@@ -275,6 +278,8 @@ function AppPageInner() {
   const [activeTab, setTab] = useTabState()
   const { prefs } = useUserPrefs()
   const searchParams = useSearchParams()
+  const online = useOnline()
+  const queuedCount = useQueuedCount()
 
   // Global search "jump to row": after switching tabs, scroll the target row into
   // view + flash it. Retries because the destination list renders async (useLiveQuery).
@@ -452,6 +457,12 @@ function AppPageInner() {
 
   async function parseText() {
     if (!text.trim() || !user) return
+    if (!online) {
+      const kind = activeTab === 'tasks' ? 'task' : activeTab === 'learning' ? 'learning' : activeTab === 'notes' ? 'note' : 'money'
+      setDraft(manualDraftFromText(kind, text.trim(), prefs.primary_currency ?? 'INR', new Date().toISOString()))
+      setText('')
+      return
+    }
     setParsing(true)
     try {
       const res = await fetch('/api/agent', {
@@ -768,6 +779,11 @@ function AppPageInner() {
                 ?
               </Button>
             </div>
+            {!online && (
+              <div role="status" className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded whitespace-nowrap">
+                ● Offline — captures log manually / queue
+              </div>
+            )}
             <form onSubmit={(e) => { e.preventDefault(); parseText() }} className="flex flex-1 gap-2 ml-2">
               <Input
                 value={text}
@@ -777,10 +793,16 @@ function AppPageInner() {
                 className="bg-transparent placeholder:text-muted-foreground border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
               />
               <Button type="submit" disabled={parsing || draft !== null || queryPlan !== null || !text.trim()}>
-                {parsing ? 'Parsing…' : 'Parse'}
+                {parsing ? 'Parsing…' : online ? 'Parse' : 'Add'}
               </Button>
             </form>
           </div>
+
+          {queuedCount > 0 && (
+            <div aria-live="polite" className="text-xs text-muted-foreground px-3 py-2">
+              {queuedCount} capture{queuedCount === 1 ? '' : 's'} pending
+            </div>
+          )}
 
           {draft && (
             <ConfirmationChip
