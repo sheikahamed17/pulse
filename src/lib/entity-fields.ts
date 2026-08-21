@@ -37,6 +37,10 @@ export const ACCOUNT_FIELDS = [
   'name', 'type', 'opening_balance', 'currency', 'icon', 'is_archived',
 ] as const
 
+export const GOAL_FIELDS = [
+  'name', 'target_amount', 'currency', 'icon', 'account_id', 'saved_amount', 'target_date', 'is_archived',
+] as const
+
 export const BUDGET_FIELDS = [
   'category_id', 'amount', 'currency',
 ] as const

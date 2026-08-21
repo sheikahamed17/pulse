@@ -191,6 +191,23 @@ export type AccountRow = {
   updated_at: string
 }
 
+export type GoalRow = {
+  id: string
+  user_id: string
+  name: string
+  target_amount: number
+  currency: string
+  icon: string | null
+  account_id: string | null
+  saved_amount: number
+  target_date: string | null
+  is_archived: number
+  field_hlcs: Record<string, string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type ProjectRow = {
   id: string
   user_id: string
@@ -226,6 +243,7 @@ class PulseDb extends Dexie {
   note_entries!: EntityTable<NoteRow, 'id'>
   budgets!: EntityTable<BudgetRow, 'id'>
   accounts!: EntityTable<AccountRow, 'id'>
+  goals!: EntityTable<GoalRow, 'id'>
   receipt_drafts!: EntityTable<ReceiptDraftRow, 'id'>
   projects!: EntityTable<ProjectRow, 'id'>
   fx_rates!: Table<FxRateRow>
@@ -269,6 +287,9 @@ class PulseDb extends Dexie {
     this.version(10).stores({
       accounts: 'id, user_id, [user_id+type]',
     })
+    this.version(11).stores({
+      goals: 'id, user_id',
+    })
   }
 }
 
@@ -289,6 +310,7 @@ export async function resetDb() {
   await db.note_entries.clear()
   await db.budgets.clear()
   await db.accounts.clear()
+  await db.goals.clear()
   await db.projects.clear()
   await db.receipt_drafts.clear()
   await db.fx_rates.clear()

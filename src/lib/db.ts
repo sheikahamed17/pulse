@@ -220,6 +220,23 @@ export interface AccountsTable {
   updated_at: string
 }
 
+export interface GoalsTable {
+  id: string
+  user_id: string
+  name: string
+  target_amount: number
+  currency: string
+  icon: string | null
+  account_id: string | null
+  saved_amount: number
+  target_date: string | null
+  is_archived: number
+  field_hlcs: string          // JSON Record<string,string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ProjectTable {
   id: string
   user_id: string
@@ -298,6 +315,7 @@ export interface DB {
   note_entries: NoteEntryTable
   budgets: BudgetTable
   accounts: AccountsTable
+  goals: GoalsTable
   projects: ProjectTable
   fx_rates: FxRateTable
   insights: InsightTable
