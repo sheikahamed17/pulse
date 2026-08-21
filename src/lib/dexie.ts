@@ -47,6 +47,8 @@ export type WidgetRow = {
   id: string
   user_id: string
   label: string | null
+  type: string | null
+  sort_order: number
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string

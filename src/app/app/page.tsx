@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Settings, Search } from 'lucide-react'
+import { Settings, Search, LayoutDashboard } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { LockGate } from '@/components/lock-gate'
 import { PulseLogo } from '@/components/pulse-logo'
@@ -717,7 +717,10 @@ function AppPageInner() {
               >
                 <Search className="h-5 w-5" />
               </button>
-              <Link href="/settings" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors">
+              <Link href="/dashboard" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-accent-2 outline-none">
+                <LayoutDashboard className="h-5 w-5" />
+              </Link>
+              <Link href="/settings" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-accent-2 outline-none">
                 <Settings className="h-5 w-5" />
               </Link>
               <Button size="sm" variant="outline"

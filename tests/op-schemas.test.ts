@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { MoneyPayloadSchema } from '@/lib/op-schemas/money'
 import { RecurringPayloadSchema } from '@/lib/op-schemas/recurring'
 import { CategoryPayloadSchema } from '@/lib/op-schemas/category'
+import { WidgetPayloadSchema } from '@/lib/op-schemas/widget'
 import { getPayloadSchemaForKind } from '@/lib/op-schemas'
 
 describe('MoneyPayloadSchema', () => {
@@ -301,9 +302,10 @@ describe('getPayloadSchemaForKind dispatcher', () => {
     expect(getPayloadSchemaForKind('money')).toBe(MoneyPayloadSchema)
     expect(getPayloadSchemaForKind('recurring')).toBe(RecurringPayloadSchema)
     expect(getPayloadSchemaForKind('category')).toBe(CategoryPayloadSchema)
+    expect(getPayloadSchemaForKind('widget')).toBe(WidgetPayloadSchema)
   })
 
-  it('returns null for kinds without a schema (e.g. widget)', () => {
-    expect(getPayloadSchemaForKind('widget')).toBeNull()
+  it('returns null for kinds without a schema (e.g. project)', () => {
+    expect(getPayloadSchemaForKind('project')).toBeNull()
   })
 })

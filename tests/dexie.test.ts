@@ -125,6 +125,7 @@ describe('Dexie schema v3 — Phase 2', () => {
   it('Phase 0/1 stores from v1+v2 still work after v3 bump', async () => {
     await db.widgets.put({
       id: 'w1', user_id: 'u1', label: 'still works',
+      type: null, sort_order: 0,
       field_hlcs: {}, deleted_at: null,
       created_at: '2026-06-18T00:00:00.000Z', updated_at: '2026-06-18T00:00:00.000Z',
     })
