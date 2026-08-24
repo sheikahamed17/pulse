@@ -21,6 +21,7 @@ import { convertViaRates } from '@/lib/fx'
 import { currencySymbol } from '@/lib/currency'
 import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { analyticsPeriods, computeTopMovers, computeCategorySeries } from '@/lib/analytics'
+import { detectSpendingAnomalies } from '@/lib/spending-anomaly'
 import { netWorth, netWorthSeries, type AccountLike } from '@/lib/accounts'
 
 export default function AnalyticsPage() {
@@ -170,6 +171,16 @@ export default function AnalyticsPage() {
     [entries, periods, resolve, toPrimary],
   )
 
+  // Compute spending anomalies (using month buckets, independent of period toggle)
+  const anomalies = useMemo(() => {
+    const monthPeriods = analyticsPeriods(nowMs, 'month', 4)
+    const series = computeCategorySeries(
+      entries.filter(e => !e.deleted_at),
+      { periods: monthPeriods, resolve, toPrimary, topN: 50 },
+    )
+    return detectSpendingAnomalies(series)
+  }, [entries, nowMs, resolve, toPrimary])
+
   const symbol = currencySymbol(prefs.primary_currency)
   const jpy = prefs.primary_currency === 'JPY'
 
@@ -206,6 +217,47 @@ export default function AnalyticsPage() {
           ) : (
             <NetWorthLine data={netWorthSeriesData} symbol={symbol} jpy={jpy} />
           )}
+        </div>
+
+        {/* Unusual spending */}
+        <div className="glass rounded-2xl p-4">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unusual spending</p>
+            {anomalies.length > 0 ? (
+              <ul className="flex flex-col gap-2">
+                {anomalies.map(anomaly => {
+                  const fmt = (v: number) =>
+                    (v / (jpy ? 1 : 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                  return (
+                    <li key={anomaly.name} className="flex flex-col gap-1">
+                      <div className="text-xs text-foreground flex items-center gap-2">
+                        {anomaly.icon && <span>{anomaly.icon}</span>}
+                        <span className="font-medium">{anomaly.name}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        <span className="font-mono">
+                          {symbol}
+                          {fmt(anomaly.current)}
+                        </span>
+                        <span> this month · </span>
+                        <span className="text-rose-500 font-medium">{anomaly.pct}%</span>
+                        <span> above your </span>
+                        <span className="font-mono">
+                          {symbol}
+                          {fmt(anomaly.baseline)}
+                        </span>
+                        <span> average</span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No unusual spending this month &mdash; you&rsquo;re tracking to your norm.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Spend per period */}
