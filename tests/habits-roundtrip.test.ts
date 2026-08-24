@@ -97,4 +97,33 @@ describe('habit + habit_log round-trip (client-side)', () => {
     const h = await db.habits.get('h1')
     expect(h?.is_archived).toBeUndefined()
   })
+
+  it('habit: create with schedule persists to client Dexie', async () => {
+    await applyLocalOp(await generateOp({
+      entity_kind: 'habit', entity_id: 'h1', op_type: 'create',
+      payload: { name: 'Gym', icon: '💪', schedule: '1,3,5' },
+      user_id: U,
+    }))
+    const h = await db.habits.get('h1')
+    expect(h?.id).toBe('h1')
+    expect(h?.name).toBe('Gym')
+    expect(h?.schedule).toBe('1,3,5')
+  })
+
+  it('habit: update only schedule via per-field LWW leaves name unchanged', async () => {
+    await applyLocalOp(await generateOp({
+      entity_kind: 'habit', entity_id: 'h1', op_type: 'create',
+      payload: { name: 'Gym', icon: '💪', schedule: '1,3,5' },
+      user_id: U,
+    }))
+    await applyLocalOp(await generateOp({
+      entity_kind: 'habit', entity_id: 'h1', op_type: 'update',
+      payload: { schedule: '0,2,4,6' },
+      user_id: U,
+    }))
+    const h = await db.habits.get('h1')
+    expect(h?.name).toBe('Gym') // unchanged
+    expect(h?.icon).toBe('💪') // unchanged
+    expect(h?.schedule).toBe('0,2,4,6') // updated
+  })
 })
