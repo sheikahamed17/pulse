@@ -82,6 +82,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/data">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Data & backup</CardTitle>
+              <CardDescription>Export and import your complete data as JSON or CSV.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/insights">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>
