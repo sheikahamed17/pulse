@@ -6,6 +6,7 @@ import { MessageCircle, Send, RotateCcw } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { buildAgentHistory } from '@/lib/assistant'
 import type { AssistantTurn } from '@/lib/assistant'
+import { loadThread, saveThread } from '@/lib/assistant-storage'
 import { useCategories } from '@/hooks/use-categories'
 import { QueryAnswerCard } from '@/components/query-answer-card'
 import { QueryTaskListAnswer, QueryLearningListAnswer, QueryNotesListAnswer } from '@/components/query-answers'
@@ -48,13 +49,26 @@ function AssistantPageInner() {
   const [busy, setBusy] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const categories = useCategories(userId ?? undefined)
+  const hydratedRef = useRef(false)
 
   useEffect(() => {
     authClient.getSession().then(res => {
-      if (!res.data?.user) router.replace('/login')
-      else setUserId(res.data.user.id)
+      if (!res.data?.user) { router.replace('/login'); return }
+      const uid = res.data.user.id
+      // Load the persisted thread (local-only, not synced) together with the user
+      // id inside this async callback — avoids synchronous setState-in-effect and
+      // the ordering hazard of hydrating in a separate effect.
+      setTurns(loadThread(uid))
+      hydratedRef.current = true
+      setUserId(uid)
     })
   }, [router])
+
+  // Persist the thread (capped) whenever it changes, after hydration.
+  useEffect(() => {
+    if (!userId || !hydratedRef.current) return
+    saveThread(userId, turns)
+  }, [turns, userId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
