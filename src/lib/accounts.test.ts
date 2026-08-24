@@ -346,27 +346,35 @@ describe('netWorth', () => {
     expect(withTransfer.net).toBe(withoutTransfer.net)
   })
 
-  it('INVARIANT: netWorthSeries output identical with vs without a transfer', () => {
-    const entries = [
-      row({
-        id: '1',
-        account_id: 'asset1',
-        amount: 20000,
-        direction: 'out',
-        occurred_at: '2026-08-15T00:00:00Z',
-      }),
+  it('INVARIANT: a transfer does not change the net-worth series (via currentNet invariance)', () => {
+    // The series is driven by currentNet + money entries. A transfer is NOT a
+    // series input; the ONLY way it could perturb the series is by changing
+    // currentNet. So derive currentNet BOTH ways (with/without a transfer)
+    // through netWorth, then feed each into netWorthSeries. If a sign bug made
+    // a transfer move net worth, the two currentNets — and the two series —
+    // would differ, and this test would fail.
+    const accts: AccountLike[] = [
+      { id: 'asset1', name: 'Asset', type: 'asset', opening_balance: 200000, currency: 'INR', icon: null },
+      { id: 'card1', name: 'Card', type: 'liability', opening_balance: 100000, currency: 'INR', icon: null },
     ]
-    const activeAccountIds = new Set(['asset1'])
+    const entries = [
+      row({ id: '1', account_id: 'asset1', amount: 20000, direction: 'out', occurred_at: '2026-08-15T00:00:00Z' }),
+    ]
+    const transfers = [
+      { id: 't1', from_account_id: 'asset1', to_account_id: 'card1', amount: 50000, currency: 'INR', deleted_at: null },
+    ]
+    const activeAccountIds = new Set(['asset1', 'card1'])
     const periods = [
+      { from: '2026-07-01T00:00:00Z', to: '2026-07-31T23:59:59Z', label: 'Jul' },
       { from: '2026-08-01T00:00:00Z', to: '2026-08-31T23:59:59Z', label: 'Aug' },
     ]
     const toPrimaryEntry = (e: MoneyEntryRow) => e.amount
 
-    // Without transfer
-    const seriesWithout = netWorthSeries(100000, entries, activeAccountIds, periods, toPrimaryEntry)
+    const netWithout = netWorth(accts, entries, [], toAcct, toPrimary).net
+    const netWith = netWorth(accts, entries, transfers, toAcct, toPrimary).net
 
-    // With transfer (should not affect series since transfers have zero net-worth effect)
-    const seriesWith = netWorthSeries(100000, entries, activeAccountIds, periods, toPrimaryEntry)
+    const seriesWithout = netWorthSeries(netWithout, entries, activeAccountIds, periods, toPrimaryEntry)
+    const seriesWith = netWorthSeries(netWith, entries, activeAccountIds, periods, toPrimaryEntry)
 
     expect(seriesWith).toEqual(seriesWithout)
   })
