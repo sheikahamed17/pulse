@@ -55,10 +55,17 @@ export async function POST(req: Request) {
   const payload = smsToMoneyPayload(agentOut, primary, nowIso, text, source)
 
   if (payload) {
-    const accts = await db.selectFrom('accounts')
-      .where('user_id', '=', userId).where('deleted_at', 'is', null)
-      .selectAll().execute()
-    payload.account_id = matchAccountFromText(text, accts as unknown as MatchableAccount[])
+    // Account auto-match is BEST-EFFORT enrichment — it must never fail the core
+    // ingest (recording the transaction). A transient D1 error on the accounts
+    // query just leaves the entry untagged (account_id null), same as no match.
+    try {
+      const accts = await db.selectFrom('accounts')
+        .where('user_id', '=', userId).where('deleted_at', 'is', null)
+        .selectAll().execute()
+      payload.account_id = matchAccountFromText(text, accts as unknown as MatchableAccount[])
+    } catch (err) {
+      console.warn('sms-ingest account match skipped', err)
+    }
   }
 
   // Token-gated dry-run: return exactly what the parser extracted, write NO op.
