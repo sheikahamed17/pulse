@@ -6,24 +6,31 @@ import { QueryLearningResponseSchema, type QueryLearningResponse } from './schem
 type Args = {
   client: Groq
   text: string
+  history?: string[]
   nowIso?: string
   userTz?: string
 }
 
 export async function parseLearningQuery({
-  client, text, nowIso, userTz,
+  client, text, history, nowIso, userTz,
 }: Args): Promise<QueryLearningResponse> {
   const system = buildQueryLearningSystemPrompt({
     nowIso: nowIso ?? new Date().toISOString(),
     userTz: userTz ?? 'UTC',
   })
 
+  let userContent = text
+  if (history && history.length > 0) {
+    const recentMsgs = history.map(msg => `- ${msg}`).join('\n')
+    userContent = `Recent messages:\n${recentMsgs}\n\nCurrent message: ${text}`
+  }
+
   const raw = await withRetry(
     () => callGroqJSON<unknown>({
       client,
       model: 'openai/gpt-oss-120b',
       system,
-      user: text,
+      user: userContent,
       temperature: 0,
       maxTokens: 256,
     }),

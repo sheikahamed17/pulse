@@ -22,6 +22,8 @@ Rules:
      } | null
    }
 
+1a. If recent messages are provided and the current message is a short follow-up (e.g. "and tagged personal?", "from today?"), resolve the missing search/tags/period from them.
+
 2. Search inference:
    - "find my note about wifi" → search: "wifi", tags: [], period: null
    - "notes about debugging" → search: "debugging", tags: [], period: null

@@ -6,15 +6,22 @@ import { RouterResponseSchema, type RouterResponse } from './schemas/router-resp
 type Args = {
   client: Groq
   text: string
+  history?: string[]
 }
 
-export async function routeIntent({ client, text }: Args): Promise<RouterResponse> {
+export async function routeIntent({ client, text, history }: Args): Promise<RouterResponse> {
+  let userContent = text
+  if (history && history.length > 0) {
+    const recentMsgs = history.map(msg => `- ${msg}`).join('\n')
+    userContent = `Recent messages:\n${recentMsgs}\n\nCurrent message: ${text}`
+  }
+
   const raw = await withRetry(
     () => callGroqJSON<unknown>({
       client,
       model: 'openai/gpt-oss-20b',
       system: ROUTER_SYSTEM_PROMPT,
-      user: text,
+      user: userContent,
       temperature: 0,
       maxTokens: 64,
     }),

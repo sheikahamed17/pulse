@@ -7,12 +7,13 @@ type Args = {
   client: Groq
   text: string
   categories: Array<{ name: string; kind: 'spend' | 'income' }>
+  history?: string[]
   nowIso?: string
   userTz?: string
 }
 
 export async function parseMoneyQuery({
-  client, text, categories, nowIso, userTz,
+  client, text, categories, history, nowIso, userTz,
 }: Args): Promise<QueryMoneyResponse> {
   const system = buildQueryMoneySystemPrompt({
     nowIso: nowIso ?? new Date().toISOString(),
@@ -20,12 +21,18 @@ export async function parseMoneyQuery({
     categories,
   })
 
+  let userContent = text
+  if (history && history.length > 0) {
+    const recentMsgs = history.map(msg => `- ${msg}`).join('\n')
+    userContent = `Recent messages:\n${recentMsgs}\n\nCurrent message: ${text}`
+  }
+
   const raw = await withRetry(
     () => callGroqJSON<unknown>({
       client,
       model: 'openai/gpt-oss-120b',
       system,
-      user: text,
+      user: userContent,
       temperature: 0,
       maxTokens: 256,
     }),

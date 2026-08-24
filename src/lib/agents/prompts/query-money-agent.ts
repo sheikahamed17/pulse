@@ -33,6 +33,8 @@ Rules:
      }
    }
 
+1a. If recent messages are provided and the current message is a short follow-up (e.g. "and last month?", "what about food?"), resolve the missing category/period/direction from them.
+
 2. Period extraction (interpret in ${userTz}, return ISO UTC bounds):
    - "this week" → start of current week (Monday) ${userTz}, exclusive end = next Monday
    - "last week" → previous full week
