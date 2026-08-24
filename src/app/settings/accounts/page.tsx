@@ -21,6 +21,7 @@ export default function AccountsPage() {
   const [newType, setNewType] = useState<'asset' | 'liability'>('asset')
   const [newOpeningBalance, setNewOpeningBalance] = useState('')
   const [newCurrency, setNewCurrency] = useState<typeof SUPPORTED_CURRENCIES[number]>('INR')
+  const [matchHints, setMatchHints] = useState('')
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -47,6 +48,7 @@ export default function AccountsPage() {
         opening_balance: openingBalanceMinor,
         currency: newCurrency,
         icon: newIcon.trim() || null,
+        match_hints: matchHints.trim() || null,
       },
       user_id: userId,
     })
@@ -56,6 +58,7 @@ export default function AccountsPage() {
     setNewOpeningBalance('')
     setNewType('asset')
     setNewCurrency('INR')
+    setMatchHints('')
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
   }
 
@@ -131,6 +134,13 @@ export default function AccountsPage() {
                 ))}
               </select>
             </div>
+            <Input
+              value={matchHints}
+              onChange={e => setMatchHints(e.target.value)}
+              placeholder="Auto-match hints, e.g. 5678, hdfc credit"
+              maxLength={200}
+              aria-label="Auto-match hints"
+            />
             <div className="flex gap-2">
               <Input
                 value={newOpeningBalance}
@@ -181,6 +191,7 @@ function AccountRow({
   const [editName, setEditName] = useState('')
   const [editIcon, setEditIcon] = useState('')
   const [editOpeningBalance, setEditOpeningBalance] = useState('')
+  const [editMatchHints, setEditMatchHints] = useState('')
 
   const divisor = account.currency === 'JPY' ? 1 : 100
 
@@ -189,6 +200,7 @@ function AccountRow({
     setEditName(a.name)
     setEditIcon(a.icon ?? '')
     setEditOpeningBalance((a.opening_balance / divisor).toLocaleString(undefined, { maximumFractionDigits: 2 }))
+    setEditMatchHints(a.match_hints ?? '')
   }
 
   async function saveEdit(id: string) {
@@ -200,6 +212,7 @@ function AccountRow({
       name: trimmed,
       icon: editIcon.trim() || null,
       opening_balance: openingBalanceMinor,
+      match_hints: editMatchHints.trim() || null,
     })
     setEditingId(null)
   }
@@ -234,6 +247,13 @@ function AccountRow({
           inputMode="decimal"
           aria-label="Edit opening balance"
         />
+        <Input
+          value={editMatchHints}
+          onChange={e => setEditMatchHints(e.target.value)}
+          placeholder="Auto-match hints, e.g. 5678, hdfc credit"
+          maxLength={200}
+          aria-label="Auto-match hints"
+        />
         <div className="flex gap-2">
           <Button
             size="sm"
@@ -258,31 +278,36 @@ function AccountRow({
   }
 
   return (
-    <li className="flex items-center justify-between p-3">
-      <span className="text-sm">
-        {account.icon && <span className="mr-1">{account.icon}</span>}
-        {account.name} ({account.type}) · {account.currency} {(account.opening_balance / divisor).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-      </span>
-      <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => startEdit(account)}
-          style={{ height: '44px', minWidth: '44px' }}
-          aria-label={`Edit ${account.name}`}
-        >
-          Edit
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => onArchive(account.id)}
-          style={{ height: '44px', minWidth: '44px' }}
-          aria-label={`Archive ${account.name}`}
-        >
-          Archive
-        </Button>
+    <li className="flex flex-col gap-1 p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm">
+          {account.icon && <span className="mr-1">{account.icon}</span>}
+          {account.name} ({account.type}) · {account.currency} {(account.opening_balance / divisor).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+        </span>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => startEdit(account)}
+            style={{ height: '44px', minWidth: '44px' }}
+            aria-label={`Edit ${account.name}`}
+          >
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onArchive(account.id)}
+            style={{ height: '44px', minWidth: '44px' }}
+            aria-label={`Archive ${account.name}`}
+          >
+            Archive
+          </Button>
+        </div>
       </div>
+      {account.match_hints && (
+        <span className="text-xs text-muted-foreground">matches: {account.match_hints}</span>
+      )}
     </li>
   )
 }

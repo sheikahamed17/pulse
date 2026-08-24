@@ -10,6 +10,7 @@ import { serverHlcFor } from '@/lib/server-hlc'
 import { materializeRow } from '@/lib/materialize'
 import { ingestNotification } from '@/lib/ingest-notification'
 import { sendPushToUser } from '@/lib/web-push'
+import { matchAccountFromText, type MatchableAccount } from '@/lib/account-match'
 import type { Op } from '@/types/ops'
 
 export const dynamic = 'force-dynamic'
@@ -52,6 +53,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'parse failed, retry later' }, { status: 503 })
   }
   const payload = smsToMoneyPayload(agentOut, primary, nowIso, text, source)
+
+  if (payload) {
+    const accts = await db.selectFrom('accounts')
+      .where('user_id', '=', userId).where('deleted_at', 'is', null)
+      .selectAll().execute()
+    payload.account_id = matchAccountFromText(text, accts as unknown as MatchableAccount[])
+  }
+
   // Token-gated dry-run: return exactly what the parser extracted, write NO op.
   if (dryRun) return NextResponse.json({ ok: true, dryRun: true, agentOut, payload })
   if (!payload) return NextResponse.json({ ok: true, added: false })

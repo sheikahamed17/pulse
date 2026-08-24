@@ -6,19 +6,42 @@ type Row = Record<string, unknown>
 let prefsRow: Row | null = null
 const opLog: Row[] = []
 const pushRows: Row[] = []
+let accountsRows: Row[] = []
 
 function makeFakeDb() {
   return {
     selectFrom: (table: string) => {
       let idVal: unknown
+      const conditions: Array<{ col: string; op: string; val: unknown }> = []
       const b: any = {
-        where: (_c: string, _o: string, v: unknown) => { idVal = v; return b },
+        where: (c: string, o: string, v: unknown) => {
+          if (c === 'id') idVal = v
+          conditions.push({ col: c, op: o, val: v })
+          return b
+        },
         select: () => b,
         selectAll: () => b,
         executeTakeFirst: async () => {
           if (table === 'op_log') return opLog.find(o => o.id === idVal) ?? null
           if (table === 'user_prefs') return prefsRow
           return null
+        },
+        execute: async () => {
+          if (table === 'accounts') {
+            let result = [...accountsRows]
+            for (const cond of conditions) {
+              if (cond.col === 'user_id' && cond.op === '=') {
+                result = result.filter(r => r.user_id === cond.val)
+              }
+              if (cond.col === 'deleted_at' && cond.op === 'is') {
+                if (cond.val === null) {
+                  result = result.filter(r => !r.deleted_at)
+                }
+              }
+            }
+            return result
+          }
+          return []
         },
       }
       return b
@@ -73,6 +96,7 @@ describe('POST /api/ingest/sms', () => {
   beforeEach(async () => {
     opLog.length = 0
     pushRows.length = 0
+    accountsRows.length = 0
     parseSmsMock.mockReset()
     sendPushMock.mockClear()
     currentFakeDb = makeFakeDb()
@@ -209,5 +233,57 @@ describe('POST /api/ingest/sms', () => {
     const res = await POST(reqS(goodToken, 'Rs.475 spent CRUNCHYROLL boom', 'email'))
     expect((await res.json() as { added: boolean }).added).toBe(true)
     expect(opLog).toHaveLength(1)
+  })
+
+  it('sets account_id when account match_hints match the text', async () => {
+    accountsRows = [
+      { id: 'acc-1', user_id: U, name: 'HDFC Card', match_hints: '5678, hdfc', is_archived: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
+    ]
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    const res = await POST(reqS(goodToken, 'Spent Rs 500 on HDFC Card XX5678'))
+    expect((await res.json() as { added: boolean }).added).toBe(true)
+    expect(opLog).toHaveLength(1)
+    const payload = JSON.parse(String(opLog[0].payload)) as { account_id?: string }
+    expect(payload.account_id).toBe('acc-1')
+  })
+
+  it('sets account_id to null when no account matches', async () => {
+    accountsRows = [
+      { id: 'acc-1', user_id: U, name: 'HDFC Card', match_hints: '5678', is_archived: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
+    ]
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    const res = await POST(reqS(goodToken, 'Spent Rs 500 on AMEX Card'))
+    expect((await res.json() as { added: boolean }).added).toBe(true)
+    expect(opLog).toHaveLength(1)
+    const payload = JSON.parse(String(opLog[0].payload)) as { account_id?: unknown }
+    expect(payload.account_id).toBeNull()
+  })
+
+  it('does not match archived accounts even if hints match', async () => {
+    accountsRows = [
+      { id: 'acc-1', user_id: U, name: 'Old Card', match_hints: 'hdfc', is_archived: 1, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
+      { id: 'acc-2', user_id: U, name: 'Active Card', match_hints: 'amex', is_archived: 0, deleted_at: null, created_at: '2026-01-02T00:00:00Z' },
+    ]
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    const res = await POST(reqS(goodToken, 'Spent Rs 500 on HDFC Card'))
+    expect((await res.json() as { added: boolean }).added).toBe(true)
+    expect(opLog).toHaveLength(1)
+    const payload = JSON.parse(String(opLog[0].payload)) as { account_id?: unknown }
+    expect(payload.account_id).toBeNull()
+  })
+
+  it('includes matched account_id in dryRun response', async () => {
+    accountsRows = [
+      { id: 'acc-1', user_id: U, name: 'HDFC Card', match_hints: '5678', is_archived: 0, deleted_at: null, created_at: '2026-01-01T00:00:00Z' },
+    ]
+    parseSmsMock.mockResolvedValue({ is_transaction: true, amount: 50000, currency: 'INR', direction: 'out', merchant: 'AMAZON' })
+    const dryReq = new Request('http://x/api/ingest/sms', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${goodToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Spent Rs 500 on HDFC Card XX5678', dryRun: true }),
+    })
+    const res = await POST(dryReq)
+    const body = await res.json() as { payload?: { account_id?: string } }
+    expect(body.payload?.account_id).toBe('acc-1')
   })
 })
