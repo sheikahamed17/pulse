@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useGoals } from '@/hooks/use-goals'
 import { useAccounts } from '@/hooks/use-accounts'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
+import { useTransfers } from '@/hooks/use-transfers'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
 import { convertViaRates } from '@/lib/fx'
@@ -19,6 +20,7 @@ export function GoalsWidget({ userId }: Props) {
   const goals = useGoals(userId)
   const accounts = useAccounts(userId)
   const entries = useMoneyEntries(userId)
+  const transfers = useTransfers(userId)
   const { prefs } = useUserPrefs()
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
 
@@ -81,7 +83,7 @@ export function GoalsWidget({ userId }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {goals.map(goal => {
-        const p = goalProgress(goal, accountLikes, entries, toAcct)
+        const p = goalProgress(goal, accountLikes, entries, transfers, toAcct)
         const pctDisplay = Math.round(p.pct)
 
         return (

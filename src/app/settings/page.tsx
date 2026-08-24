@@ -34,6 +34,14 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+        <Link href="/settings/transfers">
+          <Card className="hover:bg-white/10 transition">
+            <CardHeader>
+              <CardTitle>Transfers</CardTitle>
+              <CardDescription>Move money between your accounts.</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/settings/projects">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>

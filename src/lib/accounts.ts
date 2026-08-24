@@ -9,6 +9,15 @@ export type AccountLike = {
   icon: string | null
 }
 
+export type TransferLike = {
+  id: string
+  from_account_id: string
+  to_account_id: string
+  amount: number
+  currency: string
+  deleted_at?: string | null
+}
+
 export type NetWorth = {
   net: number
   assets: number
@@ -33,17 +42,20 @@ export type NetWorthPoint = {
  *
  * Sign conventions:
  * - delta = Σ (direction === 'in' ? +amount : −amount) for entries assigned to this account
+ *         + Σ (transfer to this account) − Σ (transfer from this account)
  * - asset.current = opening_balance + delta
  * - liability.owed = opening_balance − delta
  *
  * @param account - The account to compute balance for
  * @param entries - All money entries (filtered by account_id inside)
+ * @param transfers - All transfers (filtered by from/to_account_id inside)
  * @param toAcct - Function to convert entry amount to account currency (e.g. (e) => e.amount). Caller supplies FX conversion.
  * @returns The current balance (in account currency)
  */
 export function accountBalance(
   account: AccountLike,
   entries: MoneyEntryRow[],
+  transfers: TransferLike[],
   toAcct: (e: MoneyEntryRow) => number
 ): number {
   // Compute delta: sum of (direction === 'in' ? +amount : −amount) for entries with this account_id
@@ -57,6 +69,18 @@ export function accountBalance(
     const amountInAcctCurrency = toAcct(entry)
     const sign = entry.direction === 'in' ? 1 : -1
     delta += sign * amountInAcctCurrency
+  }
+
+  // Add transfers: to_account_id (in) and from_account_id (out)
+  for (const transfer of transfers) {
+    // Skip deleted transfers
+    if (transfer.deleted_at) continue
+
+    if (transfer.to_account_id === account.id) {
+      delta += transfer.amount
+    } else if (transfer.from_account_id === account.id) {
+      delta -= transfer.amount
+    }
   }
 
   // Apply sign convention per account type
@@ -73,6 +97,7 @@ export function accountBalance(
  *
  * @param accounts - Array of accounts
  * @param entries - All money entries
+ * @param transfers - All transfers
  * @param toAcct - Function to convert entry amount to account currency (caller supplies FX conversion)
  * @param toPrimary - Function to convert account balance to primary currency (e.g. (balance, currency) => balance)
  * @returns NetWorth with total assets, liabilities, net, and per-account breakdown
@@ -80,6 +105,7 @@ export function accountBalance(
 export function netWorth(
   accounts: AccountLike[],
   entries: MoneyEntryRow[],
+  transfers: TransferLike[],
   toAcct: (e: MoneyEntryRow) => number,
   toPrimary: (amountInAcctCurrency: number, acctCurrency: string) => number
 ): NetWorth {
@@ -99,7 +125,7 @@ export function netWorth(
       name: account.name,
       type: account.type,
       icon: account.icon,
-      balance: accountBalance(account, entries, toAcct),
+      balance: accountBalance(account, entries, transfers, toAcct),
       currency: account.currency,
     }))
     // Sort: assets first, then by name
