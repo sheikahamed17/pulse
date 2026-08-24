@@ -185,6 +185,7 @@ export type AccountRow = {
   currency: string
   icon: string | null
   is_archived: number
+  match_hints: string | null
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string

@@ -8,6 +8,7 @@ export const AccountPayloadSchema = z.object({
   currency: z.enum(SUPPORTED_CURRENCIES),
   icon: z.string().max(8).nullable().optional(),
   is_archived: z.literal(0).or(z.literal(1)).optional(),
+  match_hints: z.string().max(200).nullable().optional(),
 })
 
 export type AccountPayload = z.infer<typeof AccountPayloadSchema>
