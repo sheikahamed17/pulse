@@ -58,7 +58,7 @@ export async function applyLocalOp(op: Op): Promise<void> {
 
   await db.transaction(
     'rw',
-    [db.op_log, db.widgets, db.money_entries, db.recurring_rules, db.categories, db.tasks, db.insights, db.learning_entries, db.note_entries, db.budgets, db.accounts, db.goals, db.transfers, db.projects],
+    [db.op_log, db.widgets, db.money_entries, db.recurring_rules, db.categories, db.tasks, db.insights, db.learning_entries, db.note_entries, db.budgets, db.accounts, db.goals, db.transfers, db.habits, db.habit_logs, db.projects],
     async () => {
       await db.op_log.add(op)
 
@@ -141,8 +141,18 @@ export async function applyLocalOp(op: Op): Promise<void> {
           await db.projects.put(next as never)
           return
         }
-        // 'project':
-        // op_log stores the op but no client table yet (later phases).
+        case 'habit': {
+          const current = await db.habits.get(op.entity_id)
+          const next = applyOp(current as never, op)
+          await db.habits.put(next as never)
+          return
+        }
+        case 'habit_log': {
+          const current = await db.habit_logs.get(op.entity_id)
+          const next = applyOp(current as never, op)
+          await db.habit_logs.put(next as never)
+          return
+        }
       }
     },
   )

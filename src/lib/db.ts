@@ -265,6 +265,29 @@ export interface ProjectTable {
   updated_at: string
 }
 
+export interface HabitsTable {
+  id: string
+  user_id: string
+  name: string
+  icon: string | null
+  is_archived: number
+  field_hlcs: string          // JSON Record<string,string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface HabitLogsTable {
+  id: string
+  user_id: string
+  habit_id: string
+  day: string
+  field_hlcs: string          // JSON Record<string,string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface FxRateTable {
   date: string                                   // 'YYYY-MM-DD'
   base: string                                   // always 'EUR' from ECB
@@ -333,6 +356,8 @@ export interface DB {
   accounts: AccountsTable
   goals: GoalsTable
   transfers: TransfersTable
+  habits: HabitsTable
+  habit_logs: HabitLogsTable
   projects: ProjectTable
   fx_rates: FxRateTable
   insights: InsightTable

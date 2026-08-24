@@ -52,3 +52,11 @@ export const PROJECT_FIELDS = [
 export const TRANSFER_FIELDS = [
   'from_account_id', 'to_account_id', 'amount', 'currency', 'occurred_at', 'note',
 ] as const
+
+export const HABIT_FIELDS = [
+  'name', 'icon', 'is_archived',
+] as const
+
+export const HABIT_LOG_FIELDS = [
+  'habit_id', 'day',
+] as const
