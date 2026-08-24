@@ -191,4 +191,74 @@ describe('habit + habit_log materializeRow (server-side)', () => {
     expect(row.name).toBe('Run')
     expect(row.icon).toBe('🧘') // unchanged
   })
+
+  it('habit: CREATE op with schedule materializes to server D1 habits table', async () => {
+    const op: Op = {
+      id: 'op1',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1',
+      user_id: 'u1',
+      entity_kind: 'habit',
+      entity_id: 'h1',
+      op_type: 'create',
+      payload: { name: 'Gym', icon: '💪', schedule: '1,3,5' },
+      schema_version: 1,
+    }
+
+    await materializeRow(mockDb, op, 'u1')
+
+    expect(insertedRows).toHaveLength(1)
+    const row = insertedRows[0]
+    expect(row._table).toBe('habits')
+    expect(row.id).toBe('h1')
+    expect(row.user_id).toBe('u1')
+    expect(row.name).toBe('Gym')
+    expect(row.icon).toBe('💪')
+    expect(row.schedule).toBe('1,3,5')
+    expect(row.field_hlcs).toBeDefined()
+    expect(row.deleted_at).toBeNull()
+    expect(row.created_at).toBeDefined()
+    expect(row.updated_at).toBeDefined()
+  })
+
+  it('habit: UPDATE op changes only schedule via per-field LWW', async () => {
+    // First create
+    const createOp: Op = {
+      id: 'op1',
+      hlc: '0000000000000001-000000-d1',
+      device_id: 'd1',
+      user_id: 'u1',
+      entity_kind: 'habit',
+      entity_id: 'h1',
+      op_type: 'create',
+      payload: { name: 'Gym', icon: '💪', schedule: '1,3,5' },
+      schema_version: 1,
+    }
+
+    await materializeRow(mockDb, createOp, 'u1')
+    const created = insertedRows[0]
+    existingRows.set('habits:h1', created)
+
+    // Now update only schedule
+    insertedRows = []
+    const updateOp: Op = {
+      id: 'op2',
+      hlc: '0000000000000002-000000-d1',
+      device_id: 'd1',
+      user_id: 'u1',
+      entity_kind: 'habit',
+      entity_id: 'h1',
+      op_type: 'update',
+      payload: { schedule: '0,2,4,6' },
+      schema_version: 1,
+    }
+
+    await materializeRow(mockDb, updateOp, 'u1')
+
+    expect(insertedRows).toHaveLength(1)
+    const row = insertedRows[0]
+    expect(row.name).toBe('Gym') // unchanged
+    expect(row.icon).toBe('💪') // unchanged
+    expect(row.schedule).toBe('0,2,4,6') // updated
+  })
 })

@@ -7,7 +7,7 @@ import { useHabits, useArchivedHabits } from '@/hooks/use-habits'
 import { useHabitLogs } from '@/hooks/use-habit-logs'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
-import { habitStreaks } from '@/lib/habits'
+import { habitStreaks, parseSchedule } from '@/lib/habits'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AuroraBackground } from '@/components/aurora-background'
@@ -18,6 +18,13 @@ export default function HabitsPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [newIcon, setNewIcon] = useState('')
+  const [newScheduleIsDaily, setNewScheduleIsDaily] = useState(true)
+  const [newSelectedWeekdays, setNewSelectedWeekdays] = useState<Set<number>>(new Set())
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editIcon, setEditIcon] = useState('')
+  const [editScheduleIsDaily, setEditScheduleIsDaily] = useState(true)
+  const [editSelectedWeekdays, setEditSelectedWeekdays] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -46,6 +53,15 @@ export default function HabitsPage() {
   async function addHabit() {
     if (!userId || !newName.trim()) return
 
+    let schedule: string | null = null
+    if (!newScheduleIsDaily) {
+      if (newSelectedWeekdays.size > 0) {
+        const sorted = Array.from(newSelectedWeekdays).sort((a, b) => a - b)
+        schedule = sorted.join(',')
+      }
+      // If nothing selected, treat as daily (schedule stays null)
+    }
+
     const op = await generateOp({
       entity_kind: 'habit',
       entity_id: crypto.randomUUID(),
@@ -54,16 +70,19 @@ export default function HabitsPage() {
         name: newName.trim(),
         icon: newIcon.trim() || null,
         is_archived: 0,
+        schedule,
       },
       user_id: userId,
     })
     await applyLocalOp(op)
     setNewName('')
     setNewIcon('')
+    setNewScheduleIsDaily(true)
+    setNewSelectedWeekdays(new Set())
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
   }
 
-  async function updateHabit(id: string, payload: Record<string, number>) {
+  async function updateHabit(id: string, payload: Record<string, string | number | null>) {
     if (!userId) return
     const op = await generateOp({
       entity_kind: 'habit',
@@ -74,6 +93,38 @@ export default function HabitsPage() {
     })
     await applyLocalOp(op)
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
+  }
+
+  function startEdit(habit: HabitRow) {
+    setEditingId(habit.id)
+    setEditName(habit.name)
+    setEditIcon(habit.icon || '')
+    const parsed = parseSchedule(habit.schedule)
+    setEditScheduleIsDaily(parsed === null)
+    setEditSelectedWeekdays(parsed || new Set())
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editName.trim()) return
+
+    let schedule: string | null = null
+    if (!editScheduleIsDaily) {
+      if (editSelectedWeekdays.size > 0) {
+        const sorted = Array.from(editSelectedWeekdays).sort((a, b) => a - b)
+        schedule = sorted.join(',')
+      }
+    }
+
+    await updateHabit(editingId, {
+      name: editName.trim(),
+      icon: editIcon.trim() || null,
+      schedule,
+    })
+    setEditingId(null)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
   }
 
   async function archiveHabit(id: string) {
@@ -89,7 +140,7 @@ export default function HabitsPage() {
 
     const habitLogs = logs.filter(l => l.habit_id === habit.id && !l.deleted_at)
     const days = habitLogs.map(l => l.day)
-    const s = habitStreaks(days, todayStr)
+    const s = habitStreaks(days, todayStr, habit.schedule)
 
     const logId = `hlog-${habit.id}-${todayStr}`
 
@@ -151,6 +202,12 @@ export default function HabitsPage() {
                 aria-label="Habit icon"
               />
             </div>
+            <ScheduleControl
+              isDaily={newScheduleIsDaily}
+              selectedWeekdays={newSelectedWeekdays}
+              onDailyChange={setNewScheduleIsDaily}
+              onWeekdaysChange={setNewSelectedWeekdays}
+            />
             <Button onClick={addHabit} className="w-full">Add</Button>
           </div>
         </section>
@@ -162,39 +219,96 @@ export default function HabitsPage() {
             {habits.map(h => {
               const habitLogs = logs.filter(l => l.habit_id === h.id && !l.deleted_at)
               const days = habitLogs.map(l => l.day)
-              const s = habitStreaks(days, todayStr)
+              const s = habitStreaks(days, todayStr, h.schedule)
+              const isEditing = editingId === h.id
 
               return (
                 <li key={h.id} className="flex flex-col gap-2 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-1 min-h-[44px] items-center">
-                      <button
-                        type="button"
-                        onClick={() => toggleToday(h)}
-                        style={{ height: '44px', minWidth: '44px' }}
-                        className="flex-shrink-0 flex items-center justify-center rounded-lg border border-white/20 hover:bg-white/5 transition-colors"
-                        aria-label={`Mark ${h.name} done`}
-                      >
-                        {s.completedToday ? '✓' : '○'}
-                      </button>
-                      <span className="text-sm">
-                        {h.icon && <span className="mr-1">{h.icon}</span>}
-                        {h.name}
-                      </span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => archiveHabit(h.id)}
-                      style={{ height: '44px', minWidth: '44px' }}
-                      aria-label={`Archive ${h.name}`}
-                    >
-                      Archive
-                    </Button>
-                  </div>
-                  <div className="text-xs text-muted-foreground pl-14">
-                    🔥 {s.current} · best {s.longest} · {Math.round(s.rate30 * 100)}% (30d)
-                  </div>
+                  {isEditing ? (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            placeholder="Habit name…"
+                            maxLength={40}
+                            aria-label="Habit name edit"
+                          />
+                          <Input
+                            value={editIcon}
+                            onChange={e => setEditIcon(e.target.value)}
+                            placeholder="Icon"
+                            maxLength={8}
+                            className="w-14"
+                            aria-label="Habit icon edit"
+                          />
+                        </div>
+                        <ScheduleControl
+                          isDaily={editScheduleIsDaily}
+                          selectedWeekdays={editSelectedWeekdays}
+                          onDailyChange={setEditScheduleIsDaily}
+                          onWeekdaysChange={setEditSelectedWeekdays}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={saveEdit} className="flex-1">Save</Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEdit} className="flex-1">Cancel</Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-h-[44px] items-center">
+                          <button
+                            type="button"
+                            onClick={() => toggleToday(h)}
+                            style={{ height: '44px', minWidth: '44px' }}
+                            className={`flex-shrink-0 flex items-center justify-center rounded-lg border transition-colors ${
+                              s.dueToday
+                                ? 'border-white/20 hover:bg-white/5'
+                                : 'border-white/10 hover:bg-white/5 opacity-60'
+                            }`}
+                            aria-label={`Mark ${h.name} done`}
+                          >
+                            {s.completedToday ? '✓' : '○'}
+                          </button>
+                          <span className="text-sm">
+                            {h.icon && <span className="mr-1">{h.icon}</span>}
+                            {h.name}
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => startEdit(h)}
+                          style={{ height: '44px', minWidth: '44px' }}
+                          aria-label={`Edit ${h.name}`}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => archiveHabit(h.id)}
+                          style={{ height: '44px', minWidth: '44px' }}
+                          aria-label={`Archive ${h.name}`}
+                        >
+                          Archive
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground pl-14 flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <span>{getScheduleLabel(h.schedule)}</span>
+                          {!s.dueToday && <span className="opacity-60">·</span>}
+                          {!s.dueToday && <span className="opacity-60">not due today</span>}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground pl-14">
+                        🔥 {s.current} · best {s.longest} · {Math.round(s.rate30 * 100)}% (30d)
+                      </div>
+                    </>
+                  )}
                 </li>
               )
             })}
@@ -249,5 +363,70 @@ function ArchivedSection({
         </ul>
       )}
     </section>
+  )
+}
+
+function getScheduleLabel(schedule: string | null): string {
+  const parsed = parseSchedule(schedule)
+  if (parsed === null) return 'Daily'
+  const abbrev = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const sorted = Array.from(parsed).sort((a, b) => a - b)
+  return sorted.map(i => abbrev[i]).join(' ')
+}
+
+interface ScheduleControlProps {
+  isDaily: boolean
+  selectedWeekdays: Set<number>
+  onDailyChange: (daily: boolean) => void
+  onWeekdaysChange: (weekdays: Set<number>) => void
+}
+
+function ScheduleControl({ isDaily, selectedWeekdays, onDailyChange, onWeekdaysChange }: ScheduleControlProps) {
+  const abbrev = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+  const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  const toggleWeekday = (day: number) => {
+    const newSet = new Set(selectedWeekdays)
+    if (newSet.has(day)) {
+      newSet.delete(day)
+    } else {
+      newSet.add(day)
+    }
+    onWeekdaysChange(newSet)
+  }
+
+  return (
+    <div className="flex flex-col gap-2 text-xs">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={isDaily}
+          onChange={e => onDailyChange(e.target.checked)}
+          className="accent-foreground"
+          aria-label="Daily habit"
+        />
+        <span>Daily</span>
+      </label>
+      {!isDaily && (
+        <div className="flex gap-1">
+          {abbrev.map((letter, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => toggleWeekday(i)}
+              style={{ height: '32px', minWidth: '32px' }}
+              className={`flex items-center justify-center rounded border text-xs font-medium transition-colors ${
+                selectedWeekdays.has(i)
+                  ? 'bg-white/20 border-white/40 text-foreground'
+                  : 'border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground'
+              }`}
+              aria-label={labels[i]}
+            >
+              {letter}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

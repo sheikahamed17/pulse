@@ -54,7 +54,7 @@ export const TRANSFER_FIELDS = [
 ] as const
 
 export const HABIT_FIELDS = [
-  'name', 'icon', 'is_archived',
+  'name', 'icon', 'is_archived', 'schedule',
 ] as const
 
 export const HABIT_LOG_FIELDS = [
