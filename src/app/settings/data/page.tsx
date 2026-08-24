@@ -114,6 +114,16 @@ export default function DataPage() {
         return
       }
 
+      // All-or-nothing account guard: every op is stamped with its exporter's
+      // user_id. Importing another account's backup would pollute this device's
+      // op_log with foreign ops and then wedge sync (the server 403s on a
+      // user_id mismatch). Reject the whole file rather than replay any.
+      if (res.ops.some(op => op.user_id !== userId)) {
+        setImportError('This backup is from a different account.')
+        e.target.value = ''
+        return
+      }
+
       if (!window.confirm(`Import ${res.ops.length} entries? This merges into your current data and can't remove anything.`)) {
         e.target.value = ''
         return
