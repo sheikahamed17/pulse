@@ -40,6 +40,7 @@ export async function POST(req: Request) {
     }
   }
 
+  try {
   const { env } = getCloudflareContext()
   const d1 = (env as { DB: D1Database }).DB
   const db = createDb(d1)
@@ -100,4 +101,11 @@ export async function POST(req: Request) {
     new_ops_from_server: opsForClient,
     applied_ack: new_ops.map(o => o.id),
   })
+  } catch (err) {
+    // op_log is the source of truth and is written before this point per op; a
+    // failure here (e.g. a transient D1 error) must be diagnosable rather than an
+    // opaque 500. Log the full stack for `wrangler tail`, return a clean error.
+    console.error('[sync] unhandled error:', (err as Error)?.stack ?? String(err))
+    return NextResponse.json({ error: 'sync failed' }, { status: 500 })
+  }
 }
