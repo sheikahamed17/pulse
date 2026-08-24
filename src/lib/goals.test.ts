@@ -51,7 +51,7 @@ describe('goalProgress', () => {
       saved_amount: 30000,
       target_date: null,
     }
-    const result = goalProgress(goal, [], [], toAcct)
+    const result = goalProgress(goal, [], [], [], toAcct)
     expect(result.current).toBe(30000)
     expect(result.pct).toBe(60)
     expect(result.remaining).toBe(20000)
@@ -70,7 +70,7 @@ describe('goalProgress', () => {
       target_date: null,
     }
     const entries = [row({ id: '1', account_id: 'savings1', amount: 10000, direction: 'in' })]
-    const result = goalProgress(goal, [acct], entries, toAcct)
+    const result = goalProgress(goal, [acct], entries, [], toAcct)
     expect(result.current).toBe(50000)
     expect(result.pct).toBe(100)
     expect(result.remaining).toBe(0)
@@ -87,7 +87,7 @@ describe('goalProgress', () => {
       saved_amount: 40000,
       target_date: null,
     }
-    const result = goalProgress(goal, [], [], toAcct)
+    const result = goalProgress(goal, [], [], [], toAcct)
     expect(result.current).toBe(40000)
     expect(result.pct).toBe(100)
     expect(result.remaining).toBe(0)
@@ -104,7 +104,7 @@ describe('goalProgress', () => {
       saved_amount: 50000,
       target_date: null,
     }
-    const result = goalProgress(goal, [], [], toAcct)
+    const result = goalProgress(goal, [], [], [], toAcct)
     expect(result.current).toBe(50000)
     expect(result.pct).toBe(0)
     expect(result.remaining).toBe(0)
@@ -122,7 +122,7 @@ describe('goalProgress', () => {
       target_date: null,
     }
     // Pass empty accounts array (account not found)
-    const result = goalProgress(goal, [], [], toAcct)
+    const result = goalProgress(goal, [], [], [], toAcct)
     expect(result.current).toBe(25000)
     expect(result.pct).toBe(50)
     expect(result.remaining).toBe(25000)
@@ -140,7 +140,32 @@ describe('goalProgress', () => {
       target_date: null,
     }
     const originalGoal = { ...goal }
-    goalProgress(goal, [], [], toAcct)
+    goalProgress(goal, [], [], [], toAcct)
     expect(goal).toEqual(originalGoal)
+  })
+
+  it('account-linked goal: transfer IN to linked account => goalProgress.current rises by transfer amount', () => {
+    const acct = account({ id: 'savings1', opening_balance: 40000 })
+    const goal: GoalLike = {
+      id: 'g1',
+      name: 'Savings Goal',
+      target_amount: 100000,
+      currency: 'INR',
+      icon: null,
+      account_id: 'savings1',
+      saved_amount: 0,
+      target_date: null,
+    }
+    // Account balance is 40000 (opening), without transfer
+    const withoutTransfer = goalProgress(goal, [acct], [], [], toAcct)
+    expect(withoutTransfer.current).toBe(40000)
+
+    // With transfer in of 30000, account balance becomes 40000 + 30000 = 70000
+    const transfers = [
+      { id: 't1', from_account_id: 'other1', to_account_id: 'savings1', amount: 30000, currency: 'INR', deleted_at: null },
+    ]
+    const withTransfer = goalProgress(goal, [acct], [], transfers, toAcct)
+    expect(withTransfer.current).toBe(70000)
+    expect(withTransfer.current - withoutTransfer.current).toBe(30000)
   })
 })

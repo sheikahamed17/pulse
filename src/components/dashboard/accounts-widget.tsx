@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { useAccounts } from '@/hooks/use-accounts'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
+import { useTransfers } from '@/hooks/use-transfers'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
 import { convertViaRates } from '@/lib/fx'
@@ -16,6 +17,7 @@ type Props = { userId: string }
 export function AccountsWidget({ userId }: Props) {
   const accounts = useAccounts(userId)
   const entries = useMoneyEntries(userId)
+  const transfers = useTransfers(userId)
   const { prefs } = useUserPrefs()
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
 
@@ -64,8 +66,8 @@ export function AccountsWidget({ userId }: Props) {
       if (!acct) return 0
       return toAcct(entry, acct)
     }
-    return netWorth(accounts, entries, toAcctForNetWorth, toPrimary)
-  }, [accounts, entries, toAcct, toPrimary])
+    return netWorth(accounts, entries, transfers, toAcctForNetWorth, toPrimary)
+  }, [accounts, entries, transfers, toAcct, toPrimary])
 
   if (accounts.length === 0) {
     return (

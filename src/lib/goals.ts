@@ -1,5 +1,5 @@
 import type { MoneyEntryRow } from '@/lib/dexie'
-import type { AccountLike } from './accounts'
+import type { AccountLike, TransferLike } from './accounts'
 import { accountBalance } from './accounts'
 
 export type GoalLike = {
@@ -23,7 +23,7 @@ export type GoalProgress = {
  * Compute the progress of a savings goal.
  *
  * If goal.account_id is set and a matching account exists in accounts,
- * current = accountBalance(that account, entries, toAcct).
+ * current = accountBalance(that account, entries, transfers, toAcct).
  * Otherwise, current = goal.saved_amount (manual tracking).
  *
  * pct = goal.target_amount > 0 ? clamp((current / goal.target_amount) * 100, 0, 100) : 0
@@ -34,6 +34,7 @@ export type GoalProgress = {
  * @param goal - The goal to compute progress for
  * @param accounts - All accounts
  * @param entries - All money entries
+ * @param transfers - All transfers
  * @param toAcct - Function to convert entry amount to account currency (e.g. (e) => e.amount)
  * @returns GoalProgress with current, pct, remaining
  */
@@ -41,6 +42,7 @@ export function goalProgress(
   goal: GoalLike,
   accounts: AccountLike[],
   entries: MoneyEntryRow[],
+  transfers: TransferLike[],
   toAcct: (e: MoneyEntryRow) => number
 ): GoalProgress {
   // Determine current amount
@@ -49,7 +51,7 @@ export function goalProgress(
     // Try to find a matching account
     const account = accounts.find(a => a.id === goal.account_id)
     if (account) {
-      current = accountBalance(account, entries, toAcct)
+      current = accountBalance(account, entries, transfers, toAcct)
     }
     // If account not found, fall back to saved_amount
   }

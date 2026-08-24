@@ -13,6 +13,7 @@ import { NetWorthLine } from '@/components/charts/net-worth-line'
 import { useMoneyEntries } from '@/hooks/use-money-entries'
 import { useAllCategories } from '@/hooks/use-all-categories'
 import { useAccounts } from '@/hooks/use-accounts'
+import { useTransfers } from '@/hooks/use-transfers'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useFxRates } from '@/hooks/use-fx-rates'
 import { makeCategoryResolver } from '@/lib/category-resolve'
@@ -38,6 +39,7 @@ export default function AnalyticsPage() {
   const entries = useMoneyEntries(userId ?? undefined)
   const allCats = useAllCategories(userId ?? undefined)
   const accts = useAccounts(userId ?? undefined)
+  const transfers = useTransfers(userId ?? undefined)
   const { prefs } = useUserPrefs()
   const { rates } = useFxRates([...SUPPORTED_CURRENCIES])
 
@@ -108,8 +110,8 @@ export default function AnalyticsPage() {
 
   // Current net worth (for net worth series computation)
   const currentNet = useMemo(
-    () => netWorth(accts, entries, toAcctForNet, toPrimaryForNet).net,
-    [accts, entries, toAcctForNet, toPrimaryForNet],
+    () => netWorth(accts, entries, transfers, toAcctForNet, toPrimaryForNet).net,
+    [accts, entries, transfers, toAcctForNet, toPrimaryForNet],
   )
 
   // Entry to primary currency (for net worth series)
