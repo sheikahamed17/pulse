@@ -48,3 +48,7 @@ export const BUDGET_FIELDS = [
 export const PROJECT_FIELDS = [
   'name', 'color', 'archived',
 ] as const
+
+export const TRANSFER_FIELDS = [
+  'from_account_id', 'to_account_id', 'amount', 'currency', 'occurred_at', 'note',
+] as const

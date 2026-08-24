@@ -237,6 +237,21 @@ export interface GoalsTable {
   updated_at: string
 }
 
+export interface TransfersTable {
+  id: string
+  user_id: string
+  from_account_id: string
+  to_account_id: string
+  amount: number
+  currency: string
+  occurred_at: string
+  note: string | null
+  field_hlcs: string          // JSON Record<string,string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ProjectTable {
   id: string
   user_id: string
@@ -316,6 +331,7 @@ export interface DB {
   budgets: BudgetTable
   accounts: AccountsTable
   goals: GoalsTable
+  transfers: TransfersTable
   projects: ProjectTable
   fx_rates: FxRateTable
   insights: InsightTable

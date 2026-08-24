@@ -14,6 +14,7 @@ import {
   GOAL_FIELDS,
   BUDGET_FIELDS,
   PROJECT_FIELDS,
+  TRANSFER_FIELDS,
 } from '@/lib/entity-fields'
 
 // Materialize a single op into its derived D1 table via a per-field LWW upsert.
@@ -42,6 +43,8 @@ export async function materializeRow(db: Kysely<DB>, op: Op, userId: string) {
       return materializeRow_LWW(db, op, userId, 'accounts', ACCOUNT_FIELDS)
     case 'goal':
       return materializeRow_LWW(db, op, userId, 'goals', GOAL_FIELDS)
+    case 'transfer':
+      return materializeRow_LWW(db, op, userId, 'transfers', TRANSFER_FIELDS)
     case 'budget':
       return materializeRow_LWW(db, op, userId, 'budgets', BUDGET_FIELDS)
     case 'project':
@@ -55,7 +58,7 @@ async function materializeRow_LWW(
   db: Kysely<DB>,
   op: Op,
   userId: string,
-  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'learning_entries' | 'note_entries' | 'insights' | 'accounts' | 'goals' | 'budgets' | 'projects',
+  tableName: 'money_entries' | 'recurring_rules' | 'categories' | 'tasks' | 'learning_entries' | 'note_entries' | 'insights' | 'accounts' | 'goals' | 'transfers' | 'budgets' | 'projects',
   fields: readonly string[],
 ) {
   const existing = await db
