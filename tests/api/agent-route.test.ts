@@ -140,3 +140,83 @@ describe('/api/agent — Phase 2.6 query_money dispatch', () => {
     expect(body.payload.period.label).toBe('last week')
   })
 })
+
+describe('/api/agent — history threading (Task 2)', () => {
+  it('REGRESSION: request without history is accepted and routed normally', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_money', confidence: 0.93 })
+
+    const res = await POST(new Request('http://x/api/agent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'how much did I spend', categories: [] }),
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { intent: string }
+    expect(body.intent).toBe('query_money')
+  })
+
+  it('request with history is accepted by schema', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_money', confidence: 0.93 })
+
+    const res = await POST(new Request('http://x/api/agent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        text: 'and last month?',
+        categories: [],
+        history: ['how much did I spend this month'],
+      }),
+    }))
+    expect(res.status).toBe(200)
+    const body = await res.json() as { intent: string }
+    expect(body.intent).toBe('query_money')
+  })
+
+  it('history is forwarded to routeIntent', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    const routerMock = routeIntent as ReturnType<typeof vi.fn>
+    routerMock.mockResolvedValueOnce({ intent: 'query_money', confidence: 0.93 })
+
+    const history = ['how much did I spend on food']
+    await POST(new Request('http://x/api/agent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'and last month?', categories: [], history }),
+    }))
+
+    expect(routerMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'and last month?',
+        history,
+      })
+    )
+  })
+
+  it('history is forwarded to query agent', async () => {
+    const { routeIntent } = await import('@/lib/agents/router')
+    const { parseMoneyQuery } = await import('@/lib/agents/query-money-agent')
+    ;(routeIntent as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ intent: 'query_money', confidence: 0.93 })
+    const queryMock = parseMoneyQuery as ReturnType<typeof vi.fn>
+    queryMock.mockResolvedValueOnce({
+      direction: 'out',
+      category_name: null,
+      period: { from: '2026-06-11T00:00:00.000Z', to: '2026-06-18T00:00:00.000Z', label: 'last month' },
+    })
+
+    const history = ['how much did I spend on food this month']
+    await POST(new Request('http://x/api/agent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'and last month?', categories: [], history }),
+    }))
+
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'and last month?',
+        history,
+      })
+    )
+  })
+})

@@ -22,6 +22,8 @@ Rules:
      } | null
    }
 
+1a. If recent messages are provided and the current message is a short follow-up (e.g. "and tagged work?", "from last week?"), resolve the missing search/tags/period from them.
+
 2. Search inference:
    - "what did I learn about Rust" → search: "Rust", tags: [], period: null
    - "learnings about async" → search: "async", tags: [], period: null

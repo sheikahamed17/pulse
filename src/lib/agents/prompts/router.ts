@@ -14,6 +14,7 @@ Intents:
 
 Rules:
 - Always return a confidence between 0.0 and 1.0
+- If recent messages are provided and the current message is a short follow-up (e.g. "and last month?", "what about food?"), infer the intent it continues.
 - Return ONLY this JSON object (no prose, no markdown, no explanation):
   { "intent": "log_money" | "log_task" | "log_learning" | "log_note" | "query_money" | "query_task" | "query_learning" | "query_notes" | "chat" | "set_budget", "confidence": <number> }
 

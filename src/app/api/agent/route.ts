@@ -25,6 +25,7 @@ const RequestSchema = z.object({
     name: z.string(),
     kind: z.enum(['spend', 'income']),
   })).default([]),
+  history: z.array(z.string().max(500)).max(12).optional().default([]),
 })
 
 async function loadUserPrefs(db: ReturnType<typeof createDb>, userId: string) {
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
   const nowIso = new Date().toISOString()
 
   try {
-    const router = await routeIntent({ client: groq, text: parsed.data.text })
+    const router = await routeIntent({ client: groq, text: parsed.data.text, history: parsed.data.history })
 
     if (router.intent === 'log_money') {
       const payload = await parseMoneyEntry({
@@ -177,6 +178,7 @@ export async function POST(req: Request) {
         client: groq,
         text: parsed.data.text,
         categories: parsed.data.categories.map(c => ({ name: c.name, kind: c.kind })),
+        history: parsed.data.history,
         nowIso,
         userTz: prefs.tz,
       })
@@ -199,6 +201,7 @@ export async function POST(req: Request) {
       const plan = await parseTaskQuery({
         client: groq,
         text: parsed.data.text,
+        history: parsed.data.history,
         nowIso,
         userTz: prefs.tz,
       })
@@ -218,6 +221,7 @@ export async function POST(req: Request) {
       const plan = await parseLearningQuery({
         client: groq,
         text: parsed.data.text,
+        history: parsed.data.history,
         nowIso,
         userTz: prefs.tz,
       })
@@ -238,6 +242,7 @@ export async function POST(req: Request) {
       const plan = await parseNotesQuery({
         client: groq,
         text: parsed.data.text,
+        history: parsed.data.history,
         nowIso,
         userTz: prefs.tz,
       })

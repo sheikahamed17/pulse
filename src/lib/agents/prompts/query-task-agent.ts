@@ -21,6 +21,8 @@ Rules:
      } | null
    }
 
+1a. If recent messages are provided and the current message is a short follow-up (e.g. "what about tomorrow?", "this week?"), resolve the missing status/period from them.
+
 2. Status inference:
    - "what's due today", "what do I need to do", "tasks today" → status: "open", period: today
    - "overdue", "past due", "late" → status: "overdue" (no period needed)
