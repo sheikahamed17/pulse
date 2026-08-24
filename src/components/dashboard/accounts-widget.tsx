@@ -141,6 +141,17 @@ export function AccountsWidget({ userId }: Props) {
           </div>
         )}
       </div>
+
+      {accounts.length > 0 && (
+        <div className="border-t pt-2">
+          <Link
+            href="/settings/transfers"
+            className="text-xs text-blue-500 hover:underline"
+          >
+            Transfer →
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
