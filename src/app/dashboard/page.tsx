@@ -7,6 +7,7 @@ import { ChevronUp, ChevronDown, X, Plus } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { AuroraBackground } from '@/components/aurora-background'
 import { WidgetCard } from '@/components/dashboard/widget-card'
+import { GettingStarted } from '@/components/dashboard/getting-started'
 import { useWidgets } from '@/hooks/use-widgets'
 import { seedDefaultWidgetsIfEmpty } from '@/lib/seed-widgets'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
@@ -114,6 +115,8 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Dashboard</h1>
         </div>
+
+        {userId && <GettingStarted userId={userId} />}
 
         {widgets.length === 0 ? (
           <div className="flex flex-col gap-4">
