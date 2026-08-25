@@ -17,6 +17,7 @@ import { AuroraBackground } from '@/components/aurora-background'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PulseLogo } from '@/components/pulse-logo'
+import { VoiceRecorder } from '@/components/voice-recorder'
 
 const EXAMPLE_QUESTIONS = [
   'How much did I spend on food this month?',
@@ -74,22 +75,20 @@ function AssistantPageInner() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [turns])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!input.trim() || busy || !userId) return
+  async function submitText(userText: string) {
+    if (busy || !userId) return
+    const text = userText.trim()
+    if (!text) return
 
-    const userText = input.trim()
     const userTurn: AssistantTurn = {
       id: crypto.randomUUID(),
       role: 'user',
-      text: userText,
+      text,
     }
 
     // Build history BEFORE adding the new turn
     const history = buildAgentHistory(turns)
 
-    // Clear input immediately
-    setInput('')
     setBusy(true)
 
     // Add the user turn to the thread
@@ -100,7 +99,7 @@ function AssistantPageInner() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          text: userText,
+          text,
           categories: categories.map(c => ({ id: c.id, name: c.name, kind: c.kind })),
           history,
         }),
@@ -133,6 +132,14 @@ function AssistantPageInner() {
     } finally {
       setBusy(false)
     }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const t = input.trim()
+    if (!t || busy || !userId) return
+    setInput('')
+    void submitText(t)
   }
 
   function removeTurn(id: string) {
@@ -261,14 +268,21 @@ function AssistantPageInner() {
 
         {/* Input — pinned bottom */}
         <div className="border-t border-white/10 p-4 md:p-6">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="Ask about your data…"
-              disabled={busy}
-              aria-label="Message input"
-              className="bg-white/5 border border-white/10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 focus-visible:ring-offset-0"
+          <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+            <div className="flex-1">
+              <Input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="Ask about your data…"
+                disabled={busy}
+                aria-label="Message input"
+                className="bg-white/5 border border-white/10 placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-accent-2 focus-visible:ring-offset-0"
+              />
+            </div>
+            <VoiceRecorder
+              transcribeOnly
+              onTranscript={(t) => { void submitText(t) }}
+              disabled={busy || !userId}
             />
             <Button
               type="submit"
