@@ -7,13 +7,15 @@ import { enqueueVoice } from '@/lib/voice-queue'
 import { pickAudioMime } from '@/lib/audio-format'
 
 type Props = {
-  onParsed: (payload: unknown, transcript: string, intent?: string) => void
+  onParsed?: (payload: unknown, transcript: string, intent?: string) => void
+  onTranscript?: (text: string) => void
+  transcribeOnly?: boolean
   disabled?: boolean
 }
 
 type RecState = 'idle' | 'recording' | 'transcribing' | 'transcript' | 'parsing' | 'error'
 
-export function VoiceRecorder({ onParsed, disabled }: Props) {
+export function VoiceRecorder({ onParsed, onTranscript, transcribeOnly, disabled }: Props) {
   const [state, setState] = useState<RecState>('idle')
   const [transcript, setTranscript] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -72,18 +74,33 @@ export function VoiceRecorder({ onParsed, disabled }: Props) {
     setError(null)
 
     let serverError: string | null = null
+    let capturedTranscript: string | null = null
     const final = await callVoiceApiStreaming(blob, (event: VoiceStreamEvent) => {
       if (event.step === 'transcribing') setState('transcribing')
       else if (event.step === 'transcript') {
+        capturedTranscript = event.text
         setTranscript(event.text)
         setState('transcript')
       }
       else if (event.step === 'parsing') setState('parsing')
       else if (event.step === 'error') serverError = event.message
-    })
+    }, transcribeOnly ? { transcribeOnly: true } : {})
 
+    // Transcribe-only mode: emit transcript and stop
+    if (transcribeOnly) {
+      if (capturedTranscript) {
+        onTranscript?.(capturedTranscript)
+      } else {
+        setError("Couldn't transcribe that — please try again")
+      }
+      setState('idle')
+      setTranscript(null)
+      return
+    }
+
+    // Full parse mode: handle result and queue offline failures
     if (final) {
-      onParsed(final.payload, final.transcript, final.intent)
+      onParsed?.(final.payload, final.transcript, final.intent)
       setState('idle')
       setTranscript(null)
       return
