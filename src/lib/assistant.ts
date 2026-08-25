@@ -4,6 +4,12 @@ export type AssistantTurn = {
   text: string
   intent?: string | null
   payload?: unknown
+  /**
+   * Session-only: true when this answer's question was asked BY VOICE this
+   * session (→ speak the answer aloud). NOT persisted — `parseThread` drops it,
+   * so a reloaded voice answer never re-speaks on load.
+   */
+  viaVoice?: boolean
 }
 
 /**

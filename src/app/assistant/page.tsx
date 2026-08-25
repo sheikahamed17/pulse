@@ -7,6 +7,8 @@ import { authClient } from '@/lib/auth-client'
 import { buildAgentHistory } from '@/lib/assistant'
 import type { AssistantTurn } from '@/lib/assistant'
 import { loadThread, saveThread } from '@/lib/assistant-storage'
+import { speak, cancelSpeech } from '@/lib/speak'
+import { speakableAnswer, type SpokenAnswerInput } from '@/lib/speak-answer'
 import { useCategories } from '@/hooks/use-categories'
 import { QueryAnswerCard } from '@/components/query-answer-card'
 import { QueryTaskListAnswer, QueryLearningListAnswer, QueryNotesListAnswer } from '@/components/query-answers'
@@ -52,6 +54,17 @@ function AssistantPageInner() {
   const categories = useCategories(userId ?? undefined)
   const hydratedRef = useRef(false)
 
+  // Stop any in-flight speech when leaving the page.
+  useEffect(() => cancelSpeech, [])
+
+  // For a query answer card: speak its result only if this turn's question was a
+  // live voice question (turn.viaVoice; dropped by parseThread on reload, so a
+  // persisted answer never re-speaks). speak() no-ops when the toggle is off.
+  function onResultFor(turn: AssistantTurn): ((input: SpokenAnswerInput) => void) | undefined {
+    if (!turn.viaVoice) return undefined
+    return (input) => speak(speakableAnswer(input))
+  }
+
   useEffect(() => {
     authClient.getSession().then(res => {
       if (!res.data?.user) { router.replace('/login'); return }
@@ -75,7 +88,7 @@ function AssistantPageInner() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [turns])
 
-  async function submitText(userText: string) {
+  async function submitText(userText: string, viaVoice = false) {
     if (busy || !userId) return
     const text = userText.trim()
     if (!text) return
@@ -117,6 +130,8 @@ function AssistantPageInner() {
         text: '',
         intent: data.intent,
         payload: data.payload,
+        // Speak this answer aloud iff the question was a live voice question.
+        viaVoice: viaVoice || undefined,
       }
 
       setTurns(prev => [...prev, assistantTurn])
@@ -167,7 +182,7 @@ function AssistantPageInner() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setTurns([])}
+            onClick={() => { cancelSpeech(); setTurns([]) }}
             disabled={isEmpty}
             aria-label="Clear conversation"
             style={{ height: '44px' }}
@@ -220,6 +235,7 @@ function AssistantPageInner() {
                         userId={userId}
                         plan={turn.payload}
                         onDismiss={() => removeTurn(turn.id)}
+                        onResult={onResultFor(turn)}
                       />
                     </div>
                   ) : turn.intent === 'query_task' && isTaskPlan(turn.payload) ? (
@@ -229,6 +245,7 @@ function AssistantPageInner() {
                         userId={userId}
                         plan={turn.payload}
                         onDismiss={() => removeTurn(turn.id)}
+                        onResult={onResultFor(turn)}
                       />
                     </div>
                   ) : turn.intent === 'query_learning' && isLearningPlan(turn.payload) ? (
@@ -238,6 +255,7 @@ function AssistantPageInner() {
                         userId={userId}
                         plan={turn.payload}
                         onDismiss={() => removeTurn(turn.id)}
+                        onResult={onResultFor(turn)}
                       />
                     </div>
                   ) : turn.intent === 'query_notes' && isNotesPlan(turn.payload) ? (
@@ -247,6 +265,7 @@ function AssistantPageInner() {
                         userId={userId}
                         plan={turn.payload}
                         onDismiss={() => removeTurn(turn.id)}
+                        onResult={onResultFor(turn)}
                       />
                     </div>
                   ) : (
@@ -281,7 +300,7 @@ function AssistantPageInner() {
             </div>
             <VoiceRecorder
               transcribeOnly
-              onTranscript={(t) => { void submitText(t) }}
+              onTranscript={(t) => { void submitText(t, true) }}
               disabled={busy || !userId}
             />
             <Button
