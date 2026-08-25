@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#0a0b16',
-  width: 'device-width', initialScale: 1, maximumScale: 1, userScalable: false, viewportFit: 'cover',
+  // Allow pinch-zoom: never disable user scaling (WCAG 1.4.4) — it also lets the
+  // user shrink the view if the app feels too large on their device. Mobile inputs
+  // are 16px (text-base), so re-enabling zoom does NOT reintroduce iOS's
+  // focus-zoom-on-input. No maximumScale / userScalable:false.
+  width: 'device-width', initialScale: 1, viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
