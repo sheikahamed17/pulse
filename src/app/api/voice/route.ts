@@ -70,6 +70,9 @@ export async function POST(req: Request) {
         const { transcript } = await groqWhisper({ client: groq, blob: audio, filename: audioFilename })
         send({ step: 'transcript', text: transcript })
 
+        const mode = new URL(req.url).searchParams.get('mode')
+        if (mode === 'transcribe') { controller.close(); return }
+
         send({ step: 'parsing' })
         const router = await routeIntent({ client: groq, text: transcript })
 

@@ -25,7 +25,7 @@ export type VoiceFinalPayload = {
 export async function callVoiceApiStreaming(
   blob: Blob,
   onEvent: (e: VoiceStreamEvent) => void,
-  opts: { idleTimeoutMs?: number } = {},
+  opts: { idleTimeoutMs?: number; transcribeOnly?: boolean } = {},
 ): Promise<VoiceFinalPayload | null> {
   // Abort if the stream goes silent for too long. The server legitimately streams
   // over several seconds (transcribe → route → parse → payload), so this is an
@@ -45,7 +45,8 @@ export async function callVoiceApiStreaming(
     fd.append('audio', blob, filenameForMime(blob.type))
 
     arm()
-    const res = await fetch('/api/voice', { method: 'POST', body: fd, signal: controller.signal })
+    const url = opts.transcribeOnly ? '/api/voice?mode=transcribe' : '/api/voice'
+    const res = await fetch(url, { method: 'POST', body: fd, signal: controller.signal })
     if (!res.ok || !res.body) return null
 
     const reader = res.body.getReader()

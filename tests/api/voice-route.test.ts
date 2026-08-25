@@ -186,4 +186,48 @@ describe('/api/voice (SSE)', () => {
     expect(errEvent).toBeDefined()
     expect(errEvent!.message).toMatch(/whisper/i)
   })
+
+  it('transcribe-only mode: emits transcribing + transcript and then closes (no parsing, no payload)', async () => {
+    vi.clearAllMocks()
+    const { routeIntent } = await import('@/lib/agents/router')
+    const { parseMoneyEntry } = await import('@/lib/agents/money-agent')
+
+    const fd = new FormData()
+    fd.append('audio', new Blob(['fake'], { type: 'audio/webm' }), 'voice.webm')
+    const req = new Request('http://x/api/voice?mode=transcribe', { method: 'POST', body: fd })
+
+    const res = await POST(req)
+    const events = await consumeSSE(res)
+
+    expect(events.map(e => e.step)).toEqual(['transcribing', 'transcript'])
+    expect((events[1] as { text: string }).text).toBe('spent 80 on chai')
+
+    // Verify router and parse agents were NOT called
+    expect(routeIntent).not.toHaveBeenCalled()
+    expect(parseMoneyEntry).not.toHaveBeenCalled()
+  })
+
+  it('full flow (no mode param): still streams through to payload event (regression)', async () => {
+    vi.clearAllMocks()
+    const { routeIntent } = await import('@/lib/agents/router')
+    const { parseMoneyEntry } = await import('@/lib/agents/money-agent')
+
+    const fd = new FormData()
+    fd.append('audio', new Blob(['fake'], { type: 'audio/webm' }), 'voice.webm')
+    const req = new Request('http://x/api/voice', { method: 'POST', body: fd })
+
+    const res = await POST(req)
+    const events = await consumeSSE(res)
+
+    expect(events.map(e => e.step)).toEqual(['transcribing', 'transcript', 'parsing', 'payload'])
+    expect((events[1] as { text: string }).text).toBe('spent 80 on chai')
+
+    // Verify router and parse agents WERE called
+    expect(routeIntent).toHaveBeenCalled()
+    expect(parseMoneyEntry).toHaveBeenCalled()
+
+    const payload = (events[3] as { payload: { kind: string; amount: number } }).payload
+    expect(payload.kind).toBe('money')
+    expect(payload.amount).toBe(8000)
+  })
 })
