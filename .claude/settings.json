@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "timeout": 120,
+            "statusMessage": "ESLint (edited file)…",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/lint-edited.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
