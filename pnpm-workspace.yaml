@@ -5,12 +5,28 @@ allowBuilds:
   unrs-resolver: true
   workerd: true
 
-# Transitive-dep minimums to clear dependabot alerts. All four packages here
-# are dev-time or build-time tooling (wrangler / miniflare / next-build); none
-# are reachable from the deployed Worker runtime, so the actual exposure is
-# local-machine-only. Still worth pinning.
+# Transitive-dep security floors to clear Dependabot alerts (52 alerts across 12
+# packages, 2026-08). Most are dev/build-time tooling (wrangler / miniflare /
+# next-build / opennext) not reachable from the deployed Worker runtime, so real
+# exposure is local-machine-only — pinned regardless. The COMMITTED lockfile
+# freezes exact resolution; these floors only re-resolve on an explicit update.
+# brace-expansion & nanoid have MULTIPLE majors live in the tree, so they are
+# major-scoped + exact-pinned — an unbounded `>=` would force a `^1` parent up to
+# brace-expansion@5 (or nanoid@3 CJS up to nanoid@6 ESM) and break resolution.
+# NOTE: pnpm 11 reads overrides ONLY from here, not package.json#pnpm.overrides.
 overrides:
-  undici: '>=7.28.0'   # GHSA-vmh5-mc38-953g (high TLS bypass) + 3 others
-  ws: '>=8.21.0'        # GHSA-96hv-2xvq-fx4p (high, fragment-DoS)
-  esbuild: '>=0.28.1'   # GHSA-g7r4-m6w7-qqqr (low, Windows dev-server)
-  postcss: '>=8.5.10'   # GHSA-qx2v-qp2m-jg93 (moderate, XSS in stringify)
+  undici: '>=8.9.0'                 # 5 alerts (high/med)
+  hono: '>=4.12.34'                 # 7 alerts (med/low)
+  '@hono/node-server': '>=1.19.15 <2'  # 1 alert (med) — bound: 2.x is a major bump
+  fast-uri: '>=3.1.5 <4'            # 3 alerts (high) — bound: ajv wants 3.x
+  ip-address: '>=10.3.1'            # 3 alerts (high/med)
+  js-yaml: '>=4.3.1 <5'             # 2 alerts (high) — bound: 5.x is ESM-only
+  sharp: '>=0.35.0'                 # 1 alert (high)
+  body-parser: '>=2.3.0'            # 1 alert (low)
+  postcss: '>=8.5.23'               # 2 alerts (high/med) — was >=8.5.10
+  ws: '>=8.21.0'                    # retained pin (not currently flagged)
+  esbuild: '>=0.28.1'               # retained pin (not currently flagged)
+  'nanoid@3': '3.3.18'              # 2 alerts (high) — exact-pin the 3.x line
+  'brace-expansion@1': '1.1.16'     # part of 7 alerts (high)
+  'brace-expansion@2': '2.1.4'      #   ″
+  'brace-expansion@5': '5.0.9'      #   ″
