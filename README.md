@@ -25,7 +25,8 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 ## Highlights
 
 - 🎙️ **Voice & natural-language capture** — one field for everything; the AI routes it to the right domain and fills the fields.
-- 💬 **Ask your data** — read-only natural-language questions across all four domains (*"total spend last week"*, *"what's overdue?"*), answered by voice or text.
+- 💬 **Ask your data** — read-only natural-language questions across all four domains (*"total spend last week"*, *"what's overdue?"*), answered by voice or text — or kept going as a conversation with the AI assistant.
+- 💰 **Accounts & net worth** — balances across your accounts (assets and debts), a derived net-worth figure, and how it's moved over time.
 - 📴 **Local-first & offline** — every entry is written to on-device storage first, then synced. No spinner waiting on the network.
 - 🔐 **Passkey (Face ID) sign-in** — plus a local PIN lock and a durable session; magic-link fallback.
 - 📈 **Weekly AI digests** — a browsable history of auto-generated summaries of your week.
@@ -43,10 +44,20 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 | 📚 **Learning** | What you learned each day — a searchable running log. |
 | 📝 **Notes** | Voice quick-capture: verbatim body, AI-generated title & tags, free-text search. |
 
+Plus 🔥 **Habits & streaks** — the first non-finance domain: check off daily or weekday-scheduled habits and build streaks, on a page of their own and a dashboard widget.
+
+### Money, in depth
+- **Accounts & net worth.** Track balances across accounts (assets and liabilities); Pulse derives your **net worth** and reconstructs how it's moved over time.
+- **Cash-flow forecast.** Upcoming recurring income and bills projected forward, with a month-end net estimate on your dashboard.
+- **Bill reminders.** A push notification before a recurring bill falls due.
+- **Savings goals.** Target amounts — linked to an account or tracked manually — with progress bars on your dashboard.
+- **Transfers.** Move money between your own accounts (Bank → Savings, or paying down a card) without it distorting your spend/income totals.
+
 ### Intelligence
 - **Router → domain agents.** A small model classifies your input into one of ~10 intents; a per-domain agent extracts structured fields.
 - **Query agents ("ask your data").** Questions become a *plan* the client executes locally over your own data — the AI never sees your entries, only the shape of the question. Supports totals, breakdowns, period-over-period deltas, and time series for money, plus lookups for tasks, learning, and notes.
 - **Voice answers.** Voice question → transcription → route → plan → answer card, with a concise spoken summary read back to you.
+- **Conversational assistant.** A persistent chat thread over your data at `/assistant` — follow-ups keep context, work by voice or text, and answers are read back for a hands-free loop. Same privacy model as the query agents: the model sees the question, never your entries.
 - **Insights.** Weekly digests generated on a schedule and browsable at `/insights`, with on-demand refresh for the current week.
 
 ### Capture & auto-import
@@ -57,7 +68,10 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 ### Organize & analyze
 - **Category management.** Rename, set icons, archive/restore, and **merge duplicates** (reassigning their entries) in Settings → Categories.
 - **Filter, sort & timestamps.** Every list filters and sorts (money by category / source / direction / date range, or by amount); every entry shows when it's from.
-- **Analytics** (`/analytics`). Spend trend, income vs spend + net, top movers, and per-category small multiples over the last weeks/months — inline SVG on a colorblind-validated palette.
+- **Analytics** (`/analytics`). Spend trend, income vs spend + net, top movers, per-category small multiples, **net worth over time**, and **unusual-spending** detection — inline SVG on a colorblind-validated palette.
+- **Global search.** One 🔍 searches all four domains at once and jumps to — and flashes — the matching row.
+- **Backup & restore.** Export your full history (plus money as CSV) and re-import it into any instance — a non-destructive, on-device merge.
+- **Dashboard.** A `/dashboard` of widgets (accounts, upcoming, goals, habits, …) plus a Getting Started checklist that guides a fresh instance through setup and hides itself once you're rolling.
 
 ## How it works
 
