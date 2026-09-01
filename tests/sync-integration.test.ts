@@ -104,6 +104,18 @@ class MockQueryBuilder {
   }
 
   async execute() {
+    // Mimic Cloudflare D1's hard limit of 100 bound parameters per query.
+    // Each '='/'>' condition binds 1 param; an 'in' condition binds one per
+    // array element. A query that exceeds 100 is rejected by D1 at runtime —
+    // reproduce that here so the dedup-chunking regression is covered.
+    const boundParams = this.whereConditions.reduce(
+      (n, [, op, val]) => n + (op === 'in' ? (val as unknown[]).length : 1),
+      0,
+    )
+    if (boundParams > 100) {
+      throw new Error(`D1_ERROR: too many SQL variables (${boundParams} bound parameters exceed the 100 limit)`)
+    }
+
     const table = mockDbInstance[this.tableName] || []
     let filtered = [...table]
 
@@ -667,6 +679,62 @@ describe('/api/sync — Notes domain', () => {
       // Verify other fields are unchanged
       expect(rows[0].body).toBe('Had a great standup meeting today')
       expect(rows[0].title).toBe('Note about meetings')
+    })
+  })
+})
+
+describe('/api/sync — D1 bound-parameter limit (dedup chunking)', () => {
+  it('does not 500 when a client pushes more than 100 new ops in one sync', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      // A wedged client accumulates unsynced ops; once it re-pushes >100 at
+      // once, the dedup query `id IN (...)` binds >100 params. D1 rejects that
+      // (mock throws above), which — before chunking — surfaced as a 500 that
+      // never marks anything synced, permanently wedging sync.
+      const ops = Array.from({ length: 150 }, (_, i) => ({
+        id: `op-bulk-${i}`,
+        hlc: `${String(i + 1).padStart(16, '0')}-000000-d1`,
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'money' as const,
+        entity_id: `m-${i}`,
+        op_type: 'create' as const,
+        payload: { amount: 100, currency: 'INR', direction: 'out' as const, occurred_at: '2026-08-01T00:00:00Z', source: 'manual' as const },
+        schema_version: 1,
+      }))
+
+      const push = await callSync({ device_id: 'd1', new_ops: ops })
+
+      // Must succeed (no 500) and ack every op so the client can mark them synced.
+      expect(push.error).toBeUndefined()
+      expect(push.applied_ack).toHaveLength(150)
+
+      // All 150 persisted to the op_log exactly once.
+      const rows = await testDb.selectFrom('op_log').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(150)
+    })
+  })
+
+  it('still dedups correctly across chunk boundaries when re-pushing a large batch', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const mk = (i: number) => ({
+        id: `op-dd-${i}`,
+        hlc: `${String(i + 1).padStart(16, '0')}-000000-d1`,
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'money' as const,
+        entity_id: `m-${i}`,
+        op_type: 'create' as const,
+        payload: { amount: 100, currency: 'INR', direction: 'out' as const, occurred_at: '2026-08-01T00:00:00Z', source: 'manual' as const },
+        schema_version: 1,
+      })
+      const ops = Array.from({ length: 130 }, (_, i) => mk(i))
+      await callSync({ device_id: 'd1', new_ops: ops })
+      // Re-push the exact same 130 ops — dedup must recognise all as existing,
+      // creating no duplicates, across the 90-id chunk boundary.
+      const repush = await callSync({ device_id: 'd1', new_ops: ops })
+      expect(repush.error).toBeUndefined()
+      const rows = await testDb.selectFrom('op_log').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(130)
     })
   })
 })

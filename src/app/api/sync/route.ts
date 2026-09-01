@@ -55,15 +55,23 @@ export async function POST(req: Request) {
     schema_version: row.schema_version,
   })
 
-  // 1. Dedup incoming by id (bounded by |new_ops|).
-  let existingIncomingIds = new Set<string>()
-  if (new_ops.length > 0) {
+  // 1. Dedup incoming by id. Chunk the `id IN (...)` lookup so a single query
+  //    never exceeds Cloudflare D1's hard limit of 100 bound parameters (the
+  //    +1 is user_id). A wedged client re-pushes its whole unsynced backlog, so
+  //    |new_ops| can far exceed 100 — without chunking that query throws and
+  //    500s, and since acks never reach the client, sync stays permanently
+  //    wedged (the backlog only grows). 90 leaves headroom under the limit.
+  const DEDUP_CHUNK = 90
+  const existingIncomingIds = new Set<string>()
+  const incomingIds = new_ops.map(o => o.id)
+  for (let i = 0; i < incomingIds.length; i += DEDUP_CHUNK) {
+    const batch = incomingIds.slice(i, i + DEDUP_CHUNK)
     const rows = await db.selectFrom('op_log')
       .where('user_id', '=', userId)
-      .where('id', 'in', new_ops.map(o => o.id))
+      .where('id', 'in', batch)
       .select('id')
       .execute()
-    existingIncomingIds = new Set(rows.map(r => r.id))
+    for (const r of rows) existingIncomingIds.add(r.id)
   }
   const newOps = filterNewOps(new_ops, existingIncomingIds)
 
