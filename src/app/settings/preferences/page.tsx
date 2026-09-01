@@ -115,7 +115,7 @@ export default function PreferencesPage() {
           <Label className="uppercase text-xs">Primary currency</Label>
           <select
             value={state.primaryCurrency}
-            onChange={e => { setState(s => ({ ...s, primaryCurrency: e.target.value })); setDirty(true); setSaveError(null) }}
+            onChange={e => { const v = e.target.value; setState(s => ({ ...s, primaryCurrency: v })); setDirty(true); setSaveError(null) }}
             className="glass-soft rounded-lg border border-input px-3 py-2 text-sm transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-accent-2"
           >
             {SUPPORTED_CURRENCIES.map(c => (

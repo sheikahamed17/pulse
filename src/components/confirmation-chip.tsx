@@ -123,7 +123,7 @@ function ConfirmationChipMoney({
           inputMode="decimal"
           defaultValue={d.amount === 0 ? '' : major}
           placeholder="0"
-          onChange={(e) => setD(s => ({ ...s, amount: parseAmountInput(e.currentTarget.value) ?? 0 }))}
+          onChange={(e) => { const amt = parseAmountInput(e.currentTarget.value) ?? 0; setD(s => ({ ...s, amount: amt })) }}
           onBlur={() => setEditingField(null)}
           className="mb-3 font-mono text-3xl font-semibold"
         />
@@ -150,7 +150,8 @@ function ConfirmationChipMoney({
             autoFocus
             defaultValue={d.description ?? ''}
             onBlur={(e) => {
-              setD(s => ({ ...s, description: e.currentTarget.value || null }))
+              const v = e.currentTarget.value
+              setD(s => ({ ...s, description: v || null }))
               setEditingField(null)
             }}
             className="h-7 max-w-[200px] text-xs"
@@ -174,7 +175,8 @@ function ConfirmationChipMoney({
             aria-label="Merchant or payee"
             defaultValue={d.merchant ?? ''}
             onBlur={(e) => {
-              setD(s => ({ ...s, merchant: e.currentTarget.value || null }))
+              const v = e.currentTarget.value
+              setD(s => ({ ...s, merchant: v || null }))
               setEditingField(null)
             }}
             className="h-7 max-w-[200px] text-xs"
@@ -209,7 +211,7 @@ function ConfirmationChipMoney({
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <select
           value={d.account_id ?? ''}
-          onChange={(e) => setD(s => ({ ...s, account_id: e.target.value || null }))}
+          onChange={(e) => { const v = e.target.value; setD(s => ({ ...s, account_id: v || null })) }}
           className="rounded-md border bg-muted px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
           aria-label="Account"
         >
@@ -378,7 +380,7 @@ function ConfirmationChipTask({
 
         <select
           value={d.priority}
-          onChange={e => setD(s => ({ ...s, priority: e.target.value as 'low' | 'medium' | 'high' }))}
+          onChange={e => { const v = e.target.value as 'low' | 'medium' | 'high'; setD(s => ({ ...s, priority: v })) }}
           className="rounded-md border bg-muted px-2 py-0.5 text-xs"
         >
           <option value="low">low</option>
@@ -551,7 +553,8 @@ function ConfirmationChipLearning({
           autoFocus
           defaultValue={d.attribution ?? ''}
           onBlur={(e) => {
-            setD(s => ({ ...s, attribution: e.currentTarget.value || null }))
+            const v = e.currentTarget.value
+            setD(s => ({ ...s, attribution: v || null }))
             setEditingAttribution(false)
           }}
           placeholder="source / where learned…"
