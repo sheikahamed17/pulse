@@ -11,6 +11,10 @@ const fakeDb = {
       selectAll: () => ({
         executeTakeFirst: async () => userPrefsTable[0],
       }),
+      // PUT reads the stored salary_reminder before upserting (to preserve it).
+      select: () => ({
+        executeTakeFirst: async () => userPrefsTable[0],
+      }),
     }),
   }),
   insertInto: (_table: string) => ({

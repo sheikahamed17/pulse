@@ -16,6 +16,9 @@ const PutSchema = z.object({
   // string keys (a z.enum key would make the record exhaustive/require all currencies);
   // non-currency keys are filtered out server-side before persisting.
   fx_overrides: z.record(z.string(), z.number().positive().finite()).optional(),
+  // Optional so an older cached client that omits it doesn't reset the flag —
+  // the PUT preserves the stored value when this is absent.
+  salary_reminder: z.boolean().optional(),
 })
 
 function parseOverrides(raw: unknown): Record<string, number> {
@@ -44,13 +47,14 @@ export async function GET(req: Request) {
     .executeTakeFirst()
 
   if (!row) {
-    return NextResponse.json({ ...DEFAULTS, fx_overrides: {}, user_id: session.user.id })
+    return NextResponse.json({ ...DEFAULTS, fx_overrides: {}, salary_reminder: false, user_id: session.user.id })
   }
   return NextResponse.json({
     user_id: row.user_id,
     primary_currency: row.primary_currency,
     tz: row.tz,
     fx_overrides: parseOverrides(row.fx_overrides),
+    salary_reminder: row.salary_reminder === 1,
     updated_at: row.updated_at,
   })
 }
@@ -70,6 +74,12 @@ export async function PUT(req: Request) {
     ? Object.fromEntries(Object.entries(parsed.data.fx_overrides).filter(([k]) => (SUPPORTED_CURRENCIES as readonly string[]).includes(k)))
     : {}
   const fxJson = Object.keys(fxClean).length ? JSON.stringify(fxClean) : null
+
+  // Preserve the stored salary_reminder when the client omits it (older cached
+  // client saving other prefs must not silently turn the reminder off).
+  const existing = await db.selectFrom('user_prefs').where('user_id', '=', session.user.id).select('salary_reminder').executeTakeFirst()
+  const salaryReminder = (parsed.data.salary_reminder ?? (existing?.salary_reminder === 1)) ? 1 : 0
+
   const now = new Date().toISOString()
   await db
     .insertInto('user_prefs')
@@ -78,12 +88,14 @@ export async function PUT(req: Request) {
       primary_currency: parsed.data.primary_currency,
       tz: parsed.data.tz,
       fx_overrides: fxJson,
+      salary_reminder: salaryReminder,
       updated_at: now,
     })
     .onConflict(oc => oc.column('user_id').doUpdateSet({
       primary_currency: parsed.data.primary_currency,
       tz: parsed.data.tz,
       fx_overrides: fxJson,
+      salary_reminder: salaryReminder,
       updated_at: now,
     }))
     .execute()
@@ -93,6 +105,7 @@ export async function PUT(req: Request) {
     primary_currency: parsed.data.primary_currency,
     tz: parsed.data.tz,
     fx_overrides: fxClean,
+    salary_reminder: salaryReminder === 1,
     updated_at: now,
   })
 }

@@ -23,6 +23,7 @@ export default function PreferencesPage() {
     primaryCurrency: prefs.primary_currency,
     tz: prefs.tz,
     fxOverrides: prefs.fx_overrides,
+    salaryReminder: prefs.salary_reminder,
   })
   const [tzQuery, setTzQuery] = useState('')
   const [busy, setBusy] = useState(false)
@@ -42,11 +43,12 @@ export default function PreferencesPage() {
 
   // Sync local state with prefs when they change (but not while dirty)
   useEffect(() => {
-    if (!dirty && (previousPrefsRef.current.primary_currency !== prefs.primary_currency || previousPrefsRef.current.tz !== prefs.tz)) {
+    if (!dirty && (previousPrefsRef.current.primary_currency !== prefs.primary_currency || previousPrefsRef.current.tz !== prefs.tz || previousPrefsRef.current.salary_reminder !== prefs.salary_reminder)) {
       setState({
         primaryCurrency: prefs.primary_currency,
         tz: prefs.tz,
         fxOverrides: prefs.fx_overrides,
+        salaryReminder: prefs.salary_reminder,
       })
     }
     previousPrefsRef.current = prefs
@@ -66,7 +68,7 @@ export default function PreferencesPage() {
     setBusy(true)
     setSaveError(null)
     try {
-      await savePrefs({ primary_currency: state.primaryCurrency, tz: state.tz, fx_overrides: state.fxOverrides })
+      await savePrefs({ primary_currency: state.primaryCurrency, tz: state.tz, fx_overrides: state.fxOverrides, salary_reminder: state.salaryReminder })
       setDirty(false)
     } catch (err) {
       console.error('save prefs', err)
@@ -125,6 +127,22 @@ export default function PreferencesPage() {
           <p className="text-xs text-muted-foreground">
             Dashboard sums convert non-primary entries via ECB rates (Phase 2.4).
           </p>
+        </section>
+
+        <section className="glass flex flex-col gap-2 rounded-2xl p-4">
+          <label className="flex items-center justify-between gap-3 min-h-[44px]">
+            <span className="flex flex-col">
+              <span className="text-sm font-medium">Remind me to log my salary</span>
+              <span className="text-xs text-muted-foreground">A push on the last working day of each month — for income that doesn&apos;t arrive by email. Needs notifications enabled.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={state.salaryReminder}
+              onChange={e => { const v = e.currentTarget.checked; setState(s => ({ ...s, salaryReminder: v })); setDirty(true); setSaveError(null) }}
+              className="h-5 w-5 flex-shrink-0 accent-accent-2"
+              aria-label="Remind me to log my salary on the last working day of the month"
+            />
+          </label>
         </section>
 
         <section className="glass flex flex-col gap-2 rounded-2xl p-4">
@@ -259,6 +277,7 @@ export default function PreferencesPage() {
                   primaryCurrency: prefs.primary_currency,
                   tz: prefs.tz,
                   fxOverrides: prefs.fx_overrides,
+                  salaryReminder: prefs.salary_reminder,
                 })
                 setDirty(false)
                 setSaveError(null)

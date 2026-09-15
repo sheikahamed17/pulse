@@ -10,11 +10,12 @@ export const CRON_DISPATCH: Record<string, string> = {
 }
 
 // Routes that run IN ADDITION to the primary route for a given tick, so scheduled
-// work can be added without a new cron trigger. Budget threshold alerts and bill
-// reminders ride the daily FX tick (0 3) — FX rates are refreshed first, so currency
-// conversion is fresh.
+// work can be added without a new cron trigger. Budget threshold alerts, bill
+// reminders, and the salary reminder ride the daily FX tick (0 3) — FX rates are
+// refreshed first, so currency conversion is fresh. 0 3 UTC == 08:30 IST, a good
+// morning slot for the last-working-day salary nudge.
 export const CRON_SECONDARY: Record<string, string[]> = {
-  '0 3 * * *': ['/api/cron/budgets', '/api/cron/bill-reminders'],
+  '0 3 * * *': ['/api/cron/budgets', '/api/cron/bill-reminders', '/api/cron/salary-reminder'],
 }
 
 export function resolveCronRoute(cron: string): string | null {

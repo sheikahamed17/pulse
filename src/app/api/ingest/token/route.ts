@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   await db
     .insertInto('user_prefs')
-    .values({ user_id: userId, primary_currency: 'INR', tz: 'Asia/Kolkata', fx_overrides: null, sms_ingest_token_hash: hash, updated_at: now })
+    .values({ user_id: userId, primary_currency: 'INR', tz: 'Asia/Kolkata', fx_overrides: null, sms_ingest_token_hash: hash, salary_reminder: 0, updated_at: now })
     .onConflict(oc => oc.column('user_id').doUpdateSet({ sms_ingest_token_hash: hash, updated_at: now }))
     .execute()
 

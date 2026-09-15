@@ -336,6 +336,7 @@ export interface UserPrefsTable {
   tz: string
   fx_overrides: string | null          // JSON Record<string, number> (currency → EUR-rate)
   sms_ingest_token_hash: string | null // SHA-256 hex of the personal SMS-ingest token secret
+  salary_reminder: number              // 0/1 — opt-in monthly last-working-day salary reminder
   updated_at: string
 }
 
