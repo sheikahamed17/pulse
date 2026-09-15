@@ -323,6 +323,33 @@ describe('/api/sync — Phase 1 entity kinds', () => {
     })
   })
 
+  it('round-trips split_group_id on a money entry (split part)', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const op = {
+        id: 'op-split-1',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'money',
+        entity_id: 'ms1',
+        op_type: 'create' as const,
+        payload: {
+          amount: 1500, currency: 'INR', direction: 'out' as const,
+          occurred_at: '2026-09-01T10:00:00Z', source: 'manual' as const,
+          category_id: 'cat-groceries', split_group_id: 'grp-1',
+        },
+        schema_version: 1,
+      }
+      await callSync({ device_id: 'd1', new_ops: [op] })
+
+      const pull = await callSync({ device_id: 'd2', new_ops: [] })
+      expect(pull.new_ops_from_server[0].payload.split_group_id).toBe('grp-1')
+
+      const rows = await testDb.selectFrom('money_entries').where('user_id', '=', userId).selectAll().execute()
+      expect(rows[0].split_group_id).toBe('grp-1')
+    })
+  })
+
   it('persists a category entry', async () => {
     await withTestUser(async ({ userId, callSync, testDb }) => {
       const op = {

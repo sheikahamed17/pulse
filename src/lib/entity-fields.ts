@@ -1,7 +1,7 @@
 export const MONEY_FIELDS = [
   'amount', 'currency', 'direction', 'category_id', 'description',
   'occurred_at', 'source', 'receipt_key', 'raw_input', 'recurring_rule_id',
-  'merchant', 'tags', 'account_id',
+  'merchant', 'tags', 'account_id', 'split_group_id',
 ] as const
 
 export const RECURRING_FIELDS = [

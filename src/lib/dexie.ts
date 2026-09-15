@@ -109,6 +109,7 @@ export type MoneyEntryRow = {
   merchant: string | null
   tags: string[]
   account_id: string | null
+  split_group_id?: string | null   // optional: set on split parts; absent on ordinary entries (keeps fixtures lean)
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string

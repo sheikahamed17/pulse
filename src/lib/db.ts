@@ -138,6 +138,7 @@ export interface MoneyEntryTable {
   merchant: string | null
   tags: string | null             // JSON array
   account_id: string | null
+  split_group_id: string | null
   field_hlcs: string
   deleted_at: string | null
   created_at: string

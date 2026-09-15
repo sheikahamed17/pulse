@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Image from 'next/image'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,8 +13,10 @@ import { cn } from '@/lib/utils'
 import { currencySymbol } from '@/lib/currency'
 import { formatLocalDateTime } from '@/lib/format'
 import { parseAmountInput } from '@/lib/parse-amount'
+import { type Allocation, isSplitValid, splitRemaining } from '@/lib/split-transaction'
 import { useUserPrefs } from '@/hooks/use-user-prefs'
 import { useAccounts } from '@/hooks/use-accounts'
+import { useCategories } from '@/hooks/use-categories'
 import type { MoneyPayload } from '@/lib/op-schemas/money'
 import type { TaskPayload } from '@/lib/op-schemas/task'
 import type { LearningPayload } from '@/lib/op-schemas/learning'
@@ -32,7 +34,7 @@ type Props = {
   userId: string
   draft: ChipDraft
   categoryById: Map<string, CategoryRow>
-  onConfirm: (final: ChipDraft, recurring: { enabled: boolean; period: Period; intervalCount: number }) => Promise<void>
+  onConfirm: (final: ChipDraft, recurring: { enabled: boolean; period: Period; intervalCount: number }, splitAllocations?: Allocation[]) => Promise<void>
   onCancel: () => void
   mode?: 'create' | 'edit'
 }
@@ -70,21 +72,41 @@ function ConfirmationChipMoney({
 }) {
   const [d, setD] = useState<MoneyPayload & { kind: 'money'; draftCategoryName?: string; receiptPreviewUrl?: string; merchant?: string | null; tags?: string[]; account_id?: string | null }>(draft)
   const accounts = useAccounts(userId)
+  const splitCats = useCategories(userId, d.direction === 'out' ? 'spend' : 'income')
   const [editingField, setEditingField] = useState<null | 'amount' | 'description' | 'category' | 'date' | 'merchant'>(draft.amount === 0 ? 'amount' : null)
   const [newTag, setNewTag] = useState('')
   const [makeRecurring, setMakeRecurring] = useState(false)
   const [period, setPeriod] = useState<Period>('monthly')
   const [intervalCount, setIntervalCount] = useState(1)
   const [busy, setBusy] = useState(false)
+  const [splitMode, setSplitMode] = useState(false)
+  const [splitRows, setSplitRows] = useState<{ key: number; category_id: string | null; amountText: string }[]>([])
+  const splitKey = useRef(0)
   const isEdit = mode === 'edit'
 
   const major = (d.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
   const symbol = currencySymbol(d.currency)
   const cat = d.category_id ? categoryById.get(d.category_id) : undefined
 
+  const allocations: Allocation[] = splitRows.map(r => ({ category_id: r.category_id, amount: parseAmountInput(r.amountText) ?? 0 }))
+  const remaining = splitRemaining(d.amount, allocations)
+  const splitReady = isSplitValid(d.amount, allocations)
+
+  function enterSplit() {
+    setSplitRows([
+      { key: splitKey.current++, category_id: d.category_id ?? null, amountText: d.amount ? String(d.amount / 100) : '' },
+      { key: splitKey.current++, category_id: null, amountText: '' },
+    ])
+    setEditingField(null)
+    setSplitMode(true)
+  }
+
   async function handleConfirm() {
     setBusy(true)
-    try { await onConfirm(d, { enabled: makeRecurring, period, intervalCount }) } finally { setBusy(false) }
+    try {
+      if (splitMode) await onConfirm(d, { enabled: false, period, intervalCount }, allocations)
+      else await onConfirm(d, { enabled: makeRecurring, period, intervalCount })
+    } finally { setBusy(false) }
   }
 
   return (
@@ -138,13 +160,26 @@ function ConfirmationChipMoney({
       )}
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setEditingField('category')}
-          className="rounded-md border bg-muted px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
-        >
-          {cat ? `${cat.icon ?? ''} ${cat.name}` : 'Pick category…'}
-        </button>
+        {!splitMode && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingField('category')}
+              className="rounded-md border bg-muted px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+            >
+              {cat ? `${cat.icon ?? ''} ${cat.name}` : 'Pick category…'}
+            </button>
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={enterSplit}
+                className="rounded-md border border-accent-2/40 text-accent-2 px-2 py-0.5 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+              >
+                ⑂ Split
+              </button>
+            )}
+          </>
+        )}
         {editingField === 'description' ? (
           <Input
             autoFocus
@@ -166,6 +201,64 @@ function ConfirmationChipMoney({
           </button>
         )}
       </div>
+
+      {splitMode && (
+        <div className="mb-3 flex flex-col gap-2 rounded-md border bg-background p-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium">Split across categories</span>
+            <button
+              type="button"
+              onClick={() => setSplitMode(false)}
+              className="text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+            >
+              Cancel split
+            </button>
+          </div>
+          {splitRows.map((row, i) => (
+            <div key={row.key} className="flex items-center gap-1.5">
+              <select
+                value={row.category_id ?? ''}
+                onChange={e => { const v = e.target.value || null; setSplitRows(prev => prev.map((r, j) => (j === i ? { ...r, category_id: v } : r))) }}
+                aria-label={`Category for split part ${i + 1}`}
+                className="flex-1 min-w-0 rounded-md border bg-muted px-2 py-1 text-xs focus-visible:ring-2 focus-visible:ring-accent-2 outline-none"
+              >
+                <option value="">Uncategorized</option>
+                {splitCats.map(c => (
+                  <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ''}{c.name}</option>
+                ))}
+              </select>
+              <Input
+                inputMode="decimal"
+                value={row.amountText}
+                onChange={e => { const v = e.currentTarget.value; setSplitRows(prev => prev.map((r, j) => (j === i ? { ...r, amountText: v } : r))) }}
+                placeholder="0"
+                aria-label={`Amount for split part ${i + 1}`}
+                className="h-7 w-20 text-xs"
+              />
+              {splitRows.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => setSplitRows(prev => prev.filter((_, j) => j !== i))}
+                  aria-label={`Remove split part ${i + 1}`}
+                  className="text-muted-foreground hover:text-destructive focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setSplitRows(prev => [...prev, { key: splitKey.current++, category_id: null, amountText: '' }])}
+            className="self-start text-xs text-accent-2 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+          >
+            ＋ Add category
+          </button>
+          <div className={cn('text-xs font-mono tabular-nums', remaining === 0 ? 'text-muted-foreground' : 'text-destructive')}>
+            Remaining: {symbol}{(remaining / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </div>
+        </div>
+      )}
 
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         {editingField === 'merchant' ? (
@@ -259,7 +352,7 @@ function ConfirmationChipMoney({
         </div>
       )}
 
-      {!isEdit && (
+      {!isEdit && !splitMode && (
         <div className="mb-3 flex flex-col gap-2">
           <label className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
             <span>Make recurring</span>
@@ -281,8 +374,8 @@ function ConfirmationChipMoney({
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>Cancel</Button>
-        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || d.amount === 0}>
-          {isEdit ? 'Save changes' : `Confirm ${symbol}${major}`}
+        <Button className="flex-[2] bg-[linear-gradient(150deg,var(--primary),var(--accent-2))] hover:opacity-90" onClick={handleConfirm} disabled={busy || d.amount === 0 || (splitMode && !splitReady)}>
+          {isEdit ? 'Save changes' : splitMode ? `Confirm split (${splitRows.length})` : `Confirm ${symbol}${major}`}
         </Button>
       </div>
 

@@ -17,6 +17,7 @@ export const MoneyPayloadSchema = z.object({
   merchant: z.string().max(120).nullable().optional(),
   tags: z.array(z.string().max(40)).max(20).optional(),
   account_id: z.string().min(1).nullable().optional(),
+  split_group_id: z.string().min(1).nullable().optional(),
 })
 
 export type MoneyPayload = z.infer<typeof MoneyPayloadSchema>

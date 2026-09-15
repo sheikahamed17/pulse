@@ -57,6 +57,7 @@ import { HelpCard } from '@/components/help-card'
 import { seedDefaultCategoriesIfEmpty } from '@/lib/seed-categories'
 import { runCategoryDedupeOnce } from '@/lib/dedupe-categories-migration'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
+import type { Allocation } from '@/lib/split-transaction'
 import { drainVoiceQueue } from '@/lib/voice-queue'
 import { callVoiceApiStreaming } from '@/lib/voice-sse'
 import { drainReceiptQueue } from '@/lib/receipt-queue'
@@ -372,6 +373,7 @@ function AppPageInner() {
   async function confirmEntry(
     final: ChipDraft,
     recurring: { enabled: boolean; period: 'daily'|'weekly'|'monthly'|'yearly'; intervalCount: number },
+    splitAllocations?: Allocation[],
   ) {
     if (!user) return
     if (editId) { await updateEntry(final, editId); return }
@@ -463,6 +465,43 @@ function AppPageInner() {
         user_id: user.id,
       })
       await applyLocalOp(op)
+      setDraft(null)
+      setEditId(null)
+      pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))
+      return
+    }
+
+    // Split: one payment across N categories → N money entries sharing a
+    // split_group_id. Each part is an ordinary entry, so every aggregation
+    // (budgets/analytics/account balance/net worth) treats it as-is — no
+    // special-casing anywhere. Recurring is not combined with split (v1).
+    if (splitAllocations && splitAllocations.length > 0) {
+      const groupId = crypto.randomUUID()
+      for (const alloc of splitAllocations) {
+        const partOp = await generateOp({
+          entity_kind: 'money',
+          entity_id: crypto.randomUUID(),
+          op_type: 'create',
+          payload: {
+            amount: alloc.amount, currency: final.currency, direction: final.direction,
+            category_id: alloc.category_id ?? null,
+            description: final.description ?? null,
+            merchant: final.merchant ?? null,
+            tags: final.tags ?? [],
+            occurred_at: final.occurred_at,
+            source: final.source,
+            raw_input: final.raw_input ?? null,
+            recurring_rule_id: null,
+            receipt_key: final.receipt_key ?? null,
+            account_id: final.account_id ?? null,
+            split_group_id: groupId,
+          },
+          user_id: user.id,
+        })
+        await applyLocalOp(partOp)
+      }
+      if (final.draftId) await deleteReceiptDraft(final.draftId)
+      if (activeTab !== 'money') setTab('money')
       setDraft(null)
       setEditId(null)
       pushPullOnce({ userId: user.id }).catch(err => console.error('sync', err))

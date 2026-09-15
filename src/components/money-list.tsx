@@ -21,6 +21,7 @@ import { SUPPORTED_CURRENCIES } from '@/lib/op-schemas/money'
 import { EntryTimestamp } from '@/components/entry-timestamp'
 import { filterSortMoney } from '@/lib/money-filter-sort'
 import { makeCategoryResolver } from '@/lib/category-resolve'
+import { groupBySplit } from '@/lib/split-group'
 import { cn } from '@/lib/utils'
 import type { MoneyEntryRow } from '@/lib/dexie'
 import type { MoneyFilter, MoneySort } from '@/lib/money-filter-sort'
@@ -61,6 +62,17 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
     if (!filter || !sort) return entries
     return filterSortMoney(entries, filter, sort, resolve)
   }, [entries, filter, sort, resolve])
+
+  // Collapse split parts (shared split_group_id) into one expandable row.
+  const groups = useMemo(() => groupBySplit(shown), [shown])
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set())
+  function toggleGroup(id: string) {
+    setExpandedGroups(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+  }
 
   // Push deep-link: open a specific row's inline category picker once + scroll to it.
   useEffect(() => {
@@ -107,16 +119,99 @@ export function MoneyList({ userId, onEdit, categorizeId, filter, sort }: Props)
     setPickingId(null)
   }
 
+  async function deleteGroup(parts: MoneyEntryRow[]) {
+    for (const p of parts) {
+      const op = await generateOp({ entity_kind: 'money', entity_id: p.id, op_type: 'delete', payload: {}, user_id: userId })
+      await applyLocalOp(op)
+    }
+    pushPullOnce({ userId }).catch(err => console.error('sync', err))
+    undo.push(
+      `Deleted split (${parts.length} parts)`,
+      async () => {
+        for (const p of parts) {
+          const undoOp = await generateOp({ entity_kind: 'money', entity_id: p.id, op_type: 'update', payload: resurrectPayload('money', p), user_id: userId })
+          await applyLocalOp(undoOp)
+        }
+        pushPullOnce({ userId }).catch(err => console.error('sync', err))
+      },
+    )
+  }
+
   return (
     <ul className="flex flex-col gap-2">
-        {shown.length === 0 && (
+        {groups.length === 0 && (
           <li className="p-4 text-sm text-muted-foreground">
             {filter && (filter.categoryName || filter.source || filter.direction || filter.from || filter.to)
               ? 'No entries match this filter.'
               : 'No entries yet. Tap the mic above (Phase 1.3) or type below.'}
           </li>
         )}
-        {shown.map(e => {
+        {groups.map(g => {
+          if (g.kind === 'split') {
+            const open = expandedGroups.has(g.groupId)
+            const first = g.parts[0]
+            return (
+              <li key={g.groupId} id={`pulse-row-${g.groupId}`} className="glass-soft rounded-2xl p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(g.groupId)}
+                    aria-expanded={open}
+                    className="flex flex-1 flex-col items-start min-w-0 text-left focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+                  >
+                    <span className="mb-1 inline-flex items-center gap-1 rounded-xl bg-white/8 px-2 py-1 text-xs text-muted-foreground">
+                      🧩 {g.parts.length}-way split{first.merchant ? ` · ${first.merchant}` : ''}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{open ? '▾ hide categories' : '▸ show categories'}</span>
+                    <div className="mt-1"><EntryTimestamp occurredAt={first.occurred_at} /></div>
+                  </button>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className={`font-mono tabular-nums text-sm font-medium whitespace-nowrap ${first.direction === 'out' ? 'text-destructive' : 'text-income'}`}>
+                      {first.direction === 'out' ? '-' : '+'}{currencySymbol(first.currency)}{(g.total / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-[44px] px-2 text-xs"
+                      aria-label={`Delete split (${g.parts.length} parts)`}
+                      onClick={() => deleteGroup(g.parts)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+                {open && (
+                  <ul className="mt-2 flex flex-col gap-1 border-t border-white/10 pt-2">
+                    {g.parts.map(p => {
+                      const pc = p.category_id ? categoryById.get(p.category_id) : undefined
+                      return (
+                        <li key={p.id} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="flex items-center gap-1 min-w-0">
+                            <span>{pc?.icon ?? ''}</span>
+                            <span className="truncate text-muted-foreground">{pc?.name ?? 'Uncategorized'}</span>
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <span className="font-mono tabular-nums">{currencySymbol(p.currency)}{(p.amount / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                            {onEdit && (
+                              <button
+                                type="button"
+                                aria-label={`Edit ${pc?.name ?? 'split part'}`}
+                                onClick={() => onEdit(p)}
+                                className="min-h-[44px] flex items-center text-muted-foreground hover:text-accent-2 focus-visible:ring-2 focus-visible:ring-accent-2 outline-none rounded"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            )}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </li>
+            )
+          }
+          const e = g.entry
           const cat = e.category_id ? categoryById.get(e.category_id) : undefined
           const acc = e.account_id ? accountById.get(e.account_id) : undefined
           const accName = acc ? (acc.icon ? `${acc.icon} ${acc.name}` : acc.name) : (e.account_id ? 'Unknown account' : null)
