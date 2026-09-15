@@ -10,7 +10,8 @@ Ask *"how much did I spend on food this month?"* out loud and hear the answer. S
 [![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers%20%C2%B7%20D1%20%C2%B7%20R2-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
 [![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&logoColor=white)](#install-it)
-[![Tests](https://img.shields.io/badge/tests-passing-3FB950)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1257%20passing-3FB950)](#testing)
+[![Release](https://img.shields.io/github/v/release/sheikahamed17/pulse?color=6E7BFF&label=release)](https://github.com/sheikahamed17/pulse/releases)
 
 [**Run your own copy →**](./SELF-HOSTING.md)
 
@@ -32,6 +33,7 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 - 📈 **Weekly AI digests** — a browsable history of auto-generated summaries of your week.
 - 🏦 **Bank-transaction auto-import** — forward your bank's alert emails and they land as categorized entries, hands-free.
 - 📊 **Spending trends** — a dedicated analytics view: spend / income / net over time, top movers, and per-category small multiples.
+- 🧩 **Split transactions** — allocate one payment across several categories, so budgets and analytics stay accurate.
 - 📲 **Installable PWA** — add to home screen; push notifications for budget alerts and follow-ups.
 
 ## Features
@@ -44,7 +46,7 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 | 📚 **Learning** | What you learned each day — a searchable running log. |
 | 📝 **Notes** | Voice quick-capture: verbatim body, AI-generated title & tags, free-text search. |
 
-Plus 🔥 **Habits & streaks** — the first non-finance domain: check off daily or weekday-scheduled habits and build streaks, on a page of their own and a dashboard widget.
+Plus two non-finance domains that round out daily self-tracking: 🔥 **Habits & streaks** (check off daily or weekday-scheduled habits and build streaks) and 📖 **Journal** (a daily free-text entry with an optional mood) — each on a page of its own.
 
 ### Money, in depth
 - **Accounts & net worth.** Track balances across accounts (assets and liabilities); Pulse derives your **net worth** and reconstructs how it's moved over time.
@@ -52,6 +54,10 @@ Plus 🔥 **Habits & streaks** — the first non-finance domain: check off daily
 - **Bill reminders.** A push notification before a recurring bill falls due.
 - **Savings goals.** Target amounts — linked to an account or tracked manually — with progress bars on your dashboard.
 - **Transfers.** Move money between your own accounts (Bank → Savings, or paying down a card) without it distorting your spend/income totals.
+- **Recurring transfers.** Schedule those moves — a monthly card payment or savings sweep that posts itself.
+- **Split transactions.** Allocate one payment across several categories; each part flows into budgets and analytics as a normal entry.
+- **Cards & debts.** A per-card view: what's owed now, this month's spend charged to it, and the last payment made.
+- **Salary reminder.** An opt-in monthly nudge on the last working day to log income that arrives with no email trail.
 
 ### Intelligence
 - **Router → domain agents.** A small model classifies your input into one of ~10 intents; a per-domain agent extracts structured fields.
@@ -139,7 +145,7 @@ src/
   app/            # Next App Router — routes, API handlers, pages (/app, /analytics, /insights, /settings/*)
   lib/            # sync engine, agents, ingest, auth/email, pure helpers (unit-tested)
   components/     # UI: capture chips, domain lists, answer cards, charts
-migrations/       # D1 schema, applied in order 0001 → 0022
+migrations/       # D1 schema, applied in order 0001 → 0026
 scripts/          # icon generation, service-worker build, router eval, VAPID keygen
 tests/            # vitest suites (agents, api routes, sync, lib)
 docs/superpowers/ # design specs and implementation plans
@@ -158,6 +164,6 @@ The suite covers the sync engine's convergence invariants, the agent/query pipel
 
 ## Status & license
 
-Pulse is an actively developed **personal project**, deployed to production and used daily. It ships behind a CI + Cloudflare deploy pipeline on every push to `main`.
+Pulse is an actively developed **personal project**, deployed to production and used daily. It ships behind a CI + Cloudflare deploy pipeline on every push to `main`, and changes are cut as [tagged releases](https://github.com/sheikahamed17/pulse/releases) (semver from `v1.0.0`).
 
 No formal open-source license is attached yet — if you'd like to reuse the code, please ask. You're welcome to self-host your own copy for personal use.
