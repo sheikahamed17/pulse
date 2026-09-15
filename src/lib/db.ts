@@ -196,6 +196,19 @@ export interface NoteEntryTable {
   updated_at: string
 }
 
+export interface JournalEntryTable {
+  id: string
+  user_id: string
+  body: string
+  mood: string | null
+  occurred_at: string
+  source: 'voice' | 'manual'
+  field_hlcs: string
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface BudgetTable {
   id: string
   user_id: string
@@ -357,6 +370,7 @@ export interface DB {
   tasks: TaskTable
   learning_entries: LearningEntryTable
   note_entries: NoteEntryTable
+  journal_entries: JournalEntryTable
   budgets: BudgetTable
   accounts: AccountsTable
   goals: GoalsTable

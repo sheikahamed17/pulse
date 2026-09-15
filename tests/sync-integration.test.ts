@@ -58,6 +58,7 @@ function resetMockDb() {
     tasks: [],
     learning_entries: [],
     note_entries: [],
+    journal_entries: [],
     insights: [],
   }
 }
@@ -616,6 +617,55 @@ describe('/api/sync — Learning domain', () => {
       expect(tags).toEqual(['TypeScript', 'Web Development', 'Frontend'])
       // Verify other fields are unchanged
       expect(rows[0].text).toBe('Learning about TypeScript')
+    })
+  })
+})
+
+describe('/api/sync — Journal domain', () => {
+  it('persists a journal entry (body + mood) and includes it in the next pull', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      const op = {
+        id: 'op-journal-1',
+        hlc: '0000000000000001-000000-d1',
+        device_id: 'd1',
+        user_id: userId,
+        entity_kind: 'journal',
+        entity_id: 'j1',
+        op_type: 'create' as const,
+        payload: { body: 'Shipped the journal domain today', mood: '🙂', occurred_at: '2026-09-01T10:00:00Z', source: 'manual' },
+        schema_version: 1,
+      }
+      const push = await callSync({ device_id: 'd1', new_ops: [op] })
+      expect(push.applied_ack).toEqual(['op-journal-1'])
+
+      const pull = await callSync({ device_id: 'd2', new_ops: [] })
+      expect(pull.new_ops_from_server[0].entity_kind).toBe('journal')
+
+      const rows = await testDb.selectFrom('journal_entries').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].body).toBe('Shipped the journal domain today')
+      expect(rows[0].mood).toBe('🙂')
+    })
+  })
+
+  it('per-field LWW: a mood-only update leaves the body intact', async () => {
+    await withTestUser(async ({ userId, callSync, testDb }) => {
+      await callSync({ device_id: 'd1', new_ops: [{
+        id: 'op-j2a', hlc: '0000000000000001-000000-d1', device_id: 'd1', user_id: userId,
+        entity_kind: 'journal', entity_id: 'j2', op_type: 'create',
+        payload: { body: 'Original body', mood: '😐', occurred_at: '2026-09-01T10:00:00Z', source: 'manual' },
+        schema_version: 1,
+      }] })
+      await callSync({ device_id: 'd1', new_ops: [{
+        id: 'op-j2b', hlc: '0000000000000002-000000-d1', device_id: 'd1', user_id: userId,
+        entity_kind: 'journal', entity_id: 'j2', op_type: 'update',
+        payload: { mood: '😀' },
+        schema_version: 1,
+      }] })
+      const rows = await testDb.selectFrom('journal_entries').where('user_id', '=', userId).selectAll().execute()
+      expect(rows).toHaveLength(1)
+      expect(rows[0].mood).toBe('😀')
+      expect(rows[0].body).toBe('Original body')
     })
   })
 })

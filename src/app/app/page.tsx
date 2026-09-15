@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Settings, Search, LayoutDashboard, CheckCircle2, Sparkles } from 'lucide-react'
+import { Settings, Search, LayoutDashboard, CheckCircle2, Sparkles, BookOpen } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { LockGate } from '@/components/lock-gate'
 import { PulseLogo } from '@/components/pulse-logo'
@@ -586,6 +586,9 @@ function AppPageInner() {
               </Link>
               <Link href="/habits" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-accent-2 outline-none" aria-label="Habits">
                 <CheckCircle2 className="h-5 w-5" />
+              </Link>
+              <Link href="/journal" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-accent-2 outline-none" aria-label="Journal">
+                <BookOpen className="h-5 w-5" />
               </Link>
               <Link href="/assistant" className="rounded-xl p-2 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-accent-2 outline-none" aria-label="Assistant">
                 <Sparkles className="h-5 w-5" />

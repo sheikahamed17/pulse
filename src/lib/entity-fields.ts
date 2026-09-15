@@ -61,3 +61,7 @@ export const HABIT_FIELDS = [
 export const HABIT_LOG_FIELDS = [
   'habit_id', 'day',
 ] as const
+
+export const JOURNAL_FIELDS = [
+  'body', 'mood', 'occurred_at', 'source',
+] as const

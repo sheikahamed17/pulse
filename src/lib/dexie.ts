@@ -271,6 +271,19 @@ export type FxRateRow = {
   // Compound primary key in Dexie is [date+target] — `base` is implicitly 'EUR'.
 }
 
+export type JournalRow = {
+  id: string
+  user_id: string
+  body: string
+  mood: string | null
+  occurred_at: string
+  source: string
+  field_hlcs: Record<string, string>
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 class PulseDb extends Dexie {
   op_log!: EntityTable<Op, 'id'>
   widgets!: EntityTable<WidgetRow, 'id'>
@@ -290,6 +303,7 @@ class PulseDb extends Dexie {
   transfers!: EntityTable<TransferRow, 'id'>
   habits!: EntityTable<HabitRow, 'id'>
   habit_logs!: EntityTable<HabitLogRow, 'id'>
+  journal_entries!: EntityTable<JournalRow, 'id'>
   receipt_drafts!: EntityTable<ReceiptDraftRow, 'id'>
   projects!: EntityTable<ProjectRow, 'id'>
   fx_rates!: Table<FxRateRow>
@@ -343,6 +357,9 @@ class PulseDb extends Dexie {
       habits: 'id, user_id',
       habit_logs: 'id, user_id, [user_id+day]',
     })
+    this.version(14).stores({
+      journal_entries: 'id, user_id, occurred_at',
+    })
   }
 }
 
@@ -367,6 +384,7 @@ export async function resetDb() {
   await db.transfers.clear()
   await db.habits.clear()
   await db.habit_logs.clear()
+  await db.journal_entries.clear()
   await db.projects.clear()
   await db.receipt_drafts.clear()
   await db.fx_rates.clear()
