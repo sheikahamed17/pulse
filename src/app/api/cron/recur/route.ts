@@ -5,8 +5,8 @@ import { createDb } from '@/lib/db'
 import { isAuthorizedCron } from '@/lib/cron-auth'
 import { computeNextDue, checkEndConditions, type RecurringRule } from '@/lib/recurring'
 import { applyOp } from '@/lib/op-log'
-import { serverHlcFor } from '@/lib/server-hlc'
-import type { Op } from '@/types/ops'
+import { materializeRow } from '@/lib/materialize'
+import { buildRecurOp } from '@/lib/recur-emit'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,31 +100,12 @@ async function emitEntry(
   const tpl = await db
     .selectFrom('recurring_rules')
     .where('id', '=', rule.id)
-    .select(['amount', 'currency', 'direction', 'category_id', 'description'])
+    .select(['amount', 'currency', 'direction', 'category_id', 'description', 'from_account_id', 'to_account_id'])
     .executeTakeFirst()
   if (!tpl) return
 
-  const entryId = `recur-entry-${rule.id}-${rule.next_due_at}`
-  const op: Op = {
-    id: opId,
-    hlc: serverHlcFor(rule.next_due_at),
-    device_id: 'cron',
-    user_id: userId,
-    entity_kind: 'money',
-    entity_id: entryId,
-    op_type: 'create',
-    payload: {
-      amount: tpl.amount,
-      currency: tpl.currency,
-      direction: tpl.direction,
-      category_id: tpl.category_id,
-      description: tpl.description,
-      occurred_at: rule.next_due_at,
-      source: 'recurring',
-      recurring_rule_id: rule.id,
-    },
-    schema_version: 1,
-  }
+  // A rule with BOTH account ids emits a transfer; otherwise a money entry.
+  const op = buildRecurOp(tpl, rule.id, rule.next_due_at, userId)
 
   await db
     .insertInto('op_log')
@@ -140,13 +121,21 @@ async function emitEntry(
       schema_version: op.schema_version,
       applied_at: Date.now(),
     })
+    .onConflict(oc => oc.column('id').doNothing())
     .execute()
+
+  // Transfers materialize via the shared materializer; money keeps its direct
+  // insert (behavior unchanged from before recurring transfers existed).
+  if (op.entity_kind === 'transfer') {
+    await materializeRow(db, op, userId)
+    return
+  }
 
   const merged = applyOp(undefined, op)
   await db
     .insertInto('money_entries')
     .values({
-      id: entryId,
+      id: op.entity_id,
       user_id: userId,
       amount: tpl.amount,
       currency: tpl.currency,

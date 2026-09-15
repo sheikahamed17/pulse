@@ -116,6 +116,8 @@ export interface RecurringRuleTable {
   end_count: number | null
   occurrences_so_far: number
   is_active: number
+  from_account_id: string | null
+  to_account_id: string | null
   field_hlcs: string
   deleted_at: string | null
   created_at: string

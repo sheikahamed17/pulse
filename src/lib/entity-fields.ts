@@ -9,6 +9,7 @@ export const RECURRING_FIELDS = [
   'period', 'interval_count', 'anchor_at', 'next_due_at',
   'end_condition_kind', 'end_until', 'end_count',
   'occurrences_so_far', 'is_active',
+  'from_account_id', 'to_account_id',   // set → this rule recurs a TRANSFER, not a money entry
 ] as const
 
 export const CATEGORY_FIELDS = [

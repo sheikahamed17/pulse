@@ -8,6 +8,7 @@ import { useAllAccounts } from '@/hooks/use-all-accounts'
 import { useTransfers } from '@/hooks/use-transfers'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { parseAmountInput } from '@/lib/parse-amount'
+import { computeNextDue } from '@/lib/recurring'
 import { currencySymbol } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +22,8 @@ export default function TransfersPage() {
   const [amount, setAmount] = useState('')
   const [occurredAt, setOccurredAt] = useState('')
   const [note, setNote] = useState('')
+  const [repeat, setRepeat] = useState(false)
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly')
 
   useEffect(() => {
     authClient.getSession().then(res => {
@@ -75,10 +78,35 @@ export default function TransfersPage() {
       user_id: userId,
     })
     await applyLocalOp(op)
+
+    // Repeat: create a recurring rule carrying both account ids. The one-off
+    // above covers "now"; the cron creates future transfers from next_due on.
+    if (repeat) {
+      const anchorIso = new Date(occurredAt + 'T12:00:00').toISOString()
+      const nextDue = computeNextDue({
+        id: '', period, interval_count: 1, anchor_at: anchorIso, next_due_at: anchorIso,
+        occurrences_so_far: 0, end_condition_kind: 'never', end_until: null, end_count: null, is_active: 1,
+      })
+      const ruleOp = await generateOp({
+        entity_kind: 'recurring',
+        entity_id: crypto.randomUUID(),
+        op_type: 'create',
+        payload: {
+          amount: amountMinor, currency: fromAccount.currency, direction: 'out', category_id: null,
+          description: note.trim() || null, period, interval_count: 1,
+          anchor_at: anchorIso, next_due_at: nextDue, end_condition_kind: 'never', is_active: 1,
+          from_account_id: fromAccountId, to_account_id: toAccountId,
+        },
+        user_id: userId,
+      })
+      await applyLocalOp(ruleOp)
+    }
+
     setFromAccountId(null)
     setToAccountId(null)
     setAmount('')
     setNote('')
+    setRepeat(false)
     const today = new Date()
     setOccurredAt(today.toISOString().split('T')[0])
     pushPullOnce({ userId }).catch(err => console.error('sync', err))
@@ -178,12 +206,35 @@ export default function TransfersPage() {
               aria-label="Transfer note"
             />
 
+            <label className="flex items-center justify-between rounded-md bg-white/5 px-3 py-2 text-sm">
+              <span>Repeat</span>
+              <input
+                type="checkbox"
+                checked={repeat}
+                onChange={e => { const v = e.currentTarget.checked; setRepeat(v) }}
+                aria-label="Repeat this transfer on a schedule"
+              />
+            </label>
+            {repeat && (
+              <select
+                value={period}
+                onChange={e => { const v = e.target.value as typeof period; setPeriod(v) }}
+                aria-label="Repeat period"
+                className="glass-soft rounded-lg border border-input px-2 py-2 text-sm transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-accent-2"
+              >
+                <option value="daily">Every day</option>
+                <option value="weekly">Every week</option>
+                <option value="monthly">Every month</option>
+                <option value="yearly">Every year</option>
+              </select>
+            )}
+
             <Button
               onClick={addTransfer}
               disabled={!canSubmit}
               className="w-full"
             >
-              Transfer
+              {repeat ? 'Transfer + schedule' : 'Transfer'}
             </Button>
           </div>
         </section>

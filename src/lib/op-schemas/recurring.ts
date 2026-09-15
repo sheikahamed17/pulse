@@ -16,6 +16,10 @@ export const RecurringPayloadObject = z.object({
   end_count: z.number().int().positive().nullable().optional(),
   occurrences_so_far: z.number().int().nonnegative().optional(),
   is_active: z.union([z.literal(0), z.literal(1)]),
+  // When both are set, the recur cron materializes a TRANSFER (not a money entry).
+  // A transfer rule passes a placeholder direction ('out'), which the cron ignores.
+  from_account_id: z.string().min(1).nullable().optional(),
+  to_account_id: z.string().min(1).nullable().optional(),
 })
 
 export const RecurringPayloadSchema = RecurringPayloadObject.refine(

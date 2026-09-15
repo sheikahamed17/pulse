@@ -87,6 +87,8 @@ export type RecurringRuleRow = {
   end_count: number | null
   occurrences_so_far: number
   is_active: number
+  from_account_id?: string | null   // transfer rule: source account (optional keeps fixtures lean)
+  to_account_id?: string | null     // transfer rule: destination account
   field_hlcs: Record<string, string>
   deleted_at: string | null
   created_at: string
