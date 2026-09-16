@@ -94,12 +94,12 @@ function buildSeeds(): Seed[] {
   // --- Recurring: an upcoming bill + a monthly savings sweep transfer ---
   add('recurring', 'demo-recur-bill', daysAgo(30), {
     amount: 140000, currency: 'INR', direction: 'out', category_id: 'demo-cat-utilities', description: 'Volt Energy bill',
-    period: 'month', interval_count: 1, anchor_at: daysAgo(30), next_due_at: daysAhead(5),
+    period: 'monthly', interval_count: 1, anchor_at: daysAgo(30), next_due_at: daysAhead(5),
     end_condition_kind: 'never', is_active: 1, occurrences_so_far: 1,
   })
   add('recurring', 'demo-recur-sweep', daysAgo(30), {
     amount: 1000000, currency: 'INR', direction: 'out', description: 'Savings sweep',
-    period: 'month', interval_count: 1, anchor_at: daysAgo(30), next_due_at: daysAhead(9),
+    period: 'monthly', interval_count: 1, anchor_at: daysAgo(30), next_due_at: daysAhead(9),
     end_condition_kind: 'never', is_active: 1, occurrences_so_far: 1,
     from_account_id: 'demo-acct-bank', to_account_id: 'demo-acct-savings',
   })
@@ -117,13 +117,13 @@ function buildSeeds(): Seed[] {
     ['Back up photos', null, daysAgo(2), 'demo-proj-personal', 8],
   ]
   tasks.forEach(([title, due_at, completed_at, project_id, ago], i) => {
-    add('task', `demo-task-${i}`, daysAgo(ago), { title, due_at, completed_at, priority: 'normal', project_id, source: 'manual', tags: [] })
+    add('task', `demo-task-${i}`, daysAgo(ago), { title, due_at, completed_at, priority: 'medium', project_id, source: 'manual', tags: [] })
   })
   // Parent + sub-tasks
-  add('task', 'demo-task-trip', daysAgo(7), { title: 'Plan weekend trip', due_at: daysAhead(10), completed_at: null, priority: 'normal', project_id: 'demo-proj-personal', source: 'manual', tags: [] })
-  add('task', 'demo-task-trip-1', daysAgo(7), { title: 'Book a place to stay', due_at: null, completed_at: daysAgo(1), priority: 'normal', parent_id: 'demo-task-trip', source: 'manual', tags: [] })
-  add('task', 'demo-task-trip-2', daysAgo(7), { title: 'Map the route', due_at: null, completed_at: null, priority: 'normal', parent_id: 'demo-task-trip', source: 'manual', tags: [] })
-  add('task', 'demo-task-trip-3', daysAgo(7), { title: 'Pack a bag', due_at: null, completed_at: null, priority: 'normal', parent_id: 'demo-task-trip', source: 'manual', tags: [] })
+  add('task', 'demo-task-trip', daysAgo(7), { title: 'Plan weekend trip', due_at: daysAhead(10), completed_at: null, priority: 'medium', project_id: 'demo-proj-personal', source: 'manual', tags: [] })
+  add('task', 'demo-task-trip-1', daysAgo(7), { title: 'Book a place to stay', due_at: null, completed_at: daysAgo(1), priority: 'medium', parent_id: 'demo-task-trip', source: 'manual', tags: [] })
+  add('task', 'demo-task-trip-2', daysAgo(7), { title: 'Map the route', due_at: null, completed_at: null, priority: 'medium', parent_id: 'demo-task-trip', source: 'manual', tags: [] })
+  add('task', 'demo-task-trip-3', daysAgo(7), { title: 'Pack a bag', due_at: null, completed_at: null, priority: 'medium', parent_id: 'demo-task-trip', source: 'manual', tags: [] })
 
   // --- Learning ---
   const learning: Array<[string, string, number]> = [
@@ -188,7 +188,7 @@ function buildSeeds(): Seed[] {
     const starts = daysAgo(startAgo)
     const ends = daysAgo(endAgo)
     add('insight', `demo-insight-${i}`, ends, {
-      period: 'week', starts_at: starts, ends_at: ends, summary,
+      period: 'weekly', starts_at: starts, ends_at: ends, summary,
       metrics: JSON.stringify({ spend: 132500 + i * 20000, income: i === 1 ? 0 : 8500000, net: -132500, top_category: 'Groceries' }),
     })
   })

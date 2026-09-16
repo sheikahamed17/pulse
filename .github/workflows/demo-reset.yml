@@ -1,0 +1,23 @@
+name: Reset Demo Data
+
+# Wipes + reseeds the public demo every 4 hours by POSTing its DEMO_MODE-gated
+# reset endpoint. Runs from GitHub Actions (not a Cloudflare cron trigger).
+# Requires the `DEMO_CRON_SECRET` repo secret = the demo Worker's CRON_SECRET.
+# The endpoint refuses unless DEMO_MODE=true, so this can never touch production.
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset + reseed the demo instance
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "authorization: Bearer ${{ secrets.DEMO_CRON_SECRET }}" \
+            https://pulse-demo.sdsheikahamed.workers.dev/api/cron/demo-reset)
+          echo "demo reset → HTTP $code"
+          test "$code" = "200"
