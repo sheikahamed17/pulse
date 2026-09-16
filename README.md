@@ -122,11 +122,15 @@ Plus two non-finance domains that round out daily self-tracking: 🔥 **Habits &
 
 Pulse is **single-user by design** — you deploy your **own** copy (your data, your API keys, your free-tier quota, fully isolated). Everything you need has a free tier.
 
+**Step 1 — get your own copy.** Click **[Use this template](https://github.com/sheikahamed17/pulse/generate)** at the top of the repo to create an independent copy of Pulse under your own GitHub account.
+
+**Step 2 — stand it up.** From your copy, use either the one-click deploy or the manual path below. *(In a hurry? The one-click **Deploy to Cloudflare** button also creates the copy for you as it deploys, so you can skip Step 1.)*
+
 ### One-click deploy (recommended)
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/sheikahamed17/pulse)
 
-The button clones this repo into your GitHub, provisions a **fresh, isolated D1 database and R2 bucket** in your own Cloudflare account, prompts you for the secrets below, **runs the database migrations, and deploys** — then wires up automatic redeploys on every push. You'll be asked for:
+The button creates a copy of this repo in your GitHub, provisions a **fresh, isolated D1 database and R2 bucket** in your own Cloudflare account, prompts you for the secrets below, **runs the database migrations, and deploys** — then wires up automatic redeploys on every push. You'll be asked for:
 
 - **`GROQ_API_KEY`** — free at [console.groq.com](https://console.groq.com) (voice + natural-language capture, insights)
 - **`RESEND_API_KEY`** — free at [resend.com](https://resend.com) (sends your magic-link sign-in email)
@@ -143,7 +147,7 @@ Then sign in with your **Resend-account email** (the free sandbox sender only ma
 Prefer to run every step yourself, or have Claude Code do it interactively?
 
 - **A · Let Claude Code do it.** Open this repo in [Claude Code](https://claude.com/claude-code) and ask it to *"set up this project for me."* It reads [`CLAUDE.md`](./CLAUDE.md) — the project's instructions for AI agents — and walks you through creating your Cloudflare / Groq / Resend resources, applying migrations, setting secrets, and deploying.
-- **B · Do it by hand.** Follow **[SELF-HOSTING.md](./SELF-HOSTING.md)**: clone → create D1 + R2 → apply migrations → set secrets → deploy. ~20 minutes.
+- **B · Do it by hand.** Follow **[SELF-HOSTING.md](./SELF-HOSTING.md)**: use this template → create D1 + R2 → apply migrations → set secrets → deploy. ~20 minutes.
 
 ### Install it
 

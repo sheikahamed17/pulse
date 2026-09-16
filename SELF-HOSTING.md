@@ -1,6 +1,6 @@
 # Self-hosting Pulse
 
-Pulse is a **local-first, single-user** personal life-OS (money + tasks + learning + notes, voice/NL capture, weekly digests). Because it's local-first and runs entirely on your own free-tier cloud, the right way to use it is to **deploy your own copy** — your data, your API keys, your quota, fully isolated from anyone else's. This guide takes you from a clone to a live instance in about 20 minutes.
+Pulse is a **local-first, single-user** personal life-OS (money + tasks + learning + notes, voice/NL capture, weekly digests). Because it's local-first and runs entirely on your own free-tier cloud, the right way to use it is to **deploy your own copy** — your data, your API keys, your quota, fully isolated from anyone else's. This guide takes you from your own copy of the template to a live instance in about 20 minutes.
 
 > **Just want it running?** Use the **[Deploy to Cloudflare button](./README.md#one-click-deploy-recommended)** — it provisions a fresh D1 + R2 in your account, prompts for the secrets, applies the migrations, and deploys, all in one click. This document is the **manual** path, for when you want to run each step yourself (and it's the reference the button and the Claude Code path both mirror).
 
@@ -15,8 +15,10 @@ Pulse is a **local-first, single-user** personal life-OS (money + tasks + learni
 
 ## 1. Get the code
 
+First, click **[Use this template](https://github.com/sheikahamed17/pulse/generate)** at the top of the repo to create your own copy under your GitHub account. Then clone **your** copy:
+
 ```bash
-git clone https://github.com/sheikahamed17/pulse.git
+git clone https://github.com/<your-username>/pulse.git
 cd pulse
 pnpm install
 ```
@@ -61,7 +63,7 @@ This is the exact command the deploy workflow (and the one-click button) run aut
 node scripts/generate-vapid-keys.mjs
 ```
 
-This prints a **public** and a **private** key. Both are set as secrets in step 5 — you don't edit `wrangler.toml` for these (keeping the file identical across forks so it never conflicts on sync). If you set up auto-deploy (see Notes), also add the public key as the GitHub Actions **variable** `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+This prints a **public** and a **private** key. Both are set as secrets in step 5 — you don't edit `wrangler.toml` for these (keeping the file identical across instances so it never conflicts on sync). If you set up auto-deploy (see Notes), also add the public key as the GitHub Actions **variable** `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
 
 ## 5. Set your secrets
 
