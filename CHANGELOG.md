@@ -9,7 +9,8 @@ Each release is also published with notes on
 
 ## [Unreleased]
 
-_Nothing yet — changes land here before the next release._
+### Changed
+- Converted the repository to a **GitHub template** — visitors can click "Use this template" to create their own independent copy. Docs (README, SELF-HOSTING, CLAUDE.md) now lead the "get your own copy" path with the template step, complementing the existing one-click deploy and manual paths. ([1c45cb1](https://github.com/sheikahamed17/pulse/commit/1c45cb1))
 
 ## [1.2.0] — 2026-09-16
 
