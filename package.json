@@ -13,6 +13,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "gen:icons": "node scripts/gen-icons.mjs",
     "eval:router": "node scripts/eval-router.mjs",
+    "bundle:report": "node scripts/bundle-report.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
