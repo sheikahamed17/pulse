@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useNotes } from '@/hooks/use-notes'
@@ -26,11 +26,13 @@ export function NotesList({ userId, selectedTag, searchQuery = '', sort = 'newes
   const [openId, setOpenId] = useState<string | null>(null)
   const undo = useUndo()
 
-  const searched = searchNotes(notes, searchQuery)
-  const filtered = selectedTag
-    ? searched.filter(e => e.tags.includes(selectedTag))
-    : searched
-  const sorted = sortByDate(filtered, sort)
+  const sorted = useMemo(() => {
+    const searched = searchNotes(notes, searchQuery)
+    const filtered = selectedTag
+      ? searched.filter(e => (e.tags ?? []).includes(selectedTag))
+      : searched
+    return sortByDate(filtered, sort)
+  }, [notes, searchQuery, selectedTag, sort])
 
   async function deleteNote(e: NoteRow) {
     const op = await generateOp({
@@ -76,9 +78,9 @@ export function NotesList({ userId, selectedTag, searchQuery = '', sort = 'newes
             {e.title && (
               <p className="text-xs text-muted-foreground line-clamp-2">{truncatePreview(e.body, 150)}</p>
             )}
-            {e.tags.length > 0 && (
+            {(e.tags ?? []).length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {e.tags.map(tag => (
+                {(e.tags ?? []).map(tag => (
                   <span
                     key={tag}
                     className={cn(

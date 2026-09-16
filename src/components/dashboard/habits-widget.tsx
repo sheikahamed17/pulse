@@ -27,10 +27,19 @@ export function HabitsWidget({ userId }: Props) {
     return localDay(nowMs, tz)
   }, [prefs.tz])
 
+  // Compute each habit's streak once per (habits, logs, todayStr) change,
+  // instead of re-filtering all logs per-habit on every render.
+  const streaksByHabit = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof habitStreaks>>()
+    for (const h of habits) {
+      const days = logs.filter(l => l.habit_id === h.id && !l.deleted_at).map(l => l.day)
+      m.set(h.id, habitStreaks(days, todayStr, h.schedule))
+    }
+    return m
+  }, [habits, logs, todayStr])
+
   async function toggleToday(habit: HabitRow) {
-    const habitLogs = logs.filter(l => l.habit_id === habit.id && !l.deleted_at)
-    const days = habitLogs.map(l => l.day)
-    const s = habitStreaks(days, todayStr, habit.schedule)
+    const s = streaksByHabit.get(habit.id) ?? habitStreaks([], todayStr, habit.schedule)
 
     const logId = `hlog-${habit.id}-${todayStr}`
 
@@ -77,9 +86,7 @@ export function HabitsWidget({ userId }: Props) {
   return (
     <ul className="flex flex-col gap-2">
       {habits.map(h => {
-        const habitLogs = logs.filter(l => l.habit_id === h.id && !l.deleted_at)
-        const days = habitLogs.map(l => l.day)
-        const s = habitStreaks(days, todayStr, h.schedule)
+        const s = streaksByHabit.get(h.id) ?? habitStreaks([], todayStr, h.schedule)
 
         return (
           <li key={h.id} className="flex items-center gap-2 text-sm min-h-[44px]">

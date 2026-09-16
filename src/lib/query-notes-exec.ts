@@ -19,7 +19,7 @@ export function filterNotesForQuery(
   // Apply tag filter (any of the specified tags)
   if (plan.tags.length > 0) {
     live = live.filter(n =>
-      plan.tags.some(tag => n.tags.includes(tag))
+      plan.tags.some(tag => (n.tags ?? []).includes(tag))
     )
   }
 

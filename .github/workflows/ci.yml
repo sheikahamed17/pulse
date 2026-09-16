@@ -5,6 +5,12 @@ on:
   push:
     branches: [main, phase-0]
 
+# Least-privilege GITHUB_TOKEN: CI only checks out code and runs pnpm — it never
+# writes to the repo. Explicit top-level permissions satisfy CodeQL's
+# actions/missing-workflow-permissions rule (the default token is over-scoped).
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

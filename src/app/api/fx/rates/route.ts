@@ -31,13 +31,25 @@ export async function GET(req: Request) {
   const { env } = getCloudflareContext()
   const db = createDb((env as { DB: D1Database }).DB)
 
-  const rates = await db
-    .selectFrom('fx_rates')
-    .where('date', '>=', since)
-    .where('target', 'in', targets)
-    .orderBy('date', 'desc')
-    .selectAll()
-    .execute()
+  // Chunk `targets` to stay under D1's 100-bound-parameter-per-query cap
+  // (each chunk query also carries the `since` param). `targets` is
+  // user-supplied via the query string, so an unbounded IN-list would 500;
+  // realistically this is a single chunk. Re-sort the merged result to keep
+  // the original date-descending contract across chunks.
+  const uniqueTargets = [...new Set(targets)]
+  const CHUNK = 90
+  const chunks = await Promise.all(
+    Array.from({ length: Math.ceil(uniqueTargets.length / CHUNK) }, (_, i) =>
+      db
+        .selectFrom('fx_rates')
+        .where('date', '>=', since)
+        .where('target', 'in', uniqueTargets.slice(i * CHUNK, (i + 1) * CHUNK))
+        .orderBy('date', 'desc')
+        .selectAll()
+        .execute(),
+    ),
+  )
+  const rates = chunks.flat().sort((a, b) => b.date.localeCompare(a.date))
 
   return NextResponse.json({ rates }, {
     headers: {

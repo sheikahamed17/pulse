@@ -279,6 +279,17 @@ describe('filterLearningsForQuery', () => {
       // Sorted by occurred_at desc, excludes deleted l5
     })
 
+    it('does not crash on a legacy/imported row with undefined tags', () => {
+      // A learning synced/imported before the tags field existed has no `tags`
+      // in its Dexie row (undefined, not []). A tag filter must treat it as
+      // untagged, never throw `Cannot read properties of undefined`.
+      const legacy = { ...mockLearnings[0], id: 'l-legacy', tags: undefined } as unknown as LearningRow
+      const plan: QueryLearningPlan = { kind: 'query_learning', search: null, tags: ['rust'], period: null }
+      expect(() => filterLearningsForQuery([legacy, ...mockLearnings], plan)).not.toThrow()
+      const result = filterLearningsForQuery([legacy, ...mockLearnings], plan)
+      expect(result.some(l => l.id === 'l-legacy')).toBe(false)
+    })
+
     it('returns empty array when empty input', () => {
       const plan: QueryLearningPlan = {
         kind: 'query_learning',

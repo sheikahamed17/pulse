@@ -20,7 +20,10 @@ export function GlobalSearch({ userId, onClose, onSelect }: { userId: string; on
   const notes = useNotes(userId)
   const categories = useCategories(userId)
   const categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
-  const groups = searchAll(q, { money, tasks, learnings, notes, categoryById })
+  const groups = useMemo(
+    () => searchAll(q, { money, tasks, learnings, notes, categoryById }),
+    [q, money, tasks, learnings, notes, categoryById],
+  )
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

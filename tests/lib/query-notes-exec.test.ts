@@ -290,6 +290,17 @@ describe('filterNotesForQuery', () => {
       expect(result).toEqual([])
     })
 
+    it('does not crash on a legacy/imported row with undefined tags', () => {
+      // A note synced/imported before the tags field existed has no `tags` in
+      // its Dexie row (undefined, not []). A tag filter must treat it as
+      // untagged, never throw `Cannot read properties of undefined`.
+      const legacy = { ...mockNotes[0], id: 'n-legacy', tags: undefined } as unknown as NoteRow
+      const plan: QueryNotesPlan = { kind: 'query_notes', search: null, tags: ['rust'], period: null }
+      expect(() => filterNotesForQuery([legacy, ...mockNotes], plan)).not.toThrow()
+      const result = filterNotesForQuery([legacy, ...mockNotes], plan)
+      expect(result.some(n => n.id === 'n-legacy')).toBe(false)
+    })
+
     it('returns empty when no matches', () => {
       const plan: QueryNotesPlan = {
         kind: 'query_notes',

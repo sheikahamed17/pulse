@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
 import { generateOp, applyLocalOp, pushPullOnce } from '@/lib/sync-client'
 import { useLearnings } from '@/hooks/use-learnings'
@@ -20,10 +20,12 @@ export function LearningList({ userId, selectedTag, sort = 'newest', onEdit }: P
   const [openId, setOpenId] = useState<string | null>(null)
   const undo = useUndo()
 
-  const filtered = selectedTag
-    ? learnings.filter(e => e.tags.includes(selectedTag))
-    : learnings
-  const sorted = sortByDate(filtered, sort)
+  const sorted = useMemo(() => {
+    const filtered = selectedTag
+      ? learnings.filter(e => (e.tags ?? []).includes(selectedTag))
+      : learnings
+    return sortByDate(filtered, sort)
+  }, [learnings, selectedTag, sort])
 
   async function deleteLearning(e: LearningRow) {
     const op = await generateOp({
@@ -66,9 +68,9 @@ export function LearningList({ userId, selectedTag, sort = 'newest', onEdit }: P
             className="glass-soft rounded-2xl flex flex-col gap-2 p-3"
           >
             <p className="text-sm md:text-base">{e.text}</p>
-            {e.tags.length > 0 && (
+            {(e.tags ?? []).length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {e.tags.map(tag => (
+                {(e.tags ?? []).map(tag => (
                   <span
                     key={tag}
                     className={cn(

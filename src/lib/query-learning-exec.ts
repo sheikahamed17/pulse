@@ -24,7 +24,7 @@ export function filterLearningsForQuery(
   // Apply tag filter (any of the specified tags)
   if (plan.tags.length > 0) {
     live = live.filter(l =>
-      plan.tags.some(tag => l.tags.includes(tag))
+      plan.tags.some(tag => (l.tags ?? []).includes(tag))
     )
   }
 

@@ -17,7 +17,7 @@ export function NotesTagFilter({ userId, selectedTag, onChange }: Props) {
   const distinctTags = useMemo(() => {
     const tags = new Set<string>()
     for (const e of notes) {
-      for (const tag of e.tags) {
+      for (const tag of e.tags ?? []) {
         tags.add(tag)
       }
     }
