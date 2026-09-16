@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="public/logo.svg" alt="Pulse logo" width="88" height="88" />
+
 # Pulse
 
 **A local-first personal life-OS — money, tasks, learning, and notes in one place, captured by voice or plain language and synced across your devices.**
@@ -27,6 +29,30 @@ Or [set it up manually →](./SELF-HOSTING.md)
 ## Why Pulse
 
 Most life-trackers make you fill in forms. Pulse flips it: you **say or type one line** — *"lunch 240"*, *"finish the deck by friday"*, *"idea: batch the FX cron"* — and the AI files it in the right place. Your data lives **in your browser first** (so it's instant and works offline) and syncs to a database **you own**. There's no shared backend, no ads, no data mining — one instance per person, running on free tiers that comfortably fit a single user.
+
+## Screenshots
+
+<details>
+<summary><b>📸 See Pulse in action</b> — a few screens (click to expand)</summary>
+
+<br/>
+
+> Screenshots live in [`docs/screenshots/`](docs/screenshots/) — see the [capture guide](docs/screenshots/README.md). Drop the PNGs in with the filenames below and this gallery fills itself; no further edits needed.
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/capture.png" alt="Voice & natural-language capture" width="230" /><br/><sub><b>Capture</b> — one line, any domain</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/money.png" alt="Money tab with budgets" width="230" /><br/><sub><b>Money</b> — entries & budgets</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/dashboard.png" alt="Dashboard widgets" width="230" /><br/><sub><b>Dashboard</b> — widgets & onboarding</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/analytics.png" alt="Analytics charts" width="230" /><br/><sub><b>Analytics</b> — trends & net worth</sub></td>
+    <td align="center"><img src="docs/screenshots/assistant.png" alt="AI assistant" width="230" /><br/><sub><b>Assistant</b> — ask your data</sub></td>
+    <td align="center"><img src="docs/screenshots/insights.png" alt="Weekly insights" width="230" /><br/><sub><b>Insights</b> — weekly digests</sub></td>
+  </tr>
+</table>
+
+</details>
 
 ## Highlights
 
