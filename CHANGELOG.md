@@ -10,6 +10,7 @@ Each release is also published with notes on
 ## [Unreleased]
 
 ### Added
+- **Live demo.** A public, shared, read-mostly demo instance (`pulse-demo`) runs the same codebase behind a `DEMO_MODE` flag: every visitor is auto-signed-in as a shared demo user over realistic seeded data (no login/signup), AI runs on canned responses (no quota used), ingest/push/export are disabled, and a 4-hour cron wipes + reseeds. Its D1/R2 are isolated from production, and every destructive path independently checks `DEMO_MODE`, so production is untouched. Linked from the README. ([496bbf2](https://github.com/sheikahamed17/pulse/commit/496bbf2))
 - **First-run setup wizard.** A freshly deployed instance routes every request to a `/setup` wizard until an owner account exists in D1, so a new self-hoster's first action is creating their account — not editing files or running commands. Steps: welcome → create account (email magic-link) → verify the Groq key actually works (a real pass/fail check) → optional email auto-import → done, then into the app. The gate is enforced in middleware from the `user` table (not a cookie), so a deep link can't slip past it, and it never reappears once an owner exists. ([a8623aa](https://github.com/sheikahamed17/pulse/commit/a8623aa))
 
 ### Changed
