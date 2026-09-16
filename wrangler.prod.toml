@@ -1,0 +1,45 @@
+# PRODUCTION config — the live pulse.workers.dev instance.
+#
+# This is a full copy of wrangler.toml PLUS the real resource IDs. It exists
+# because wrangler.toml is deliberately id-less (so the "Deploy to Cloudflare"
+# button provisions fresh, isolated resources per clone — see that file's
+# header). Production must NOT deploy id-less, or it would target a new empty
+# database, so every production command passes `-c wrangler.prod.toml`:
+#
+#   wrangler d1 migrations apply DB --remote -c wrangler.prod.toml
+#   wrangler deploy -c wrangler.prod.toml
+#
+# The GitHub Actions deploy workflow (.github/workflows/deploy.yml) does this.
+#
+# ⚠️ Keep this in sync with wrangler.toml — same name/main/compat/assets/
+# bindings/crons/vars; the ONLY differences are the resource IDs below.
+# database_id is a resource handle, not a secret (it was already committed in
+# the pre-button wrangler.toml).
+
+name = "pulse"
+main = "worker.ts"
+compatibility_date = "2026-06-15"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pulse"
+database_id = "df509c20-ed81-4146-941f-6e48e7f1f925"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "RECEIPTS"
+bucket_name = "pulse-receipts"
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["0 2 * * *", "0 3 * * *", "*/15 * * * *", "30 2 * * 1", "30 14 * * 1"]
+
+[vars]
+EMAIL_FROM = "Pulse <onboarding@resend.dev>"

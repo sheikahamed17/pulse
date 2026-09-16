@@ -9,6 +9,8 @@
     "start": "next start",
     "cf:build": "pnpm build && pnpm opennextjs-cloudflare build",
     "cf:preview": "pnpm cf:build && pnpm wrangler pages dev",
+    "deploy": "opennextjs-cloudflare build && wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "gen:icons": "node scripts/gen-icons.mjs",
     "eval:router": "node scripts/eval-router.mjs",
     "lint": "eslint",
@@ -16,6 +18,43 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
+  },
+  "cloudflare": {
+    "label": "Pulse",
+    "products": [
+      "Workers",
+      "D1",
+      "R2"
+    ],
+    "bindings": {
+      "DB": {
+        "description": "A fresh D1 database for your Pulse instance. Schema migrations run automatically on every deploy."
+      },
+      "RECEIPTS": {
+        "description": "A fresh R2 bucket that stores receipt images you attach to money entries."
+      },
+      "BETTER_AUTH_SECRET": {
+        "description": "A random 32+ character string that signs your session cookies. Generate one with: openssl rand -hex 32"
+      },
+      "BETTER_AUTH_URL": {
+        "description": "Your deployed instance URL (e.g. https://pulse.<you>.workers.dev). You can update this after the first deploy prints the URL."
+      },
+      "GROQ_API_KEY": {
+        "description": "Free API key from https://console.groq.com — powers voice capture, natural-language entry, and weekly insights."
+      },
+      "RESEND_API_KEY": {
+        "description": "Free API key from https://resend.com — sends your magic-link sign-in email. The free tier delivers to your own Resend signup address, which is all a single-user instance needs."
+      },
+      "VAPID_PUBLIC_KEY": {
+        "description": "Optional (web push). Generate with: node scripts/generate-vapid-keys.mjs — paste the public key."
+      },
+      "VAPID_PRIVATE_KEY": {
+        "description": "Optional (web push). The private key printed alongside VAPID_PUBLIC_KEY by the same command."
+      },
+      "CRON_SECRET": {
+        "description": "Any long random string that guards the scheduled endpoints. Generate one with: openssl rand -hex 32"
+      }
+    }
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

@@ -32,6 +32,15 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Apply every migration in order to a fresh, throwaway LOCAL D1 (a SQLite
+      # file under .wrangler/, created on the runner). This catches a broken or
+      # out-of-order migration — bad SQL, a column added twice, a typo'd table —
+      # BEFORE it can reach the real database on deploy. No API token and no
+      # database_id are needed for --local, so it runs on every PR (including
+      # forks). `db:migrate:local` = `wrangler d1 migrations apply DB --local`.
+      - name: Validate D1 migrations (ephemeral local DB)
+        run: pnpm db:migrate:local
+
       # Catch production-build failures (e.g. a useSearchParams/CSR-bailout that
       # `next build` rejects during static prerender) on every push/PR — these
       # are invisible to lint/typecheck/test and previously only surfaced at

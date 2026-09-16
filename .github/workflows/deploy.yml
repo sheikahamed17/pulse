@@ -49,7 +49,7 @@ jobs:
 
       - name: Verify CRON_SECRET provisioned
         run: |
-          pnpm exec wrangler secret list | grep -q CRON_SECRET || (echo "ERROR: CRON_SECRET not found in wrangler secrets" && exit 1)
+          pnpm exec wrangler secret list --config wrangler.prod.toml | grep -q CRON_SECRET || (echo "ERROR: CRON_SECRET not found in wrangler secrets" && exit 1)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
@@ -60,46 +60,45 @@ jobs:
           command: r2 bucket create pulse-receipts
         continue-on-error: true
 
+      # Apply pending D1 migrations BEFORE deploy, so new code never runs
+      # against an old schema. `wrangler d1 migrations apply` is idempotent —
+      # it tracks applied files in a `d1_migrations` table and runs only what's
+      # pending. This step is intentionally BLOCKING (no continue-on-error): a
+      # broken or failed migration must fail the deploy loudly rather than ship
+      # code against a mismatched schema.
+      #
+      # REQUIRES: CLOUDFLARE_API_TOKEN must include D1 edit scope (as well as
+      # Workers). The default "Edit Cloudflare Workers" template does NOT — with
+      # that token this step fails with `code: 10000` Authentication error.
+      # Regenerate the token with both Workers and D1 scopes (see SELF-HOSTING.md).
+      #
+      # ONE-TIME (pre-existing prod DB only): this repo's production DB had
+      # migrations 0001-0026 applied via `wrangler d1 execute` before this
+      # workflow switched to `migrations apply`, so it has no `d1_migrations`
+      # tracking table. Backfill it ONCE before the first run of this step, or
+      # the step will try to re-apply 0001 and fail on "table already exists":
+      #   wrangler d1 execute pulse --remote --command \
+      #     "CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY \
+      #      AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT \
+      #      CURRENT_TIMESTAMP NOT NULL);"
+      #   wrangler d1 execute pulse --remote --command \
+      #     "INSERT OR IGNORE INTO d1_migrations (name) VALUES \
+      #      ('0001_initial.sql'), … ('0026_journal.sql');"
+      # A fresh instance (button / self-host) needs NO backfill — its DB starts
+      # empty and `migrations apply` creates everything from scratch.
+      - name: Apply D1 migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: d1 migrations apply DB --remote --config wrangler.prod.toml
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # `-c wrangler.prod.toml` is REQUIRED: the default wrangler.toml is
+          # id-less (for the Deploy button) and would target a new empty DB.
+          # wrangler.prod.toml carries the production database_id.
           # `wrangler deploy` reads .open-next/worker.js + .open-next/assets/
-          # which were produced by the previous step.
-          command: deploy
-
-      - name: Apply D1 migrations (idempotent)
-        # Allowed to fail without blocking the deploy. The default
-        # "Edit Cloudflare Workers" API token template does not include
-        # D1:Edit permission, so this step errors with `code: 10000`
-        # Authentication error until the token is regenerated with both
-        # Workers and D1 scopes. Phase 0 migrations are applied manually
-        # via `wrangler d1 execute --remote` from a logged-in dev machine.
-        # When the token is upgraded, this step will start succeeding
-        # without any workflow change.
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: d1 execute pulse --remote --file=migrations/0001_initial.sql
-
-      - name: Apply D1 migrations — Phase 1 (idempotent)
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: d1 execute pulse --remote --file=migrations/0002_phase_1_money.sql
-
-      - name: Apply D1 migrations — Phase 2 (idempotent)
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: d1 execute pulse --remote --file=migrations/0003_phase_2_tasks.sql
-
-      - name: Apply D1 migrations — Phase 3 (idempotent)
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: d1 execute pulse --remote --file=migrations/0004_phase_3_insight_push_receipts.sql
+          # produced by the cf:build step above.
+          command: deploy --config wrangler.prod.toml

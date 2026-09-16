@@ -14,9 +14,8 @@ Walk them through the steps below. **The canonical, always-up-to-date reference 
 
 1. **Prereqs** — Node 22 + pnpm; `npm i -g wrangler` then **ask the user to run `wrangler login`**.
 2. `pnpm install`.
-3. **Create resources:** `wrangler d1 create pulse` → put the printed `database_id` into `wrangler.toml` under `[[d1_databases]]` (this is the ONLY per-instance value in that file). `wrangler r2 bucket create pulse-receipts`.
-4. **Migrations:** apply every file in `migrations/` in order (0001 → the highest number) to the remote D1:
-   `wrangler d1 execute pulse --remote --file=migrations/0001_initial.sql` … If `--file` returns a `401`, use `--command "<paste the file's SQL>"` instead (a known Wrangler/OAuth quirk).
+3. **Create resources:** `wrangler d1 create pulse` → add the printed `database_id` under `[[d1_databases]]` in `wrangler.toml`. Note: `wrangler.toml` is the **id-less template** the Deploy button reads (so it can't collide with any real DB); a fresh manual clone must add its own id there. `wrangler.prod.toml` is the upstream production config (carries this repo's live id) — used by CI via `-c`. `wrangler r2 bucket create pulse-receipts`.
+4. **Migrations:** apply all pending in one idempotent command: `wrangler d1 migrations apply DB --remote` (tracks applied files in a `d1_migrations` table; runs only what's pending; references the **binding** `DB`). If an OAuth `401` blocks it, fall back to per-file `wrangler d1 execute pulse --remote --command "<paste the file's SQL>"` in numeric order.
 5. **VAPID keys:** `node scripts/generate-vapid-keys.mjs` → set BOTH keys as secrets in the next step.
 6. **Secrets** (via `wrangler secret put <NAME>`): `BETTER_AUTH_SECRET` (≥32 random chars), `BETTER_AUTH_URL` (the instance URL), `GROQ_API_KEY`, `RESEND_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `CRON_SECRET`. **Secrets are Worker secrets — never write them into the repo.**
 7. **Build & deploy:** `pnpm cf:build && wrangler deploy`. Set `BETTER_AUTH_URL` to the printed URL and redeploy if needed.
@@ -45,7 +44,7 @@ Walk them through the steps below. **The canonical, always-up-to-date reference 
 - **The op_log is truth.** Server materialized tables can be stale/divergent. To diagnose entity state, reconstruct from `op_log` (per id: latest-HLC op is a delete? → gone; else active). Don't trust the server `money`/`categories` tables directly.
 - **Adding a new persisted `entity_kind`** requires BOTH server `src/lib/materialize.ts` AND client `src/lib/sync-client.ts` (`applyLocalOp` + the Dexie transaction list) — the client half is easy to forget; add a test. Adding a new *value* to an existing enum needs neither.
 - **Cloudflare caps cron triggers at 5 per Worker.** Never exceed 5; extra scheduled work rides an existing tick (see the `CRON_SECONDARY` map in `worker.ts`).
-- **Remote D1 migrations:** prefer `wrangler d1 execute pulse --remote --command "<sql>"`; `--file` can 401 under OAuth.
+- **Remote D1 migrations:** the standard path is `wrangler d1 migrations apply DB --remote` (idempotent; the deploy workflow and the Deploy button both run it automatically). For a one-off manual statement, prefer `wrangler d1 execute pulse --remote --command "<sql>"`; `--file` can 401 under OAuth. **Two configs:** `wrangler.toml` is id-less (Deploy-button template); production commands (deploy, migrate) pass `-c wrangler.prod.toml`. Never commit a real `database_id` into `wrangler.toml`.
 - **ESLint `react-hooks/purity`:** never call `Date.now()` in a render body or inside `useMemo` — use `new Date().getTime()` (in a `useMemo`/handler), or the deploy's Lint step fails.
 - **Charts** are inline SVG (no chart library). Follow the dataviz method: form → **validated** palette → marks → hover → a11y. Categorical color follows the **entity** (hash its name), never its rank; never a dual-axis; series colors must not reuse the categorical hues.
 - **Money amounts are minor units** — divide by 100 for display, except **JPY** (whole). Currency conversion goes through `convertViaRates` (fallback to 0 on a missing rate).
@@ -60,11 +59,11 @@ Walk them through the steps below. **The canonical, always-up-to-date reference 
 - `migrations/` — D1 schema; apply in numeric order.
 - `scripts/` — icon generation, service-worker build, VAPID keygen, router eval.
 - `docs/superpowers/` — design specs + implementation plans.
-- `wrangler.toml` — Worker config; the only per-instance value is your `database_id`.
+- `wrangler.toml` — id-less Worker config (the Deploy-button template); `wrangler.prod.toml` — same config plus the production resource IDs, used by CI via `-c`.
 
 ## Guardrails — do NOT
 
 - Hardcode secrets or API keys anywhere in the repo — they are Worker secrets (`wrangler secret put`) / GitHub Actions secrets.
-- Put anything but your own `database_id` as per-instance config in `wrangler.toml`; keep `EMAIL_FROM` as the Resend sandbox sender unless the user verifies a domain.
+- Commit a real `database_id` (or any real resource ID) into `wrangler.toml` — it is the id-less Deploy-button template; production IDs live only in `wrangler.prod.toml`. Keep `EMAIL_FROM` as the Resend sandbox sender unless the user verifies a domain.
 - Exceed 5 cron triggers; add a heavy dependency (e.g. a chart library) without a real need.
 - Push to `main` without the full gate green, or skip `pnpm lint`.

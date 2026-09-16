@@ -1,0 +1,38 @@
+# Pulse — runtime Worker secrets.
+#
+# The "Deploy to Cloudflare" button reads this file and prompts for each value
+# during one-click setup, then stores them as encrypted Worker secrets. For a
+# manual deploy, copy this to `.dev.vars` (git-ignored) for `wrangler dev`, and
+# set each on the deployed Worker with `wrangler secret put <NAME>`.
+#
+# EMAIL_FROM is NOT here — it's a non-secret var with a working default in
+# wrangler.toml. NEXT_PUBLIC_VAPID_PUBLIC_KEY is NOT here either — it's baked
+# into the client at BUILD time, so it must be set as a Workers Builds *build*
+# variable (see README → push notifications), not as a runtime secret.
+
+# --- Auth (required) ---
+# 32+ random chars. Generate: `openssl rand -hex 32`
+BETTER_AUTH_SECRET=
+# Your deployed instance URL, e.g. https://pulse.<you>.workers.dev
+# (For local dev: http://localhost:3000)
+BETTER_AUTH_URL=
+
+# --- AI (required for capture, voice, insights) ---
+# Free key from https://console.groq.com
+GROQ_API_KEY=
+
+# --- Email magic-link sign-in (required to receive the login link) ---
+# Free key from https://resend.com. On the free tier the default sender
+# (onboarding@resend.dev, set in wrangler.toml) only delivers to your own
+# Resend signup email — which is all a single-user instance needs.
+RESEND_API_KEY=
+
+# --- Web push notifications (optional) ---
+# Generate both with: `node scripts/generate-vapid-keys.mjs`
+# Push also needs NEXT_PUBLIC_VAPID_PUBLIC_KEY set as a build variable — see README.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+
+# --- Cron authentication (required) ---
+# Any long random string; guards the scheduled endpoints. `openssl rand -hex 32`
+CRON_SECRET=

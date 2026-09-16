@@ -2,7 +2,9 @@
 
 Pulse is a **local-first, single-user** personal life-OS (money + tasks + learning + notes, voice/NL capture, weekly digests). Because it's local-first and runs entirely on your own free-tier cloud, the right way to use it is to **deploy your own copy** — your data, your API keys, your quota, fully isolated from anyone else's. This guide takes you from a clone to a live instance in about 20 minutes.
 
-> **Prefer to let AI do it?** Open the repo in [Claude Code](https://claude.com/claude-code) and ask it to *"set up this project for me."* It follows [`CLAUDE.md`](./CLAUDE.md) (the repo's agent instructions) and runs these same steps with you — you still supply your own Cloudflare / Groq / Resend accounts. This document is the manual path (and the reference the AI path uses).
+> **Just want it running?** Use the **[Deploy to Cloudflare button](./README.md#one-click-deploy-recommended)** — it provisions a fresh D1 + R2 in your account, prompts for the secrets, applies the migrations, and deploys, all in one click. This document is the **manual** path, for when you want to run each step yourself (and it's the reference the button and the Claude Code path both mirror).
+
+> **Prefer to let AI do it?** Open the repo in [Claude Code](https://claude.com/claude-code) and ask it to *"set up this project for me."* It follows [`CLAUDE.md`](./CLAUDE.md) (the repo's agent instructions) and runs these same steps with you — you still supply your own Cloudflare / Groq / Resend accounts.
 
 ## What you need (all have free tiers)
 
@@ -27,19 +29,31 @@ wrangler d1 create pulse                    # note the printed database_id
 wrangler r2 bucket create pulse-receipts
 ```
 
-In `wrangler.toml`, replace the `database_id` under `[[d1_databases]]` with **your** new D1 id. (Enable R2 in the Cloudflare dashboard once if prompted.)
+`wrangler.toml` ships **without** a `database_id` — that's deliberate, and it's what lets the one-click button provision a fresh database per person. Add **your** new id under `[[d1_databases]]`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "pulse"
+database_id = "<your new D1 id from the command above>"
+migrations_dir = "migrations"
+```
+
+(Enable R2 in the Cloudflare dashboard once if prompted.)
+
+> The committed `wrangler.prod.toml` is the **upstream** production config — it carries *this repo's* live id, not yours. Ignore it for a manual deploy. Only touch it if you want GitHub Actions auto-deploy (see Notes), in which case replace its id with yours.
 
 ## 3. Apply the database migrations
 
-Run every file in `migrations/` (0001 → 0014) against your remote D1, in order:
+Apply every file in `migrations/` to your remote D1 with one idempotent command — it tracks which migrations have run (in a `d1_migrations` table) and applies only the pending ones, in order:
 
 ```bash
-wrangler d1 execute pulse --remote --file=migrations/0001_initial.sql
-wrangler d1 execute pulse --remote --file=migrations/0002_phase_1_money.sql
-# …continue through every file up to 0014_user_prefs_sms_token.sql
+wrangler d1 migrations apply DB --remote
 ```
 
-> If `--file` returns a `401` with an OAuth login, apply each as `--command "<paste the file's SQL>"` instead — a known Wrangler quirk with OAuth tokens.
+This is the exact command the deploy workflow (and the one-click button) run automatically on every deploy, so your database always matches the code.
+
+> If you hit an OAuth `401`, apply the files individually instead — in numeric order, `0001` → the highest — with `wrangler d1 execute pulse --remote --command "<paste that file's SQL>"` (a known Wrangler quirk with OAuth tokens; `--file` can 401 where `--command` succeeds).
 
 ## 4. Generate your Web-Push (VAPID) keys
 
@@ -83,6 +97,6 @@ After signing in, add a **passkey** (Settings → Security) for Face ID / one-ta
 ## Notes
 
 - **Free-tier reality:** Groq's free *daily* quota is modest but fine for one person; Cloudflare Workers/D1/R2 free tiers are plenty for personal use. This is exactly why one instance *per person* beats a shared one — you each get your own quota.
-- **Auto-deploy (optional):** to redeploy on every `git push`, add a `CLOUDFLARE_API_TOKEN` GitHub Actions **secret** (with Workers **and** D1 edit scopes) and a `NEXT_PUBLIC_VAPID_PUBLIC_KEY` Actions **variable** — the bundled `.github/workflows/deploy.yml` does the rest.
+- **Auto-deploy (optional):** to redeploy on every `git push`, add a `CLOUDFLARE_API_TOKEN` GitHub Actions **secret** and a `NEXT_PUBLIC_VAPID_PUBLIC_KEY` Actions **variable** — the bundled `.github/workflows/deploy.yml` does the rest. The token needs **both** Workers *and* D1 edit scopes: the workflow applies any pending migrations (`wrangler d1 migrations apply`) before deploying, and that fails without the D1 scope. The workflow deploys via `-c wrangler.prod.toml`, so put **your** id in that file (see step 2). (The one-click button uses Cloudflare's own Workers Builds instead and needs none of this.)
 - **Transaction auto-import (optional):** Settings → "Auto-import transactions" works on your instance too (Google Apps Script → your endpoint; see the in-app steps).
 - **Everything is yours:** your entries live in your browser (Dexie) and sync to *your* D1. Nothing is shared with the upstream repo or its author.

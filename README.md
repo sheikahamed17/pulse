@@ -13,7 +13,12 @@ Ask *"how much did I spend on food this month?"* out loud and hear the answer. S
 [![Tests](https://img.shields.io/badge/tests-1257%20passing-3FB950)](#testing)
 [![Release](https://img.shields.io/github/v/release/sheikahamed17/pulse?color=6E7BFF&label=release)](https://github.com/sheikahamed17/pulse/releases)
 
-[**Run your own copy →**](./SELF-HOSTING.md)
+<br/>
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/sheikahamed17/pulse)
+
+**Deploy your own private instance in one click** — your Cloudflare account, your data, your keys.<br/>
+Or [set it up manually →](./SELF-HOSTING.md)
 
 </div>
 
@@ -113,12 +118,28 @@ Plus two non-finance domains that round out daily self-tracking: 🔥 **Habits &
 
 Pulse is **single-user by design** — you deploy your **own** copy (your data, your API keys, your free-tier quota, fully isolated). Everything you need has a free tier.
 
-**Two ways to stand up your own instance:**
+### One-click deploy (recommended)
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/sheikahamed17/pulse)
+
+The button clones this repo into your GitHub, provisions a **fresh, isolated D1 database and R2 bucket** in your own Cloudflare account, prompts you for the secrets below, **runs the database migrations, and deploys** — then wires up automatic redeploys on every push. You'll be asked for:
+
+- **`GROQ_API_KEY`** — free at [console.groq.com](https://console.groq.com) (voice + natural-language capture, insights)
+- **`RESEND_API_KEY`** — free at [resend.com](https://resend.com) (sends your magic-link sign-in email)
+- **`BETTER_AUTH_SECRET`** and **`CRON_SECRET`** — any long random strings (`openssl rand -hex 32`)
+- **`BETTER_AUTH_URL`** — your instance URL; you can set a placeholder now and fix it after the first deploy prints the real one
+- **`VAPID_PUBLIC_KEY`** / **`VAPID_PRIVATE_KEY`** — optional, push only (`node scripts/generate-vapid-keys.mjs`)
+
+Then sign in with your **Resend-account email** (the free sandbox sender only mails you) — no custom domain needed.
+
+> **Push notifications** (budget alerts, bill/salary reminders) also need `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — the **same value** as `VAPID_PUBLIC_KEY` — set as a **build variable** in Workers Builds (your Worker → Settings → Build → *Variables and secrets*), because it's inlined into the app at build time. Everything else works without it.
+
+### Manual setup (advanced)
+
+Prefer to run every step yourself, or have Claude Code do it interactively?
 
 - **A · Let Claude Code do it.** Open this repo in [Claude Code](https://claude.com/claude-code) and ask it to *"set up this project for me."* It reads [`CLAUDE.md`](./CLAUDE.md) — the project's instructions for AI agents — and walks you through creating your Cloudflare / Groq / Resend resources, applying migrations, setting secrets, and deploying.
-- **B · Do it by hand.** Follow **[SELF-HOSTING.md](./SELF-HOSTING.md)**: clone → create D1 + R2 → apply migrations → set secrets → `wrangler deploy`. ~20 minutes.
-
-Either way you sign in with your **Resend-account email** (the free sandbox sender only mails you) — no custom domain needed.
+- **B · Do it by hand.** Follow **[SELF-HOSTING.md](./SELF-HOSTING.md)**: clone → create D1 + R2 → apply migrations → set secrets → deploy. ~20 minutes.
 
 ### Install it
 

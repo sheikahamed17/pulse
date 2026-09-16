@@ -1,3 +1,16 @@
+# ⚠️ TEMPLATE CONFIG — intentionally has NO resource IDs.
+#
+# This file is what the "Deploy to Cloudflare" button reads. Leaving
+# `database_id` (and other resource IDs) out is what lets Cloudflare
+# provision a FRESH, isolated D1 + R2 in each person's own account on a
+# one-click deploy, then write the new IDs back into their clone.
+#
+# Because of that, DO NOT run a bare `wrangler deploy` against this file for
+# the production instance — with no `database_id` it would target a new,
+# empty database. Production deploys use `wrangler.prod.toml` (which carries
+# the real IDs) via `-c wrangler.prod.toml`; the GitHub Actions deploy
+# workflow already does this. See SELF-HOSTING.md.
+
 name = "pulse"
 main = "worker.ts"
 compatibility_date = "2026-06-15"
@@ -13,7 +26,10 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "pulse"
-database_id = "df509c20-ed81-4146-941f-6e48e7f1f925"
+# No `database_id`: provisioned per-deploy by the button. Production's real
+# ID lives in wrangler.prod.toml. `migrations_dir` points `wrangler d1
+# migrations apply DB` at migrations/ (its default, set explicitly for clarity).
+migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "RECEIPTS"
