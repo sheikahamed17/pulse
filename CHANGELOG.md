@@ -9,6 +9,9 @@ Each release is also published with notes on
 
 ## [Unreleased]
 
+### Added
+- **First-run setup wizard.** A freshly deployed instance routes every request to a `/setup` wizard until an owner account exists in D1, so a new self-hoster's first action is creating their account — not editing files or running commands. Steps: welcome → create account (email magic-link) → verify the Groq key actually works (a real pass/fail check) → optional email auto-import → done, then into the app. The gate is enforced in middleware from the `user` table (not a cookie), so a deep link can't slip past it, and it never reappears once an owner exists. ([a8623aa](https://github.com/sheikahamed17/pulse/commit/a8623aa))
+
 ### Changed
 - Converted the repository to a **GitHub template** — visitors can click "Use this template" to create their own independent copy. Docs (README, SELF-HOSTING, CLAUDE.md) now lead the "get your own copy" path with the template step, complementing the existing one-click deploy and manual paths. ([1c45cb1](https://github.com/sheikahamed17/pulse/commit/1c45cb1))
 
