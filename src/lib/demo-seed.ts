@@ -48,12 +48,12 @@ function buildSeeds(): Seed[] {
     { id: 'demo-cat-shopping', name: 'Shopping', kind: 'spend', icon: '🛍️' },
     { id: 'demo-cat-salary', name: 'Salary', kind: 'income', icon: '💼' },
   ]
-  cats.forEach((c, i) => add('category', c.id, daysAgo(30), { name: c.name, kind: c.kind, icon: c.icon, sort_order: i, is_archived: null }))
+  cats.forEach((c, i) => add('category', c.id, daysAgo(30), { name: c.name, kind: c.kind, icon: c.icon, sort_order: i }))
 
   // --- Accounts (minor units) ---
-  add('account', 'demo-acct-bank', daysAgo(30), { name: 'Everyday Bank', type: 'asset', opening_balance: 4200000, currency: 'INR', icon: '🏦', is_archived: null })
-  add('account', 'demo-acct-card', daysAgo(30), { name: 'Rewards Card', type: 'liability', opening_balance: -850000, currency: 'INR', icon: '💳', is_archived: null })
-  add('account', 'demo-acct-savings', daysAgo(30), { name: 'Savings', type: 'asset', opening_balance: 12000000, currency: 'INR', icon: '🐷', is_archived: null })
+  add('account', 'demo-acct-bank', daysAgo(30), { name: 'Everyday Bank', type: 'asset', opening_balance: 4200000, currency: 'INR', icon: '🏦' })
+  add('account', 'demo-acct-card', daysAgo(30), { name: 'Rewards Card', type: 'liability', opening_balance: -850000, currency: 'INR', icon: '💳' })
+  add('account', 'demo-acct-savings', daysAgo(30), { name: 'Savings', type: 'asset', opening_balance: 12000000, currency: 'INR', icon: '🐷' })
 
   // --- Money (minor units, mixed categories/accounts/dates) ---
   const money = [
@@ -89,7 +89,7 @@ function buildSeeds(): Seed[] {
   add('budget', 'demo-budget-shopping', daysAgo(30), { category_id: 'demo-cat-shopping', amount: 800000, currency: 'INR' })   // over
 
   // --- Savings goal (manual progress) ---
-  add('goal', 'demo-goal-coast', daysAgo(30), { name: 'Trip to the coast', target_amount: 5000000, saved_amount: 3200000, currency: 'INR', icon: '🏖️', account_id: null, target_date: daysAhead(90), is_archived: null })
+  add('goal', 'demo-goal-coast', daysAgo(30), { name: 'Trip to the coast', target_amount: 5000000, saved_amount: 3200000, currency: 'INR', icon: '🏖️', account_id: null, target_date: daysAhead(90) })
 
   // --- Recurring: an upcoming bill + a monthly savings sweep transfer ---
   add('recurring', 'demo-recur-bill', daysAgo(30), {
@@ -105,8 +105,8 @@ function buildSeeds(): Seed[] {
   })
 
   // --- Projects + tasks (some done, some due soon, one with sub-tasks) ---
-  add('project', 'demo-proj-home', daysAgo(20), { name: 'Home', color: '#6f7bff', archived: null })
-  add('project', 'demo-proj-personal', daysAgo(20), { name: 'Personal', color: '#34e6ff', archived: null })
+  add('project', 'demo-proj-home', daysAgo(20), { name: 'Home', color: '#6f7bff' })
+  add('project', 'demo-proj-personal', daysAgo(20), { name: 'Personal', color: '#34e6ff' })
   const tasks: Array<[string, string | null, string | null, string | null, number]> = [
     // title, due_at, completed_at, project_id, ago
     ['Pay the card bill', daysAhead(3), null, 'demo-proj-home', 6],
@@ -160,7 +160,7 @@ function buildSeeds(): Seed[] {
   ]
   habits.forEach(([name, icon, streak], hi) => {
     const habitId = `demo-habit-${hi}`
-    add('habit', habitId, daysAgo(40), { name, icon, is_archived: null, schedule: null })
+    add('habit', habitId, daysAgo(40), { name, icon, schedule: null })
     for (let d = 0; d < streak; d++) {
       const day = dayStr(d)
       add('habit_log', `hlog-${habitId}-${day}`, daysAgo(d), { habit_id: habitId, day })
