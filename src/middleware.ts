@@ -19,11 +19,18 @@ export async function middleware(req: NextRequest) {
   let usersExist = ownerExists
   if (!usersExist) {
     const db = (getCloudflareContext().env as { DB?: D1Database }).DB
-    // Fail open — a missing binding must never lock the whole app out.
+    // Fail open — a missing binding, a transient D1 error, or a pre-migration
+    // state must never 500 every route and lock the whole instance out. On any
+    // failure we let the request through (the client auth/login flow still
+    // works); the gate simply doesn't force /setup this time.
     if (!db) return NextResponse.next()
-    const row = await db.prepare('SELECT 1 FROM user LIMIT 1').first()
-    usersExist = Boolean(row)
-    if (usersExist) ownerExists = true
+    try {
+      const row = await db.prepare('SELECT 1 FROM user LIMIT 1').first()
+      usersExist = Boolean(row)
+      if (usersExist) ownerExists = true
+    } catch {
+      return NextResponse.next()
+    }
   }
 
   const target = middlewareRedirect({ usersExist, pathname })

@@ -12,10 +12,14 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const { env } = getCloudflareContext()
   const cfEnv = env as { DB: D1Database; RESEND_API_KEY?: string; EMAIL_FROM?: string }
-  const db = createDb(cfEnv.DB)
-  const row = await db.selectFrom('user').select('id').limit(1).executeTakeFirst()
-  return NextResponse.json({
-    usersExist: Boolean(row),
-    emailConfigured: isEmailConfigured(cfEnv),
-  })
+  const emailConfigured = isEmailConfigured(cfEnv)
+  try {
+    const db = createDb(cfEnv.DB)
+    const row = await db.selectFrom('user').select('id').limit(1).executeTakeFirst()
+    return NextResponse.json({ usersExist: Boolean(row), emailConfigured })
+  } catch {
+    // D1 blip — degrade to "fresh instance" (matching the client-side fallback)
+    // so the wizard still renders instead of 500ing.
+    return NextResponse.json({ usersExist: false, emailConfigured })
+  }
 }
