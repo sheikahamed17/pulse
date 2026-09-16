@@ -10,7 +10,7 @@ Ask *"how much did I spend on food this month?"* out loud and hear the answer. S
 [![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers%20%C2%B7%20D1%20%C2%B7%20R2-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
 [![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&logoColor=white)](#install-it)
-[![Tests](https://img.shields.io/badge/tests-1257%20passing-3FB950)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1259%20passing-3FB950)](#testing)
 [![Release](https://img.shields.io/github/v/release/sheikahamed17/pulse?color=6E7BFF&label=release)](https://github.com/sheikahamed17/pulse/releases)
 
 <br/>
@@ -40,6 +40,7 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 - 📊 **Spending trends** — a dedicated analytics view: spend / income / net over time, top movers, and per-category small multiples.
 - 🧩 **Split transactions** — allocate one payment across several categories, so budgets and analytics stay accurate.
 - 📲 **Installable PWA** — add to home screen; push notifications for budget alerts and follow-ups.
+- 🚀 **One-click deploy** — the *Deploy to Cloudflare* button stands up your own isolated instance (database, storage, and schema migrations) on the free tier in a single click.
 
 ## Features
 
@@ -63,6 +64,7 @@ Plus two non-finance domains that round out daily self-tracking: 🔥 **Habits &
 - **Split transactions.** Allocate one payment across several categories; each part flows into budgets and analytics as a normal entry.
 - **Cards & debts.** A per-card view: what's owed now, this month's spend charged to it, and the last payment made.
 - **Salary reminder.** An opt-in monthly nudge on the last working day to log income that arrives with no email trail.
+- **Manual exchange rates.** Money is multi-currency with daily ECB FX; for any currency the ECB feed doesn't list, set your own `1 EUR = N` rate so those amounts still convert into your primary currency.
 
 ### Intelligence
 - **Router → domain agents.** A small model classifies your input into one of ~10 intents; a per-domain agent extracts structured fields.
@@ -75,6 +77,8 @@ Plus two non-finance domains that round out daily self-tracking: 🔥 **Habits &
 - **Manual add** on any tab, with back-dating for money entries.
 - **Categorize-on-ingest.** Auto-imported transactions arrive with a one-tap category picker and a push notification.
 - **Email auto-ingest.** A Gmail filter + a tiny Google Apps Script forwards bank alerts to your instance — the only truly hands-off path on iOS.
+- **Auto-detect the account.** An imported bank or card alert is matched to the right account from the card/merchant it mentions (via per-account patterns you set), so balances stay correct with no manual picking.
+- **SMS auto-ingest (iOS).** For the alerts your bank sends by text instead of email, an Apple Shortcut forwards them to your instance (Settings → Auto-import from SMS).
 
 ### Organize & analyze
 - **Category management.** Rename, set icons, archive/restore, and **merge duplicates** (reassigning their entries) in Settings → Categories.
