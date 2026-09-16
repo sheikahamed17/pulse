@@ -2,6 +2,8 @@
 
 Pulse is a **local-first, single-user** personal life-OS (money + tasks + learning + notes, voice/NL capture, weekly digests). Because it's local-first and runs entirely on your own free-tier cloud, the right way to use it is to **deploy your own copy** — your data, your API keys, your quota, fully isolated from anyone else's. This guide takes you from your own copy of the template to a live instance in about 20 minutes.
 
+> **Just want to look around first?** [Try the live demo](https://pulse-demo.sdsheikahamed.workers.dev) — fully seeded, no sign-up, resets every 4 hours.
+
 > **Just want it running?** Use the **[Deploy to Cloudflare button](./README.md#one-click-deploy-recommended)** — it provisions a fresh D1 + R2 in your account, prompts for the secrets, applies the migrations, and deploys, all in one click. This document is the **manual** path, for when you want to run each step yourself (and it's the reference the button and the Claude Code path both mirror).
 
 > **Prefer to let AI do it?** Open the repo in [Claude Code](https://claude.com/claude-code) and ask it to *"set up this project for me."* It follows [`CLAUDE.md`](./CLAUDE.md) (the repo's agent instructions) and runs these same steps with you — you still supply your own Cloudflare / Groq / Resend accounts.

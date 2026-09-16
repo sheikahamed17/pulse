@@ -3,6 +3,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { getSession } from '@/lib/auth'
 import { createDb } from '@/lib/db'
+import { isDemoMode } from '@/lib/demo'
 import { makeGroqClient } from '@/lib/agents/llm-client'
 import { groqWhisper } from '@/lib/agents/whisper'
 import { routeIntent } from '@/lib/agents/router'
@@ -33,6 +34,12 @@ export async function POST(req: Request) {
   const session = await getSession(req)
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const userId = session.user.id
+
+  // Voice transcription is a real Groq (Whisper) call — never run it in the
+  // public demo (shared quota). The mic is also hidden client-side in demo mode.
+  if (isDemoMode(getCloudflareContext().env as { DEMO_MODE?: string })) {
+    return NextResponse.json({ transcript: '', intent: null, confidence: 0, payload: null, demoLimited: true })
+  }
 
   const formData = await req.formData().catch(() => null)
   if (!formData) return NextResponse.json({ error: 'expected multipart/form-data' }, { status: 400 })

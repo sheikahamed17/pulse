@@ -1,0 +1,62 @@
+name: Deploy Demo to Cloudflare Workers
+
+# Separate from the production deploy pipeline. Deploys the public demo Worker
+# (pulse-demo) on every push to main, so the demo always tracks the latest code.
+# Every command is scoped by `-c wrangler.demo.toml`, whose D1/R2 ids differ from
+# production's — this workflow can never write production's bindings.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-demo-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-demo:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The production CI/deploy workflows already run lint/typecheck/test on the
+      # same commit; here we just build the Worker and ship it to the demo.
+      - name: Build for Cloudflare (Next.js + OpenNext)
+        env:
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+        run: pnpm cf:build
+
+      - name: Create demo R2 bucket (idempotent)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: r2 bucket create pulse-demo-receipts
+        continue-on-error: true
+
+      - name: Apply D1 migrations to the DEMO database
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: d1 migrations apply DB --remote --config wrangler.demo.toml
+
+      - name: Deploy the demo Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: deploy --config wrangler.demo.toml

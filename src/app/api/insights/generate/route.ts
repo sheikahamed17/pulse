@@ -3,6 +3,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { getSession } from '@/lib/auth'
 import { createDb } from '@/lib/db'
+import { isDemoMode } from '@/lib/demo'
 import { makeGroqClient } from '@/lib/agents/llm-client'
 import { currentWeekBounds } from '@/lib/digest-window'
 import { generateInsight } from '@/lib/insight-generate'
@@ -16,7 +17,12 @@ export async function POST(req: Request) {
   const userId = session.user.id
 
   const { env } = getCloudflareContext()
-  const cfEnv = env as { DB: D1Database; GROQ_API_KEY?: string }
+  const cfEnv = env as { DB: D1Database; DEMO_MODE?: string; GROQ_API_KEY?: string }
+  // Demo insights are pre-seeded; live generation would spend the shared Groq
+  // quota, so it's disabled (the refresh button is hidden client-side too).
+  if (isDemoMode(cfEnv)) {
+    return NextResponse.json({ error: 'disabled_in_demo', message: 'Insights are pre-generated in the demo.' }, { status: 200 })
+  }
   const db = createDb(cfEnv.DB)
   const groq = cfEnv.GROQ_API_KEY ? makeGroqClient(cfEnv.GROQ_API_KEY) : null
 

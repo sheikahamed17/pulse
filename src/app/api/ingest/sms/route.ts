@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { createDb } from '@/lib/db'
+import { isDemoMode } from '@/lib/demo'
 import { makeGroqClient } from '@/lib/agents/llm-client'
 import { parseSms } from '@/lib/agents/sms-agent'
 import { parseIngestToken, hashSecret } from '@/lib/ingest-token'
@@ -22,7 +23,10 @@ export async function POST(req: Request) {
   if (!parsed) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
 
   const { env } = getCloudflareContext()
-  const cfEnv = env as { DB: D1Database; GROQ_API_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_PUBLIC_KEY?: string }
+  const cfEnv = env as { DB: D1Database; DEMO_MODE?: string; GROQ_API_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_PUBLIC_KEY?: string }
+  // Email/SMS auto-ingest into a shared public database is a content-injection
+  // vector — disabled in demo mode.
+  if (isDemoMode(cfEnv)) return NextResponse.json({ error: 'disabled_in_demo' }, { status: 403 })
   const db = createDb(cfEnv.DB)
 
   const prefs = await db.selectFrom('user_prefs').where('user_id', '=', parsed.userId).selectAll().executeTakeFirst()

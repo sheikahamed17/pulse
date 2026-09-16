@@ -4,6 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { getSession } from '@/lib/auth'
 import { createDb } from '@/lib/db'
+import { isDemoMode, cannedAgentResponse, demoLimitedResponse } from '@/lib/demo'
 import { makeGroqClient } from '@/lib/agents/llm-client'
 import { routeIntent } from '@/lib/agents/router'
 import { parseMoneyEntry } from '@/lib/agents/money-agent'
@@ -49,6 +50,16 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const { env } = getCloudflareContext()
+
+  // DEMO_MODE: never spend the shared Groq quota. Suggested example phrases get
+  // a canned result (same shape as below); anything else returns a friendly
+  // demo-limited response the UI turns into "deploy your own for full AI".
+  if (isDemoMode(env as { DEMO_MODE?: string })) {
+    const nowIso = new Date().toISOString()
+    const canned = cannedAgentResponse(parsed.data.text, parsed.data.categories, nowIso)
+    return NextResponse.json(canned ?? demoLimitedResponse(parsed.data.text))
+  }
+
   const apiKey = (env as { GROQ_API_KEY?: string }).GROQ_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'groq_not_configured' }, { status: 500 })
   const groq = makeGroqClient(apiKey)

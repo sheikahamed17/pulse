@@ -6,6 +6,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { z } from 'zod'
 import { createDb } from '@/lib/db'
 import { sendMagicLinkEmail } from '@/lib/email'
+import { isDemoMode, DEMO_USER } from '@/lib/demo'
 import type { D1Database } from '@cloudflare/workers-types'
 
 // Auth secrets live in the Workers runtime env (set via `wrangler secret put`
@@ -134,11 +135,40 @@ function buildAuth() {
 
 // Per-request handler — Cloudflare context not available at module load
 export async function handler(req: Request) {
+  // DEMO_MODE: no login/signup. Report the fixed demo user for the client's
+  // get-session poll (so authClient.useSession resolves to the demo user and
+  // never redirects to /login), and make sign-in/up/out inert.
+  if (isDemoMode(getCloudflareContext().env as { DEMO_MODE?: string })) {
+    const url = new URL(req.url)
+    if (url.pathname.endsWith('/get-session')) {
+      const nowIso = new Date().toISOString()
+      const expiresAt = new Date(Date.now() + 31_536_000_000).toISOString() // +1y
+      return Response.json({
+        session: { id: 'demo-session', token: 'demo', userId: DEMO_USER.id, expiresAt, createdAt: nowIso, updatedAt: nowIso },
+        user: { id: DEMO_USER.id, email: DEMO_USER.email, name: DEMO_USER.name, emailVerified: true, image: null, createdAt: nowIso, updatedAt: nowIso },
+      })
+    }
+    if (url.pathname.includes('/sign-')) {
+      return Response.json({ status: true })
+    }
+  }
   const auth = buildAuth()
   return auth.handler(req)
 }
 
 export async function getSession(req: Request) {
+  const cfEnv = getCloudflareContext().env as CloudflareEnv & { DEMO_MODE?: string }
+  if (isDemoMode(cfEnv)) {
+    // DEMO_MODE: every visitor is the single fixed demo user — no real sign-in,
+    // no magic link, no cookie. All demo data is shared (see src/lib/demo.ts).
+    return {
+      session: null,
+      user: {
+        id: DEMO_USER.id, email: DEMO_USER.email, name: DEMO_USER.name,
+        emailVerified: true, image: null, createdAt: new Date(), updatedAt: new Date(),
+      },
+    } as unknown as Awaited<ReturnType<ReturnType<typeof buildAuth>['api']['getSession']>>
+  }
   const auth = buildAuth()
   return auth.api.getSession({ headers: req.headers })
 }

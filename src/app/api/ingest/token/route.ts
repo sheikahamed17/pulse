@@ -3,6 +3,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { getSession } from '@/lib/auth'
 import { createDb } from '@/lib/db'
+import { isDemoMode } from '@/lib/demo'
 import { makeIngestToken, hashSecret } from '@/lib/ingest-token'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,11 @@ export async function POST(req: Request) {
   const userId = session.user.id
 
   const { env } = getCloudflareContext()
+  // Email/SMS auto-ingest into a shared public database is a content-injection
+  // vector — disabled in demo mode; the Settings screen is hidden too.
+  if (isDemoMode(env as { DEMO_MODE?: string })) {
+    return NextResponse.json({ error: 'disabled_in_demo' }, { status: 403 })
+  }
   const db = createDb((env as { DB: D1Database }).DB)
 
   const { token, secret } = makeIngestToken(userId)

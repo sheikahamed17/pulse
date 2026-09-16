@@ -3,8 +3,10 @@
 import Link from 'next/link'
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { AuroraBackground } from '@/components/aurora-background'
+import { useDemo } from '@/hooks/use-demo'
 
 export default function SettingsPage() {
+  const { demoMode } = useDemo()
   return (
     <>
       <AuroraBackground />
@@ -58,14 +60,16 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
-        <Link href="/settings/security">
-          <Card className="hover:bg-white/10 transition">
-            <CardHeader>
-              <CardTitle>Security</CardTitle>
-              <CardDescription>Passkeys (Face ID sign-in) and app PIN lock.</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+        {!demoMode && (
+          <Link href="/settings/security">
+            <Card className="hover:bg-white/10 transition">
+              <CardHeader>
+                <CardTitle>Security</CardTitle>
+                <CardDescription>Passkeys (Face ID sign-in) and app PIN lock.</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
         <Link href="/settings/preferences">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>
@@ -74,22 +78,26 @@ export default function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
-        <Link href="/settings/sms-import">
-          <Card className="hover:bg-white/10 transition">
-            <CardHeader>
-              <CardTitle>Auto-import transactions</CardTitle>
-              <CardDescription>Turn bank transaction emails + SMS into money entries automatically.</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link href="/settings/data">
-          <Card className="hover:bg-white/10 transition">
-            <CardHeader>
-              <CardTitle>Data & backup</CardTitle>
-              <CardDescription>Export and import your complete data as JSON or CSV.</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+        {!demoMode && (
+          <Link href="/settings/sms-import">
+            <Card className="hover:bg-white/10 transition">
+              <CardHeader>
+                <CardTitle>Auto-import transactions</CardTitle>
+                <CardDescription>Turn bank transaction emails + SMS into money entries automatically.</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
+        {!demoMode && (
+          <Link href="/settings/data">
+            <Card className="hover:bg-white/10 transition">
+              <CardHeader>
+                <CardTitle>Data & backup</CardTitle>
+                <CardDescription>Export and import your complete data as JSON or CSV.</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
         <Link href="/insights">
           <Card className="hover:bg-white/10 transition">
             <CardHeader>

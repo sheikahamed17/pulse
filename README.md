@@ -17,6 +17,10 @@ Ask *"how much did I spend on food this month?"* out loud and hear the answer. S
 
 <br/>
 
+**[▶ Try the live demo →](https://pulse-demo.sdsheikahamed.workers.dev)** — fully seeded with sample data, no sign-up. Resets every 4 hours.
+
+<br/>
+
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/sheikahamed17/pulse)
 
 **Deploy your own private instance in one click** — your Cloudflare account, your data, your keys.<br/>

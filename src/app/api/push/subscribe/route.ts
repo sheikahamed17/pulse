@@ -4,6 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { getSession } from '@/lib/auth'
 import { createDb } from '@/lib/db'
+import { isDemoMode } from '@/lib/demo'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,12 @@ const UnsubscribeSchema = z.object({
 export async function POST(req: Request) {
   const session = await getSession(req)
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  // Push (un)subscription for a shared anonymous demo user makes no sense and
+  // could notify the wrong visitor — disabled in demo mode; the UI is hidden too.
+  if (isDemoMode(getCloudflareContext().env as { DEMO_MODE?: string })) {
+    return NextResponse.json({ error: 'disabled_in_demo' }, { status: 403 })
+  }
 
   let body: unknown
   try {
@@ -68,6 +75,12 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const session = await getSession(req)
   if (!session?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+
+  // Push (un)subscription for a shared anonymous demo user makes no sense and
+  // could notify the wrong visitor — disabled in demo mode; the UI is hidden too.
+  if (isDemoMode(getCloudflareContext().env as { DEMO_MODE?: string })) {
+    return NextResponse.json({ error: 'disabled_in_demo' }, { status: 403 })
+  }
 
   let body: unknown
   try {

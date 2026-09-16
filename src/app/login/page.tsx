@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Fingerprint } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,13 +9,21 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuroraBackground } from '@/components/aurora-background'
 import { authClient } from '@/lib/auth-client'
+import { useDemo } from '@/hooks/use-demo'
 import { PulseLogo } from '@/components/pulse-logo'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const { demoMode } = useDemo()
   const [email, setEmail] = useState('')
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [showEmail, setShowEmail] = useState(false)
+
+  // The demo has no login — every visitor is already the demo user.
+  useEffect(() => {
+    if (demoMode) router.replace('/app')
+  }, [demoMode, router])
 
   async function handlePasskey() {
     setState('sending'); setErrorMsg('')

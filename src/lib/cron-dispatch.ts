@@ -18,8 +18,16 @@ export const CRON_SECONDARY: Record<string, string[]> = {
   '0 3 * * *': ['/api/cron/budgets', '/api/cron/bill-reminders', '/api/cron/salary-reminder'],
 }
 
+// Demo-only reset trigger. Kept SEPARATE from CRON_DISPATCH so the ≤5 guard on
+// the production trigger set stays accurate: the demo Worker (wrangler.demo.toml)
+// fires only this single trigger, and the route itself is DEMO_MODE-gated, so a
+// production Worker that never has this cron pattern can never run it.
+export const CRON_DEMO: Record<string, string> = {
+  '0 */4 * * *': '/api/cron/demo-reset',
+}
+
 export function resolveCronRoute(cron: string): string | null {
-  return CRON_DISPATCH[cron] ?? null
+  return CRON_DISPATCH[cron] ?? CRON_DEMO[cron] ?? null
 }
 
 export function resolveSecondaryCronRoutes(cron: string): string[] {

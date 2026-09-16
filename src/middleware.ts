@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { D1Database } from '@cloudflare/workers-types'
 import { middlewareRedirect } from '@/lib/setup'
+import { isDemoMode } from '@/lib/demo'
 
 // First-run gate: until an owner account exists in D1, force every route to the
 // /setup wizard so a new self-hoster's first action is creating their account.
@@ -15,6 +16,10 @@ export async function middleware(req: NextRequest) {
   // Static assets (anything with a file extension: .js/.png/.svg/.webmanifest…)
   // never gate — the wizard needs its own assets while no user exists.
   if (/\.[a-zA-Z0-9]+$/.test(pathname)) return NextResponse.next()
+
+  // The public demo skips the first-run setup wizard entirely — every visitor
+  // is auto-signed-in as the shared demo user (src/lib/demo.ts).
+  if (isDemoMode(getCloudflareContext().env as { DEMO_MODE?: string })) return NextResponse.next()
 
   let usersExist = ownerExists
   if (!usersExist) {
