@@ -1,0 +1,45 @@
+# Changelog
+
+All notable changes to Pulse are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Each release is also published with notes on
+[GitHub Releases](https://github.com/sheikahamed17/pulse/releases).
+
+## [Unreleased]
+
+Shipped to production since `v1.1.0` (each change goes out behind the CI +
+Cloudflare deploy pipeline on merge to `main`).
+
+### Added
+- **One-click "Deploy to Cloudflare" button** with **automatic D1 migrations on every deploy** (first and subsequent). The button provisions a fresh, isolated D1 database and R2 bucket in the visitor's own Cloudflare account, prompts for secrets, runs the migrations, and deploys. Implemented via an id-less `wrangler.toml` template plus a `wrangler.prod.toml` for CI, a `deploy` npm script that runs `wrangler d1 migrations apply` before `wrangler deploy`, `.dev.vars.example` for secret prompting, and a `cloudflare.bindings` help block. CI now validates every migration against an ephemeral local D1. ([ac49752](https://github.com/sheikahamed17/pulse/commit/ac49752))
+- **`pnpm bundle:report`** — a dev tool that measures per-route First Load JS (gzip transfer size, split into framework / polyfill / app code) from the real build output, since Turbopack prints no size table. ([5233e4c](https://github.com/sheikahamed17/pulse/commit/5233e4c))
+
+### Changed
+- **Performance:** memoized hot render paths — the habits dashboard widget's per-habit streak computation, global search, and the notes/learning list filter+sort. ([e4e92b4](https://github.com/sheikahamed17/pulse/commit/e4e92b4))
+- **Docs:** README refreshed to cover one-click deploy, auto-detect-account on alert imports, SMS auto-ingest, and manual exchange-rate overrides. ([17bda58](https://github.com/sheikahamed17/pulse/commit/17bda58))
+
+### Fixed
+- **Crash on tag-filtered learning/notes with legacy or imported rows.** A learning/note row synced or imported without a `tags` field would crash the page when filtered by tag; all tag paths (filters, lists, query-exec) are now guarded with `(tags ?? [])`, with regression tests. ([e4e92b4](https://github.com/sheikahamed17/pulse/commit/e4e92b4))
+- **`/api/fx/rates` could 500 on many currencies.** The `targets` query parameter was uncapped and could exceed Cloudflare D1's 100-bound-parameter limit; the `IN` query is now chunked to ≤90. ([e4e92b4](https://github.com/sheikahamed17/pulse/commit/e4e92b4))
+
+### Security
+- **Cleared 11 Dependabot alerts** (4 critical, 2 high, 5 moderate): `next` + `eslint-config-next` `16.2.11 → 16.3.5` (two critical advisories), `vitest` + `@vitest/coverage-v8` `→ 4.1.11`, and transitive floors for `browserslist`, `qs`, and `baseline-browser-mapping`. ([9644522](https://github.com/sheikahamed17/pulse/commit/9644522))
+- **CodeQL:** added least-privilege `permissions: contents: read` to the CI workflow, clearing a medium "workflow does not contain permissions" finding. ([e4e92b4](https://github.com/sheikahamed17/pulse/commit/e4e92b4))
+
+## [1.1.0] — 2026-09-15
+
+Splits, recurring transfers, cards & debts, salary reminder, and the journal
+domain, plus two production fixes (sync-500 on large backlogs; money add-form
+crash). Schema migrations `0023 → 0026`. Test suite at 1,257.
+See the [v1.1.0 release notes](https://github.com/sheikahamed17/pulse/releases/tag/v1.1.0).
+
+## [1.0.0] — 2026-08-28
+
+First stable release — the clean starting line.
+See the [v1.0.0 release notes](https://github.com/sheikahamed17/pulse/releases/tag/v1.0.0).
+
+[Unreleased]: https://github.com/sheikahamed17/pulse/compare/v1.1.0...main
+[1.1.0]: https://github.com/sheikahamed17/pulse/releases/tag/v1.1.0
+[1.0.0]: https://github.com/sheikahamed17/pulse/releases/tag/v1.0.0

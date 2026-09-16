@@ -189,6 +189,6 @@ The suite covers the sync engine's convergence invariants, the agent/query pipel
 
 ## Status & license
 
-Pulse is an actively developed **personal project**, deployed to production and used daily. It ships behind a CI + Cloudflare deploy pipeline on every push to `main`, and changes are cut as [tagged releases](https://github.com/sheikahamed17/pulse/releases) (semver from `v1.0.0`).
+Pulse is an actively developed **personal project**, deployed to production and used daily. It ships behind a CI + Cloudflare deploy pipeline on every push to `main`; changes are recorded in the [changelog](./CHANGELOG.md) and cut as [tagged releases](https://github.com/sheikahamed17/pulse/releases) (semver from `v1.0.0`).
 
 No formal open-source license is attached yet — if you'd like to reuse the code, please ask. You're welcome to self-host your own copy for personal use.
