@@ -36,27 +36,22 @@ Most life-trackers make you fill in forms. Pulse flips it: you **say or type one
 
 ## Screenshots
 
-<details>
-<summary><b>📸 See Pulse in action</b> — a few screens (click to expand)</summary>
-
-<br/>
-
-> Screenshots live in [`docs/screenshots/`](docs/screenshots/) — see the [capture guide](docs/screenshots/README.md). Drop the PNGs in with the filenames below and this gallery fills itself; no further edits needed.
+> Captured from the [live demo](https://pulse-demo.sdsheikahamed.workers.dev) — real synthetic data, one instance, no login. See the [capture guide](docs/screenshots/README.md) to refresh them.
 
 <table>
   <tr>
-    <td align="center" width="33%"><img src="docs/screenshots/capture.png" alt="Voice & natural-language capture" width="230" /><br/><sub><b>Capture</b> — one line, any domain</sub></td>
-    <td align="center" width="33%"><img src="docs/screenshots/money.png" alt="Money tab with budgets" width="230" /><br/><sub><b>Money</b> — entries & budgets</sub></td>
-    <td align="center" width="33%"><img src="docs/screenshots/dashboard.png" alt="Dashboard widgets" width="230" /><br/><sub><b>Dashboard</b> — widgets & onboarding</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/capture.jpg" alt="Voice & natural-language capture" width="200" /><br/><sub><b>Capture</b> — one line, any domain</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/money.jpg" alt="Money tab: spend breakdown & filters" width="200" /><br/><sub><b>Money</b> — spend, budgets & filters</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/tasks.jpg" alt="Tasks with projects and sub-tasks" width="200" /><br/><sub><b>Tasks</b> — projects & sub-tasks</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/learn.jpg" alt="Learning notes with tags" width="200" /><br/><sub><b>Learn</b> — tagged learnings</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/analytics.png" alt="Analytics charts" width="230" /><br/><sub><b>Analytics</b> — trends & net worth</sub></td>
-    <td align="center"><img src="docs/screenshots/assistant.png" alt="AI assistant" width="230" /><br/><sub><b>Assistant</b> — ask your data</sub></td>
-    <td align="center"><img src="docs/screenshots/insights.png" alt="Weekly insights" width="230" /><br/><sub><b>Insights</b> — weekly digests</sub></td>
+    <td align="center"><img src="docs/screenshots/notes.jpg" alt="Notes with search and tags" width="200" /><br/><sub><b>Notes</b> — search & tags</sub></td>
+    <td align="center"><img src="docs/screenshots/habits.jpg" alt="Habits with streaks" width="200" /><br/><sub><b>Habits</b> — streaks & schedules</sub></td>
+    <td align="center"><img src="docs/screenshots/analytics.jpg" alt="Analytics: net worth & unusual spending" width="200" /><br/><sub><b>Analytics</b> — net worth & anomalies</sub></td>
+    <td align="center"><img src="docs/screenshots/assistant.jpg" alt="AI assistant: ask your data" width="200" /><br/><sub><b>Assistant</b> — ask your data</sub></td>
   </tr>
 </table>
-
-</details>
 
 ## Highlights
 
