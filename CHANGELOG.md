@@ -9,8 +9,14 @@ Each release is also published with notes on
 
 ## [Unreleased]
 
-Shipped to production since `v1.1.0` (each change goes out behind the CI +
-Cloudflare deploy pipeline on merge to `main`).
+_Nothing yet — changes land here before the next release._
+
+## [1.2.0] — 2026-09-16
+
+One-click "Deploy to Cloudflare" with automatic D1 migrations, two security
+sweeps (Dependabot + CodeQL), a crash fix and a scaling fix, render-performance
+memoizations, and a bundle-measurement tool. Each change shipped to production
+behind the CI + Cloudflare deploy pipeline on merge to `main`.
 
 ### Added
 - **One-click "Deploy to Cloudflare" button** with **automatic D1 migrations on every deploy** (first and subsequent). The button provisions a fresh, isolated D1 database and R2 bucket in the visitor's own Cloudflare account, prompts for secrets, runs the migrations, and deploys. Implemented via an id-less `wrangler.toml` template plus a `wrangler.prod.toml` for CI, a `deploy` npm script that runs `wrangler d1 migrations apply` before `wrangler deploy`, `.dev.vars.example` for secret prompting, and a `cloudflare.bindings` help block. CI now validates every migration against an ephemeral local D1. ([ac49752](https://github.com/sheikahamed17/pulse/commit/ac49752))
@@ -40,6 +46,7 @@ See the [v1.1.0 release notes](https://github.com/sheikahamed17/pulse/releases/t
 First stable release — the clean starting line.
 See the [v1.0.0 release notes](https://github.com/sheikahamed17/pulse/releases/tag/v1.0.0).
 
-[Unreleased]: https://github.com/sheikahamed17/pulse/compare/v1.1.0...main
+[Unreleased]: https://github.com/sheikahamed17/pulse/compare/v1.2.0...main
+[1.2.0]: https://github.com/sheikahamed17/pulse/releases/tag/v1.2.0
 [1.1.0]: https://github.com/sheikahamed17/pulse/releases/tag/v1.1.0
 [1.0.0]: https://github.com/sheikahamed17/pulse/releases/tag/v1.0.0
