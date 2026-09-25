@@ -9,6 +9,9 @@ Each release is also published with notes on
 
 ## [Unreleased]
 
+### Fixed
+- **Responsive layout across all devices and screen sizes.** Two bugs made the app render poorly off phone-width: (1) on `/app`, the grid/flex content column defaulted to `min-width: auto`, so the header (logo + nav icons + Sign out) and capture bar refused to shrink and forced a ~120px horizontal scroll on narrow phones (and pushed the sidebar off-screen at tablet width) — fixed with `min-w-0` + `flex-wrap` so they reflow, plus a global `overflow-x-clip` safety net; (2) every page except `/app` (dashboard, analytics, all of settings, habits, journal, insights) was hardcoded to a fixed 448px column with no responsive breakpoints, stranding content in empty space on tablets/laptops — they now widen to a comfortable centered column on larger screens (`md:max-w-3xl`). No behavior or data changes.
+
 ## [1.3.0] — 2026-09-16
 
 A public **live demo**, a **first-run setup wizard** for self-hosters,

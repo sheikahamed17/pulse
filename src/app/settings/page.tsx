@@ -10,7 +10,7 @@ export default function SettingsPage() {
   return (
     <>
       <AuroraBackground />
-      <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
+      <main className="mx-auto flex w-full max-w-md md:max-w-3xl flex-col gap-4 p-6">
         <h1 className="text-2xl font-semibold">Settings</h1>
         <Link href="/settings/categories">
           <Card className="hover:bg-white/10 transition">

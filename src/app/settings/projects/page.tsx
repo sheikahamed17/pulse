@@ -48,7 +48,7 @@ export default function ProjectsPage() {
   return (
     <>
       <AuroraBackground />
-      <main className="mx-auto flex max-w-md flex-col gap-6 p-6">
+      <main className="mx-auto flex w-full max-w-md md:max-w-3xl flex-col gap-6 p-6">
         <header className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Projects</h1>
           <Button size="sm" variant="ghost" onClick={() => router.push('/settings')}>← Settings</Button>

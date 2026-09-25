@@ -39,7 +39,7 @@ export default function InsightsPage() {
   return (
     <>
       <AuroraBackground />
-      <main className="mx-auto flex max-w-md flex-col gap-4 p-6">
+      <main className="mx-auto flex w-full max-w-md md:max-w-3xl flex-col gap-4 p-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Insights</h1>
           <button

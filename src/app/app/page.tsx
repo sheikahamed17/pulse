@@ -566,13 +566,13 @@ function AppPageInner() {
     <UndoProvider>
       <AuroraBackground />
       <main className="mx-auto grid w-full max-w-6xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:gap-8 md:p-8 md:pb-8 md:grid-cols-[1fr_360px]">
-        <div className="flex flex-col gap-6 md:gap-7">
-          <header className="flex items-center justify-between">
+        <div className="flex min-w-0 flex-col gap-6 md:gap-7">
+          <header className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <PulseLogo className="size-6" />
               <h1 className="text-2xl font-semibold">Pulse</h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-1 md:gap-3">
               <button
                 type="button"
                 aria-label="Search"
@@ -605,7 +605,7 @@ function AppPageInner() {
           <p className="text-xs text-muted-foreground">Signed in as {user.email}</p>
 
           {/* Shared input header — voice + text — dispatches to either tab */}
-          <div className="glass rounded-2xl flex items-center justify-between gap-2 p-3">
+          <div className="glass rounded-2xl flex flex-wrap items-center justify-between gap-2 p-3">
             <div className="flex items-center gap-2">
               <VoiceRecorder
                 disabled={draft !== null || parsing || queryPlan !== null}
@@ -864,7 +864,7 @@ function AppPageInner() {
         </div>
 
         {/* Desktop-only sticky sidebar (right column) */}
-        <aside className="hidden md:block">
+        <aside className="hidden min-w-0 md:block">
           <div className="sticky top-6 flex flex-col gap-4">
             {activeTab === 'money' && <MoneyCard userId={user.id} onSelectCategory={(name) => setMoneyFilter(f => ({ ...f, categoryName: name }))} />}
             {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
