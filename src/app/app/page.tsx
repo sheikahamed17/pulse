@@ -565,7 +565,7 @@ function AppPageInner() {
   return (
     <UndoProvider>
       <AuroraBackground />
-      <main className="mx-auto grid w-full max-w-6xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:gap-8 md:p-8 md:pb-8 md:grid-cols-[1fr_360px]">
+      <main className="mx-auto grid w-full max-w-6xl gap-6 p-6 pb-[calc(6rem_+_env(safe-area-inset-bottom))] md:gap-8 md:p-8 lg:pb-8 lg:grid-cols-[1fr_360px]">
         <div className="flex min-w-0 flex-col gap-6 md:gap-7">
           <header className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -746,7 +746,7 @@ function AppPageInner() {
           <TodayNudge userId={user.id} onGoToTasks={() => setTab('tasks')} />
 
           {/* Desktop tab bar — appears in document flow above the tab content */}
-          <div className="hidden md:block">
+          <div className="hidden lg:block">
             <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
           </div>
 
@@ -864,7 +864,7 @@ function AppPageInner() {
         </div>
 
         {/* Desktop-only sticky sidebar (right column) */}
-        <aside className="hidden min-w-0 md:block">
+        <aside className="hidden min-w-0 lg:block">
           <div className="sticky top-6 flex flex-col gap-4">
             {activeTab === 'money' && <MoneyCard userId={user.id} onSelectCategory={(name) => setMoneyFilter(f => ({ ...f, categoryName: name }))} />}
             {activeTab === 'tasks' && <TaskSummary userId={user.id} />}
@@ -874,8 +874,8 @@ function AppPageInner() {
         </aside>
       </main>
 
-      {/* Mobile-only fixed bottom tab bar */}
-      <div className="md:hidden">
+      {/* Mobile + tablet fixed bottom tab bar (desktop uses the in-flow bar) */}
+      <div className="lg:hidden">
         <TabBar active={activeTab} onChange={setTab} taskBadgeCount={taskBadgeCount} />
       </div>
 
