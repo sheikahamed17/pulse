@@ -131,8 +131,8 @@ export function MoneyCard({ userId, onSelectCategory }: Props) {
               onClick={() => onSelectCategory?.(row.name)}
               className="flex-1 min-h-[44px] flex items-center gap-2 px-2 -mx-2 rounded hover:bg-white/5 active:bg-white/10 transition-colors text-left"
             >
-              <span className="w-12 flex-shrink-0 truncate">{row.icon ?? ''} {row.name}</span>
-              <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <span className="flex-shrink-0 whitespace-nowrap">{row.icon ?? ''} {row.name}</span>
+              <div className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
                 <div className="absolute inset-y-0 left-0 bg-foreground/70" style={{ width: `${(row.amount / Math.max(1, ...bd.rows.map(r => r.amount))) * 100}%` }} />
               </div>
               <span className="font-mono tabular-nums flex-shrink-0">{symbol}{fmt(row.amount)}</span>
